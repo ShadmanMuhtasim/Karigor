@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/backend/">
+    <Project Path="backend/Karigor.Api/Karigor.Api.csproj" />
+    <Project Path="backend/Karigor.Application/Karigor.Application.csproj" />
+    <Project Path="backend/Karigor.Domain/Karigor.Domain.csproj" />
+    <Project Path="backend/Karigor.Infrastructure/Karigor.Infrastructure.csproj" />
+  </Folder>
+</Solution>

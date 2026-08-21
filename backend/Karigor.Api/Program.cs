@@ -1,8 +1,13 @@
+using System.Text;
 using Karigor.Api.Middleware;
+using Karigor.Application.Auth;
 using Karigor.Infrastructure.Models;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using Serilog;
+
 
 // ---------------------------------------------------------------------------
 // Bootstrap Serilog early so all startup events are captured
@@ -32,8 +37,7 @@ try
     // -------------------------------------------------------------------------
     builder.Services.AddDbContext<KarigorDbContext>(options =>
         options.UseSqlServer(
-            builder.Configuration.GetConnectionString("DefaultConnection"),
-            sqlOptions => sqlOptions.EnableRetryOnFailure()));
+            builder.Configuration.GetConnectionString("DefaultConnection")));
 
     // -------------------------------------------------------------------------
     // ASP.NET Core Identity
@@ -48,7 +52,41 @@ try
     .AddDefaultTokenProviders();
 
     // -------------------------------------------------------------------------
-    // CORS — allow Vite dev server
+    // JWT Authentication
+    // -------------------------------------------------------------------------
+    var jwtKey = builder.Configuration["Jwt:Key"]
+        ?? throw new InvalidOperationException("Jwt:Key is not set. Use 'dotnet user-secrets set \"Jwt:Key\" \"...\"'.");
+
+    builder.Services.AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme    = JwtBearerDefaults.AuthenticationScheme;
+    })
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer           = true,
+            ValidateAudience         = true,
+            ValidateLifetime         = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer              = builder.Configuration["Jwt:Issuer"],
+            ValidAudience            = builder.Configuration["Jwt:Audience"],
+            IssuerSigningKey         = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+            ClockSkew                = TimeSpan.Zero  // no slack on expiry
+        };
+    });
+
+    builder.Services.AddAuthorization();
+
+    // -------------------------------------------------------------------------
+    // Application services
+    // -------------------------------------------------------------------------
+    builder.Services.AddScoped<ITokenService, TokenService>();
+    builder.Services.AddScoped<IAuthService, AuthService>();
+
+    // -------------------------------------------------------------------------
+    // CORS — allow Vite dev server with credentials (for httpOnly cookie)
     // -------------------------------------------------------------------------
     const string CorsPolicyName = "ViteDev";
     builder.Services.AddCors(options =>
@@ -59,7 +97,7 @@ try
                   .AllowCredentials()));
 
     // -------------------------------------------------------------------------
-    // Controllers + Swagger
+    // Controllers + Swagger (with JWT Bearer security scheme)
     // -------------------------------------------------------------------------
     builder.Services.AddControllers();
     builder.Services.AddEndpointsApiExplorer();
@@ -72,6 +110,19 @@ try
     // Build
     // -------------------------------------------------------------------------
     var app = builder.Build();
+
+    // Seed roles on startup (idempotent) - inline seed to avoid RoleSeeder dependency
+    using (var scope = app.Services.CreateScope())
+    {
+        var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+        foreach (var roleName in new[] { "Customer", "Worker", "Admin" })
+        {
+            if (!roleManager.RoleExistsAsync(roleName).GetAwaiter().GetResult())
+            {
+                roleManager.CreateAsync(new IdentityRole(roleName)).GetAwaiter().GetResult();
+            }
+        }
+    }
 
     // -------------------------------------------------------------------------
     // Middleware pipeline (ordering matters)

@@ -14,7 +14,6 @@
 - [x] .env file configured with MSSQL_SA_PASSWORD
 
 ## Incomplete Items
-- [ ] Fix circular dependency by removing incorrect reverse references (Domain <-> Infrastructure)
 - [ ] Install Serilog.AspNetCore only in Api (not in Domain/Infrastructure to avoid circular refs)
 - [ ] Start SQL Server via docker-compose (Docker daemon not running)
 - [ ] Apply schema and seed scripts
@@ -42,8 +41,8 @@
 6. Complete Milestone 5 (Deployment preparation)
 
 ## Current Status
-- **Milestone 1**: COMPLETE (Foundation & Architecture)
-- **Milestone 2**: IN_PROGRESS (Docker setup pending)
+- **Milestone 1**: IN PROGRESS
+- **Milestone 2**: IN PROGRESS (Docker setup pending)
 - **Milestone 3**: PENDING (Frontend)
 - **Milestone 4**: PENDING (Integration testing)
 - **Milestone 5**: PENDING (Deployment)

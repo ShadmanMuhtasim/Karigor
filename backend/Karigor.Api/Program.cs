@@ -84,6 +84,7 @@ try
     // -------------------------------------------------------------------------
     builder.Services.AddScoped<ITokenService, TokenService>();
     builder.Services.AddScoped<IAuthService, AuthService>();
+    builder.Services.AddScoped<Karigor.Application.Worker.IWorkerService, Karigor.Application.Worker.WorkerService>();
 
     // -------------------------------------------------------------------------
     // CORS — allow Vite dev server with credentials (for httpOnly cookie)
@@ -142,6 +143,7 @@ try
     }
 
     app.UseHttpsRedirection();
+    app.UseStaticFiles();   // serves wwwroot/uploads/worker-documents/*
     app.UseCors(CorsPolicyName);
     app.UseAuthentication();
     app.UseAuthorization();

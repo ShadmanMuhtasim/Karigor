@@ -341,3 +341,84 @@ Frontend:
 [PENDING] Manual browser UI verification.
 
 **MILESTONE_2_STATUS=COMPLETE**
+## 2026-08-22 | Milestone 3 - Phase 2 Backend Implementation
+
+**Status:** BUILD VERIFIED (0 Errors, 0 Warnings)
+**Branch:** milestone-3
+**Build command:** `dotnet build Karigor.slnx`
+**Build result:** Build succeeded. 0 Error(s). 0 Warning(s). Time Elapsed 00:00:04.57
+
+### Files Created
+
+**Application Layer - backend/Karigor.Application/Worker/**
+- `IWorkerService.cs` - Service interface; all methods scoped by userId (JWT sub), no client WorkerProfile ID trusted
+- `WorkerService.cs` - Full service implementation; file storage via Stream (framework-agnostic)
+- `DTOs/WorkerProfileDto.cs` - GET profile response DTO
+- `DTOs/UpdateWorkerProfileDto.cs` - PUT profile request DTO with validation attributes
+- `DTOs/SkillDto.cs` - Single skill/category assignment DTO
+- `DTOs/AddSkillsDto.cs` - Batch skill assignment request DTO
+- `DTOs/AvailabilitySlotDto.cs` - Availability slot response DTO
+- `DTOs/SetAvailabilityDto.cs` - Atomic availability replace request DTO (with slot validation)
+- `DTOs/WorkerDocumentDto.cs` - Document list item DTO
+- `DTOs/WorkerDashboardStatsDto.cs` - Dashboard stats DTO (formula documented inline)
+
+**API Layer - backend/Karigor.Api/**
+- `Controllers/WorkerController.cs` - Thin controller, [Authorize(Roles="Worker")] on class
+- `wwwroot/uploads/worker-documents/.gitkeep` - Upload root directory placeholder
+- `Program.cs` - +IWorkerService DI registration, +UseStaticFiles()
+
+**Supporting Changes**
+- `.gitignore` - Added upload exclusion rules (real uploaded files never committed)
+
+### Endpoints Implemented
+
+| Method | Route | Description |
+|--------|-------|-------------|
+| GET    | /api/worker/profile | Get authenticated worker profile + skills |
+| PUT    | /api/worker/profile | Update editable profile fields only |
+| GET    | /api/worker/skills | List assigned skill categories |
+| POST   | /api/worker/skills | Assign one or more categories (batch, duplicate-safe) |
+| DELETE | /api/worker/skills/{categoryId} | Remove a skill (junction row only; category untouched) |
+| GET    | /api/worker/availability | List weekly availability schedule |
+| PUT    | /api/worker/availability | Atomically replace full schedule |
+| GET    | /api/worker/documents | List uploaded documents |
+| POST   | /api/worker/documents | Upload verification document (multipart/form-data) |
+| GET    | /api/worker/dashboard/stats | Computed worker dashboard stats |
+
+### Security Model
+
+- Every endpoint: `[Authorize(Roles = "Worker")]` at controller class level
+- Identity chain: JWT sub -> ApplicationUser.Id -> WorkerProfiles.UserId (server-side only)
+- No client-supplied workerId/profileId accepted
+- Prohibited client modification: UserId, VerificationStatus, AverageRating, Id
+- Document upload: extension whitelist (pdf, jpg, jpeg, png), 10 MB size limit, GUID filenames, relative URL stored (never raw path)
+- Transaction used for atomic availability replacement
+
+### Profile Completion Formula (documented in code)
+  1. Bio not empty         -> +20%
+  2. HourlyRate > 0        -> +20%
+  3. Lat + Lng both set    -> +20%
+  4. At least 1 skill      -> +20%
+  5. At least 1 avail slot -> +20%
+  Total: 100%
+
+### Build Evidence
+
+```
+dotnet build Karigor.slnx
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+Time Elapsed 00:00:04.57
+```
+
+### Verification Status
+
+- [IMPLEMENTED + BUILD VERIFIED] All 10 endpoints
+- [NOT YET RUNTIME VERIFIED] Endpoint behavior (Part 3)
+- [NOT YET VERIFIED] File upload end-to-end storage
+- [PENDING] Frontend integration (Part 4)
+
+### Blockers
+
+None. Ready for Part 3 (Backend Verification / Security Testing).

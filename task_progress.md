@@ -456,3 +456,39 @@
 
 # NEXT
 
+
+## Milestone 3 - Phase 2: Worker Backend Implementation
+
+**Status:** COMPLETE (Build Verified)
+
+### Backend Items Implemented and Build-Verified
+
+- [x] IWorkerService interface created
+- [x] WorkerService implementation created (framework-agnostic, IConfiguration-injected upload path)
+- [x] WorkerController created with class-level [Authorize(Roles="Worker")]
+- [x] GET /api/worker/profile
+- [x] PUT /api/worker/profile (Bio, HourlyRate, Lat, Lng, ServiceRadiusKm only; Id/UserId/VerificationStatus/AverageRating protected)
+- [x] GET /api/worker/skills
+- [x] POST /api/worker/skills (batch, duplicate-safe, category existence verified)
+- [x] DELETE /api/worker/skills/{categoryId} (junction row only)
+- [x] GET /api/worker/availability
+- [x] PUT /api/worker/availability (atomic replace, StartTime < EndTime validated)
+- [x] GET /api/worker/documents
+- [x] POST /api/worker/documents (multipart; ext whitelist; 10MB limit; GUID filename; relative URL stored)
+- [x] GET /api/worker/dashboard/stats (deterministic formula)
+- [x] IWorkerService registered in Program.cs DI
+- [x] UseStaticFiles() added to serve uploads
+- [x] .gitignore updated to exclude uploaded files
+- [x] wwwroot/uploads/worker-documents/.gitkeep created
+- [x] dotnet build Karigor.slnx -> 0 Error(s), 0 Warning(s)
+
+### Not Yet Verified (requires Part 3)
+
+- [ ] Runtime endpoint verification
+- [ ] Role authorization enforcement (401/403 checks)
+- [ ] Duplicate skill prevention runtime test
+- [ ] Availability atomic replace runtime test
+- [ ] Document upload runtime test
+- [ ] Dashboard stats accuracy runtime test
+
+**MILESTONE_3_PART2_STATUS=COMPLETE_BUILD_VERIFIED**

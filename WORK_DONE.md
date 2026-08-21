@@ -422,3 +422,75 @@ Time Elapsed 00:00:04.57
 ### Blockers
 
 None. Ready for Part 3 (Backend Verification / Security Testing).
+
+## 2026-08-22 | Milestone 3 — Part 3 Backend Verification (continued, new agent session)
+
+**Status:** VERIFIED COMPLETE
+
+### 1. Handoff Verification
+- [PASS] Handoff state matched reality: branch milestone-3, clean working tree, build succeeded (0 errors).
+
+### 2. Historical PASS evidence
+- Preserved the 18 previously passed tests (Profile GET/PUT, Skills CRUD, Availability CRUD, PDF upload) without rerunning them fully.
+- Spot-checked GET /api/worker/profile and GET /api/worker/documents to confirm state had not drifted.
+
+### 3. Document Tests
+- [PASS] GET /api/worker/documents after upload: Returns exactly 1 document (Id: 1, Type: NationalId, Status: Pending).
+- [PASS] POST /api/worker/documents (.exe): Rejected with 400 Bad Request.
+- [PASS] POST /api/worker/documents (oversized file >10MB): Rejected with 400 Bad Request.
+- [PASS] DB Integrity: WorkerDocuments table correctly contains only the 1 valid upload; rejected files were not persisted.
+
+### 4. Dashboard Stats
+- [PASS] GET /api/worker/dashboard/stats:
+  - VerificationStatus = "Pending"
+  - TotalSkills = 2
+  - ProfileCompletionPercentage = 100 (Formula: Bio=20, HourlyRate=20, Lat/Lng=20, Skills=20, Availability=20)
+  - AvailabilityStatus = "Available"
+  - AverageRating = 0
+
+### 5. Security (Customer Authorization - 403)
+- [PASS] Customer JWT against GET /api/worker/profile -> 403
+- [PASS] Customer JWT against PUT /api/worker/profile -> 403
+- [PASS] Customer JWT against GET /api/worker/skills -> 403
+- [PASS] Customer JWT against POST /api/worker/skills -> 403
+- [PASS] Customer JWT against DELETE /api/worker/skills/1 -> 403
+- [PASS] Customer JWT against GET /api/worker/availability -> 403
+- [PASS] Customer JWT against PUT /api/worker/availability -> 403
+- [PASS] Customer JWT against GET /api/worker/documents -> 403
+- [PASS] Customer JWT against POST /api/worker/documents -> 403
+- [PASS] Customer JWT against GET /api/worker/dashboard/stats -> 403
+
+### 6. Security (Unauthenticated - 401)
+- [PASS] No token against GET /api/worker/profile -> 401
+- [PASS] No token against GET /api/worker/skills -> 401
+- [PASS] No token against GET /api/worker/dashboard/stats -> 401
+
+### 7. Security (IDOR / Ownership)
+- [PASS] Created Worker2 account.
+- [PASS] Profile isolation: Worker2 requesting profile receives own profile (Id: 4), not Worker1's.
+- [PASS] Skill isolation: Worker2 attempting to delete Worker1's skill (Id 1) gets 404 NotFound.
+- [PASS] Document isolation: Worker2 sees 0 documents, cannot access Worker1's document.
+- [PASS] DB Verification: Worker1's profile, skills, availability, and documents were entirely untouched by Worker2's actions.
+
+### 8. Milestone 2 Regression
+- [PASS] Customer login succeeds.
+- [PASS] Worker login succeeds.
+- [PASS] JWT Validation succeeds.
+- [PASS] Refresh Token Rotation succeeds (received new token via karigor_rt cookie).
+- [PASS] Existing roles still enforced appropriately.
+
+### 9. Final Database Integrity
+- [PASS] WorkerProfiles FK → AspNetUsers (0 orphans)
+- [PASS] WorkerSkills FK → WorkerProfiles (0 orphans)
+- [PASS] WorkerSkills FK → ServiceCategories (0 orphans)
+- [PASS] WorkerAvailability FK → WorkerProfiles (0 orphans)
+- [PASS] WorkerDocuments FK → WorkerProfiles (0 orphans)
+- [PASS] No duplicate WorkerSkill assignments.
+
+### 10. Bugs / Fixes
+- None. Implementation proved robust during exhaustive testing.
+
+### 11. Final Build
+dotnet build Karigor.slnx -> Build succeeded (0 Error(s)).
+
+**MILESTONE_3_PART3_STATUS=COMPLETE**

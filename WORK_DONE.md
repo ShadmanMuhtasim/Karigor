@@ -330,4 +330,14 @@ Frontend:
 
 [PENDING] Manual browser UI verification.
 
+**MILESTONE_2_STATUS=COMPLETE** JWT authentication and role-based authorization verified.
+
+[PASS] Refresh-token rotation, revocation, and reuse detection verified.
+
+[PASS] Frontend authentication architecture implemented.
+
+[PASS] TypeScript and Vite production builds verified.
+
+[PENDING] Manual browser UI verification.
+
 **MILESTONE_2_STATUS=COMPLETE**

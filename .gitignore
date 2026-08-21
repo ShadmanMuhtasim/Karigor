@@ -63,3 +63,8 @@ lerna-debug.log*
 *~
 .DS_Store
 Thumbs.db
+# --------------------------------------------------
+# Worker Document Uploads (never commit real files)
+# --------------------------------------------------
+backend/Karigor.Api/wwwroot/uploads/worker-documents/*
+!backend/Karigor.Api/wwwroot/uploads/worker-documents/.gitkeep

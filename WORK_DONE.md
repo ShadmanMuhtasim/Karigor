@@ -494,3 +494,43 @@ None. Ready for Part 3 (Backend Verification / Security Testing).
 dotnet build Karigor.slnx -> Build succeeded (0 Error(s)).
 
 **MILESTONE_3_PART3_STATUS=COMPLETE**
+
+## 2026-08-22 | Milestone 3 — Part 4 Worker Frontend Implementation
+
+**Status:** IMPLEMENTED + BUILD VERIFIED; browser verification pending.
+
+### Frontend implementation
+
+- [x] `workerApi.ts` implemented using the existing centralized Axios client.
+- [x] `categoryApi.ts` implemented for live `/api/categories`.
+- [x] Worker dashboard upgraded with Overview, Profile, Skills, Availability, and Documents sections.
+- [x] TanStack Query used for Worker server state and mutation invalidation.
+- [x] Profile editing implemented for supported fields.
+- [x] Skills add/delete UI implemented using live service categories.
+- [x] Seven-day availability scheduler implemented.
+- [x] Document upload/list UI implemented.
+- [x] Loading, error, and empty states implemented.
+- [x] Responsive Tailwind layout implemented.
+
+### Files created
+
+- `karigor-client/src/api/workerApi.ts`
+- `karigor-client/src/api/categoryApi.ts`
+- `karigor-client/src/pages/worker/WorkerOverviewTab.tsx`
+- `karigor-client/src/pages/worker/WorkerProfileTab.tsx`
+- `karigor-client/src/pages/worker/WorkerSkillsTab.tsx`
+- `karigor-client/src/pages/worker/WorkerAvailabilityTab.tsx`
+- `karigor-client/src/pages/worker/WorkerDocumentsTab.tsx`
+
+### Files modified
+
+- `karigor-client/src/pages/WorkerDashboard.tsx`
+- `karigor-client/src/App.tsx`
+- `karigor-client/tsconfig.app.json`
+
+### Build verification
+
+Command:
+
+```text
+npm run build

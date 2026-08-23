@@ -11,6 +11,13 @@ export function getAccessToken() {
   return accessToken;
 }
 
+export function getFileUrl(relativeUrl: string): string {
+  const apiOrigin = import.meta.env.VITE_API_URL || 'http://localhost:5253';
+  const origin = apiOrigin.endsWith('/') ? apiOrigin.slice(0, -1) : apiOrigin;
+  const path = relativeUrl.startsWith('/') ? relativeUrl : `/${relativeUrl}`;
+  return `${origin}${path}`;
+}
+
 export const apiClient = axios.create({
   baseURL: '/api',
   headers: { 'Content-Type': 'application/json' },

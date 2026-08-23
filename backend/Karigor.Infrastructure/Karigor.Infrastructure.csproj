@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Karigor.Domain\Karigor.Domain.csproj" />
+    <ProjectReference Include="..\Karigor.Abstractions\Karigor.Abstractions.csproj" />
   </ItemGroup>
 
 </Project>

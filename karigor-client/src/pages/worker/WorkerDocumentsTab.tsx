@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { workerApi } from '../../api/workerApi';
+import { getFileUrl } from '../../api/client';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/card';
 
 export function WorkerDocumentsTab() {
@@ -42,13 +43,13 @@ export function WorkerDocumentsTab() {
     e.preventDefault();
     if (!selectedFile) return;
     setActionMessage(null);
-    
+
     // basic client-side validation
     if (selectedFile.size > 10 * 1024 * 1024) {
       setActionMessage({ type: 'error', text: 'File exceeds 10MB limit.' });
       return;
     }
-    
+
     uploadMutation.mutate({ documentType, file: selectedFile });
   };
 
@@ -76,7 +77,7 @@ export function WorkerDocumentsTab() {
                   <option value="Certification">Professional Certification</option>
                 </select>
               </div>
-              
+
               <div className="flex-1 w-full">
                 <label className="block text-sm font-medium text-gray-400 mb-1">File (PDF/JPG/PNG, max 10MB)</label>
                 <input
@@ -129,9 +130,9 @@ export function WorkerDocumentsTab() {
                     <tr key={doc.id} className="border-b border-gray-800 hover:bg-gray-800/50">
                       <td className="px-4 py-3 text-gray-300 font-medium">{doc.documentType}</td>
                       <td className="px-4 py-3">
-                        <a 
-                          href={doc.fileUrl} 
-                          target="_blank" 
+                        <a
+                          href={getFileUrl(doc.fileUrl)}
+                          target="_blank"
                           rel="noopener noreferrer"
                           className="text-emerald-500 hover:underline"
                         >
@@ -140,8 +141,8 @@ export function WorkerDocumentsTab() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          doc.status === 'Verified' ? 'bg-emerald-900 text-emerald-300' : 
-                          doc.status === 'Rejected' ? 'bg-red-900 text-red-300' : 
+                          doc.status === 'Verified' ? 'bg-emerald-900 text-emerald-300' :
+                          doc.status === 'Rejected' ? 'bg-red-900 text-red-300' :
                           'bg-amber-900 text-amber-300'
                         }`}>
                           {doc.status}

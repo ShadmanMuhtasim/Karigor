@@ -1,6 +1,12 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 using Karigor.Application.Worker.DTOs;
 using Karigor.Infrastructure.Models;
 using Microsoft.EntityFrameworkCore;
+using Karigor.Abstractions.Worker;
 using Microsoft.Extensions.Configuration;
 
 namespace Karigor.Application.Worker;
@@ -8,7 +14,7 @@ namespace Karigor.Application.Worker;
 public class WorkerService : IWorkerService
 {
     private readonly KarigorDbContext _db;
-    private readonly string _uploadRoot;  // absolute path to wwwroot/uploads/worker-documents
+    private readonly IUploadPathProvider _pathProvider;
 
     // Allowed document extensions (lower-case, without dot).
     private static readonly HashSet<string> AllowedExtensions =
@@ -16,12 +22,10 @@ public class WorkerService : IWorkerService
 
     private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
 
-    public WorkerService(KarigorDbContext db, IConfiguration config)
+    public WorkerService(KarigorDbContext db, IUploadPathProvider pathProvider)
     {
         _db = db;
-        // Resolve upload root: prefer explicit config, fall back to sibling wwwroot
-        _uploadRoot = config["WorkerDocuments:UploadPath"]
-            ?? Path.Combine(AppContext.BaseDirectory, "wwwroot", "uploads", "worker-documents");
+        _pathProvider = pathProvider;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -249,7 +253,7 @@ public class WorkerService : IWorkerService
 
     // ─────────────────────────────────────────────────────────────────────────
     // Documents
-    // ─────────────────────────────────────────────────────────────────────────
+    // ────────────────────────────────────────────────────────────────────────
     public async Task<List<WorkerDocumentDto>> GetDocumentsAsync(string userId)
     {
         var profile = await _db.WorkerProfiles
@@ -303,7 +307,8 @@ public class WorkerService : IWorkerService
         // ── Secure storage ────────────────────────────────────────────────────
         // Store under <uploadRoot>/<workerId>/<guid>.<ext>
         // Generated filename → no path traversal, no executable exposure
-        var workerUploadDir = Path.Combine(_uploadRoot, profile.Id.ToString());
+        var uploadRoot = _pathProvider.GetUploadRoot();
+        var workerUploadDir = Path.Combine(uploadRoot, profile.Id.ToString());
         Directory.CreateDirectory(workerUploadDir);   // idempotent
 
         var safeFileName = $"{Guid.NewGuid():N}.{ext}";

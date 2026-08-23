@@ -1,12 +1,15 @@
 using System.Text;
+using System.IO;
 using Karigor.Api.Middleware;
 using Karigor.Application.Auth;
 using Karigor.Infrastructure.Models;
+using Karigor.Infrastructure.Upload;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
+using Karigor.Abstractions.Worker;
 
 
 // ---------------------------------------------------------------------------
@@ -78,6 +81,15 @@ try
     });
 
     builder.Services.AddAuthorization();
+
+    // DI: IUploadPathProvider using host web root
+    builder.Services.AddScoped<IUploadPathProvider>(sp =>
+        new HostWebRootUploadPathProvider(
+            builder.Environment.WebRootPath ?? Path.Combine(builder.Environment.ContentRootPath, "wwwroot")
+        ));
+
+    // Configuration overrides for Application layer
+    // Removed hard-coded path override; path will be provided via DI
 
     // -------------------------------------------------------------------------
     // Application services

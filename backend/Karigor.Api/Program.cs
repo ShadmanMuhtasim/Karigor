@@ -97,6 +97,7 @@ try
     builder.Services.AddScoped<ITokenService, TokenService>();
     builder.Services.AddScoped<IAuthService, AuthService>();
     builder.Services.AddScoped<Karigor.Application.Worker.IWorkerService, Karigor.Application.Worker.WorkerService>();
+    builder.Services.AddScoped<Karigor.Application.Customer.ICustomerService, Karigor.Application.Customer.CustomerService>();
 
     // -------------------------------------------------------------------------
     // CORS — allow Vite dev server with credentials (for httpOnly cookie)

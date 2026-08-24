@@ -1,4 +1,4 @@
-﻿## [2026-08-20 11:04] Empty Directory Verification and Environment Check Setup
+## [2026-08-20 11:04] Empty Directory Verification and Environment Check Setup
 
 **What I did:**
 Verified the working directory is completely empty before starting any work. Created the WORK_DONE.md log file to track all progress throughout the task.
@@ -595,4 +595,67 @@ npm run build```
 - **Build Result**: Backend (0 errors), Frontend (0 TypeScript errors, Vite build succeeded).
 
 **MILESTONE_3_STATUS=COMPLETE**
+
+## 2026-08-24 | Milestone 4 — Customer Module & Service Requests
+
+**Status:** IMPLEMENTED + BUILD VERIFIED (Backend: 0 Errors, Frontend: 0 Errors)  
+**Lead:** Mustakim Musa  
+
+### Summary of Implementation
+
+Implemented the full Customer module for Karigor, mirroring the architecture, security models, and conventions established in Milestones 1–3.
+
+#### 1. Backend Implementation (C# / .NET 10)
+- **Application Layer (`backend/Karigor.Application/Customer/`)**:
+  - `ICustomerService.cs` – Interface for all customer operations scoped by JWT `sub` (User ID).
+  - `CustomerService.cs` – Service implementation with direct `KarigorDbContext` queries, manual DTO mapping, category validation, status filtering, and Haversine distance calculations for worker discovery.
+  - **DTOs (`backend/Karigor.Application/Customer/DTOs/`)**:
+    - `CustomerProfileDto.cs`
+    - `UpdateCustomerProfileDto.cs`
+    - `CreateServiceRequestDto.cs`
+    - `ServiceRequestDto.cs`
+    - `WorkerSearchParamsDto.cs`
+    - `WorkerSearchResultDto.cs`
+    - `WorkerPublicDetailDto.cs`
+    - `CustomerDashboardStatsDto.cs`
+- **API Layer (`backend/Karigor.Api/`)**:
+  - `Controllers/CustomerController.cs` – Enforces `[Authorize(Roles = "Customer")]` on class level; resolves `CustomerProfile` from claims; handles:
+    - `GET /api/customer/profile`
+    - `PUT /api/customer/profile`
+    - `POST /api/customer/requests`
+    - `GET /api/customer/requests` (supports `?status=` query filter)
+    - `GET /api/customer/requests/{id}`
+    - `GET /api/customer/workers/search` (supports category, keyword, rating, distance/radius)
+    - `GET /api/customer/workers/{id}` (public profile view with skills & weekly availability)
+    - `GET /api/customer/dashboard/stats`
+  - `Program.cs` – Registered `ICustomerService` with `AddScoped<ICustomerService, CustomerService>()`.
+
+#### 2. Frontend Implementation (React + TypeScript + Tailwind)
+- **API Client (`karigor-client/src/api/customerApi.ts`)**:
+  - Typed DTOs and Axios client functions for all customer API endpoints.
+- **Customer Dashboard Tabs (`karigor-client/src/pages/customer/`)**:
+  - `CustomerOverviewTab.tsx` – Metrics cards (Total requests, Active, Completed, Bookings), quick action banner, and recent requests list.
+  - `CustomerProfileTab.tsx` – Form to update FullName, Address, and ProfileImageUrl with TanStack Query mutation and feedback messages.
+  - `CustomerRequestsTab.tsx` – Filter requests by status pills (All, Open, InProgress, Completed, Cancelled), responsive request cards, and "+ Create Request" action.
+  - `CustomerSearchTab.tsx` – Search and discover workers by category, keyword, min rating, and distance with GPS geolocation auto-detection.
+- **Pages (`karigor-client/src/pages/`)**:
+  - `CustomerDashboard.tsx` – Upgraded to modern 4-tab dashboard matching `WorkerDashboard.tsx` design system and session header.
+  - `CreateRequestPage.tsx` – Full request creation form with category selector, description, address with auto GPS detection, preferred datetime picker, and optional photo URLs.
+  - `RequestDetailPage.tsx` – Detailed view of a single request with status badge, address, description, photos preview, and quotations placeholder.
+  - `SearchWorkersPage.tsx` – Standalone worker search page.
+  - `WorkerProfilePage.tsx` – Public worker profile page showing skills, hourly rate, average rating, verification status, and weekly availability timetable.
+- **Routing (`karigor-client/src/App.tsx`)**:
+  - Registered customer routes guarded with `<ProtectedRoute requiredRole="Customer">`:
+    - `/customer/dashboard` & `/dashboard/customer`
+    - `/customer/requests/new`
+    - `/customer/requests/:id`
+    - `/customer/search`
+    - `/customer/worker/:id`
+
+### Build Verification
+- **Backend**: `dotnet build Karigor.slnx` → **Build succeeded. 0 Error(s). 0 Warning(s).**
+- **Frontend**: `npm run build` → **TypeScript 0 errors, Vite production build succeeded.**
+
+**MILESTONE_4_STATUS=COMPLETE**
+
 

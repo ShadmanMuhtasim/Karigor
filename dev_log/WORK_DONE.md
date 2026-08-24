@@ -711,6 +711,31 @@ Implemented a complete, high-fidelity UI overhaul for the Karigor client applica
    - When logged in: Visiting `/` redirects to `/home` (or smart dashboard).
    - Dedicated `/home` route available for all users.
 
+## 2026-08-24 | Milestone 5 — Quotations, Negotiation & Booking
+
+**Status:** IMPLEMENTED; frontend build verified. Backend runtime verification is pending local NuGet/SQL availability.
+
+### Backend implementation
+
+- Added `MarketplaceService` and `IMarketplaceService`, with DTOs for quotations, counters, bookings, booking status, and worker-matched open requests.
+- Added `QuotationsController`: worker quote creation and matching open jobs, customer-owned request quotation list, accept (atomic booking creation), and counter-offer endpoints.
+- Added `BookingsController`: customer/worker histories, ownership-protected detail, accepted-quote booking lookup, and worker status updates.
+- All endpoints derive identity from the JWT. Customer/worker ownership checks prevent cross-account access; workers can only update their own bookings. Status progression is `Scheduled → InProgress → Completed` (or cancellation).
+
+### Frontend implementation
+
+- Added a typed `marketplaceApi.ts` client.
+- Customer request details now display live quotations and support accepting one to create a booking or sending a counter-offer.
+- Added the **Bookings** tab to the Customer Dashboard.
+- Added an ownership-protected booking detail page available from customer booking cards.
+- Added **Jobs & Bookings** to the Worker Dashboard: workers see skill-matched requests, send quotations, start jobs, and mark in-progress jobs completed.
+- Reused the established responsive rounded-card layout, colors, dark mode, and tab flow.
+
+### Verification
+
+- **Frontend:** `npm run build` completed successfully; TypeScript and Vite production build passed.
+- **Backend build/runtime tests attempted:** blocked because NuGet restore cannot reach packages (`NU1301` SSL/authentication failures for `Microsoft.SqlServer.Server` and `Microsoft.Data.SqlClient.SNI.runtime`). Endpoint tests also require a configured local SQL Server. No backend test was recorded as passed.
+
 ### Build Verification
 - **Frontend Build**: `npm run build` → **0 TypeScript errors, Vite production build succeeded.**
 - **Backend Build**: `dotnet build Karigor.slnx` → **0 errors, 0 warnings.**

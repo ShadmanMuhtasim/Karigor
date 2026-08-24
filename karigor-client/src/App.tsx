@@ -8,6 +8,10 @@ import { CustomerDashboard } from './pages/CustomerDashboard';
 import { WorkerDashboard } from './pages/WorkerDashboard';
 import { UnauthorizedPage } from './pages/UnauthorizedPage';
 import { Categories } from './pages/Categories';
+import { CreateRequestPage } from './pages/CreateRequestPage';
+import { RequestDetailPage } from './pages/RequestDetailPage';
+import { SearchWorkersPage } from './pages/SearchWorkersPage';
+import { WorkerProfilePage } from './pages/WorkerProfilePage';
 
 /**
  * SmartDashboard — redirects an authenticated user to their
@@ -41,7 +45,7 @@ function App() {
             }
           />
 
-          {/* Role-protected dashboards */}
+          {/* Customer Routes */}
           <Route
             path="/dashboard/customer"
             element={
@@ -50,6 +54,48 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/customer/dashboard"
+            element={
+              <ProtectedRoute requiredRole="Customer">
+                <CustomerDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/customer/requests/new"
+            element={
+              <ProtectedRoute requiredRole="Customer">
+                <CreateRequestPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/customer/requests/:id"
+            element={
+              <ProtectedRoute requiredRole="Customer">
+                <RequestDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/customer/search"
+            element={
+              <ProtectedRoute requiredRole="Customer">
+                <SearchWorkersPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/customer/worker/:id"
+            element={
+              <ProtectedRoute requiredRole="Customer">
+                <WorkerProfilePage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Worker Routes */}
           <Route
             path="/dashboard/worker"
             element={

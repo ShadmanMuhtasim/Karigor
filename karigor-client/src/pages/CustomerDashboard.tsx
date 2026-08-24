@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { Navbar } from '../components/Navbar';
 import { CustomerOverviewTab } from './customer/CustomerOverviewTab';
 import { CustomerRequestsTab } from './customer/CustomerRequestsTab';
 import { CustomerSearchTab } from './customer/CustomerSearchTab';
@@ -8,7 +8,6 @@ import { CustomerProfileTab } from './customer/CustomerProfileTab';
 type CustomerTabId = 'overview' | 'requests' | 'search' | 'profile';
 
 export function CustomerDashboard() {
-  const { user, logoutUser } = useAuth();
   const [activeTab, setActiveTab] = useState<CustomerTabId>('overview');
 
   const tabs: { id: CustomerTabId; label: string }[] = [
@@ -19,45 +18,34 @@ export function CustomerDashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
-      {/* Nav Header */}
-      <header className="border-b border-gray-800 px-6 py-4 flex items-center justify-between sticky top-0 bg-gray-950/80 backdrop-blur z-10">
-        <div className="flex items-center gap-6">
-          <span className="text-xl font-bold text-indigo-400">Karigor</span>
-        </div>
-        <div className="flex items-center gap-4">
-          <span className="hidden sm:inline text-sm text-gray-400">{user?.email}</span>
-          <span className="text-xs bg-indigo-900/80 border border-indigo-700/50 text-indigo-300 px-2.5 py-1 rounded-full font-medium">
-            Customer
-          </span>
-          <button
-            id="customer-logout-btn"
-            onClick={logoutUser}
-            className="text-sm text-gray-400 hover:text-white transition cursor-pointer"
-          >
-            Sign out
-          </button>
-        </div>
-      </header>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-white transition-colors duration-200 flex flex-col">
+      <Navbar />
 
       {/* Main Container */}
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8">
         <div className="mb-8">
-          <h2 className="text-3xl font-bold mb-2">Customer Dashboard</h2>
-          <p className="text-gray-400">Post service requests, manage bookings, and hire workers.</p>
+          <div className="flex items-center gap-3 mb-2">
+            <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white">Customer Dashboard</h2>
+            <span className="text-xs bg-indigo-100 dark:bg-indigo-950/80 border border-indigo-300 dark:border-indigo-700/50 text-indigo-700 dark:text-indigo-300 px-2.5 py-1 rounded-full font-bold">
+              Customer
+            </span>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Post service requests, manage bookings, and hire skilled workers.
+          </p>
         </div>
 
         {/* Tab Navigation */}
-        <div className="border-b border-gray-800 mb-6 overflow-x-auto">
+        <div className="border-b border-gray-200 dark:border-gray-800 mb-6 overflow-x-auto">
           <nav className="flex space-x-6 min-w-max pb-px">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`pb-3 text-sm font-medium transition whitespace-nowrap cursor-pointer ${
+                className={`pb-3 text-sm font-semibold transition whitespace-nowrap cursor-pointer ${
                   activeTab === tab.id
-                    ? 'border-b-2 border-indigo-500 text-indigo-400'
-                    : 'border-b-2 border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-700'
+                    ? 'border-b-2 border-indigo-600 dark:border-sky-500 text-indigo-600 dark:text-sky-400'
+                    : 'border-b-2 border-transparent text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-700'
                 }`}
               >
                 {tab.label}

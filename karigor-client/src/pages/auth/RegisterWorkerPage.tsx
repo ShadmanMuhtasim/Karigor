@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { apiClient } from '../../api/client';
+import { Navbar } from '../../components/Navbar';
 
 interface Category { id: number; name: string; }
 
@@ -15,7 +16,17 @@ export function RegisterWorkerPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    apiClient.get<Category[]>('/categories').then((r) => setCategories(r.data)).catch(() => {});
+    apiClient
+      .get<{ value?: Category[] } | Category[]>('/categories')
+      .then((r) => {
+        const raw = r.data;
+        if (Array.isArray(raw)) {
+          setCategories(raw);
+        } else if (raw && Array.isArray((raw as any).value)) {
+          setCategories((raw as any).value);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   function onChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
@@ -56,80 +67,112 @@ export function RegisterWorkerPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-950 px-4 py-10">
-      <div className="w-full max-w-lg">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">Karigor</h1>
-          <p className="text-gray-400">Create your worker account</p>
-        </div>
+    <div className="min-h-screen bg-white dark:bg-gray-950 text-gray-900 dark:text-white transition-colors duration-200 flex flex-col">
+      <Navbar />
 
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 shadow-2xl">
-          <form onSubmit={handleSubmit} className="space-y-5" id="register-worker-form">
-            {error && (
-              <div id="register-worker-error" className="bg-red-900/40 border border-red-600 text-red-300 rounded-lg px-4 py-3 text-sm">
-                {error}
-              </div>
-            )}
+      <main className="flex-1 flex items-center justify-center px-4 py-12">
+        <div className="w-full max-w-lg">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-black text-gray-900 dark:text-white mb-2">Create Worker Account</h1>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Join Karigor to get direct service requests with fair pay
+            </p>
+          </div>
 
-            {[
-              { id: 'rw-fullname', name: 'fullName', label: 'Full Name', type: 'text', placeholder: 'Your full name' },
-              { id: 'rw-email', name: 'email', label: 'Email', type: 'email', placeholder: 'you@example.com' },
-              { id: 'rw-password', name: 'password', label: 'Password', type: 'password', placeholder: '••••••••' },
-              { id: 'rw-hourlyrate', name: 'hourlyRate', label: 'Hourly Rate (BDT)', type: 'number', placeholder: 'e.g. 500' },
-            ].map(({ id, name, label, type, placeholder }) => (
-              <div key={name}>
-                <label htmlFor={id} className="block text-sm font-medium text-gray-300 mb-1">{label}</label>
-                <input
-                  id={id} name={name} type={type} value={form[name as keyof typeof form]}
-                  onChange={onChange} required
-                  className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
-                  placeholder={placeholder}
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-500 to-sky-500" />
+
+            <form onSubmit={handleSubmit} className="space-y-4" id="register-worker-form">
+              {error && (
+                <div
+                  id="register-worker-error"
+                  className="p-3.5 bg-rose-50 dark:bg-rose-950/50 border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 rounded-xl text-sm font-medium"
+                >
+                  {error}
+                </div>
+              )}
+
+              {[
+                { id: 'rw-fullname', name: 'fullName', label: 'Full Name', type: 'text', placeholder: 'Your full name' },
+                { id: 'rw-email', name: 'email', label: 'Email', type: 'email', placeholder: 'you@example.com' },
+                { id: 'rw-password', name: 'password', label: 'Password', type: 'password', placeholder: '••••••••' },
+                { id: 'rw-hourlyrate', name: 'hourlyRate', label: 'Hourly Rate (USD / BDT)', type: 'number', placeholder: 'e.g. 25' },
+              ].map(({ id, name, label, type, placeholder }) => (
+                <div key={name}>
+                  <label htmlFor={id} className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1.5">
+                    {label}
+                  </label>
+                  <input
+                    id={id}
+                    name={name}
+                    type={type}
+                    value={form[name as keyof typeof form]}
+                    onChange={onChange}
+                    required
+                    className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm transition"
+                    placeholder={placeholder}
+                  />
+                </div>
+              ))}
+
+              <div>
+                <label htmlFor="rw-bio" className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1.5">
+                  Bio (optional)
+                </label>
+                <textarea
+                  id="rw-bio"
+                  name="bio"
+                  value={form.bio}
+                  onChange={onChange}
+                  rows={2}
+                  className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm transition resize-none"
+                  placeholder="Briefly describe your skills, tools, and experience"
                 />
               </div>
-            ))}
 
-            <div>
-              <label htmlFor="rw-bio" className="block text-sm font-medium text-gray-300 mb-1">Bio (optional)</label>
-              <textarea
-                id="rw-bio" name="bio" value={form.bio} onChange={onChange} rows={2}
-                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition resize-none"
-                placeholder="Briefly describe your skills and experience"
-              />
-            </div>
-
-            <div>
-              <p className="block text-sm font-medium text-gray-300 mb-2">Service Categories <span className="text-red-400">*</span></p>
-              <div className="grid grid-cols-2 gap-2">
-                {categories.map((cat) => (
-                  <button
-                    key={cat.id} type="button" id={`rw-cat-${cat.id}`}
-                    onClick={() => toggleCategory(cat.id)}
-                    className={`rounded-xl px-3 py-2 text-sm font-medium border transition ${
-                      selectedCategories.includes(cat.id)
-                        ? 'bg-emerald-600 border-emerald-500 text-white'
-                        : 'bg-gray-800 border-gray-700 text-gray-300 hover:border-emerald-600'
-                    }`}
-                  >
-                    {cat.name}
-                  </button>
-                ))}
+              <div>
+                <p className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-2">
+                  Service Categories <span className="text-rose-500">*</span>
+                </p>
+                <div className="grid grid-cols-2 gap-2 max-h-44 overflow-y-auto pr-1">
+                  {categories.map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      id={`rw-cat-${cat.id}`}
+                      onClick={() => toggleCategory(cat.id)}
+                      className={`rounded-xl px-3 py-2 text-xs font-bold border transition text-left cursor-pointer ${
+                        selectedCategories.includes(cat.id)
+                          ? 'bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20'
+                          : 'bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-emerald-500'
+                      }`}
+                    >
+                      {selectedCategories.includes(cat.id) ? '✓ ' : '+ '}
+                      {cat.name}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            <button
-              id="register-worker-submit" type="submit" disabled={loading}
-              className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-900 disabled:cursor-not-allowed text-white font-semibold rounded-xl py-3 transition duration-200"
-            >
-              {loading ? 'Creating account…' : 'Create Worker Account'}
-            </button>
-          </form>
+              <button
+                id="register-worker-submit"
+                type="submit"
+                disabled={loading}
+                className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-300 text-white font-bold rounded-xl py-3.5 shadow-lg shadow-emerald-600/25 transition duration-200 cursor-pointer disabled:cursor-not-allowed text-sm"
+              >
+                {loading ? 'Creating account…' : 'Create Worker Account'}
+              </button>
+            </form>
 
-          <p className="mt-6 text-center text-sm text-gray-400">
-            Already have an account?{' '}
-            <Link to="/login" className="text-emerald-400 hover:text-emerald-300 font-medium">Sign in</Link>
-          </p>
+            <p className="mt-6 text-center text-xs text-gray-600 dark:text-gray-400">
+              Already have an account?{' '}
+              <Link to="/login" className="text-emerald-600 dark:text-emerald-400 font-bold hover:underline">
+                Sign in
+              </Link>
+            </p>
+          </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

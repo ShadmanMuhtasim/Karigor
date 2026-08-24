@@ -433,20 +433,33 @@ Open `http://localhost:5173` in your browser.
 
 ## 8. Quick Functional Test
 
-1. **Register as a Customer** – Fill in the form, submit. You should be redirected to the Customer Dashboard.
-2. **Register as a Worker** – Fill in the form (select at least one skill), submit. You should be redirected to the Worker Dashboard.
-3. **Login** – Use the credentials you just created.
-4. **Worker Dashboard** – Explore the tabs (Overview, Profile, Skills, Availability, Documents). Try updating your profile, adding skills, and setting availability.
+1. **Register as a Customer** – Fill in the form, submit. You will be redirected to the Customer Dashboard.
+2. **Register as a Worker** – Fill in the form (select at least one skill), submit. You will be redirected to the Worker Dashboard.
+3. **Login** – Use the credentials you just created to sign in.
+4. **Worker Dashboard** – Explore the tabs (Overview, Profile, Skills, Availability, Documents). Update profile, add skills, and set availability.
+5. **Customer Dashboard** – Create service requests, browse categories, and search nearby workers.
 
 ---
 
-💡 The Typical Workflow
-Terminal 1 — Backend (always running)
-bash
-# Keep this running
+## 9. 💡 Typical Daily Workflow
+
+When actively developing Karigor, keep two terminals open:
+
+### Terminal 1 — Backend API Server
+```bash
+# Keep this running at http://localhost:5253
 dotnet run --project backend/Karigor.Api
-Terminal 2 — Frontend
-bash
-# Keep this running too
+```
+
+### Terminal 2 — Frontend Client
+```bash
+# Keep this running at http://localhost:5173
 cd karigor-client
 npm run dev
+```
+
+---
+
+## 📄 Academic Project & License
+
+KARIGOR is developed as an undergraduate software engineering project. All rights reserved.

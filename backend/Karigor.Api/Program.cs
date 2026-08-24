@@ -98,6 +98,7 @@ try
     builder.Services.AddScoped<IAuthService, AuthService>();
     builder.Services.AddScoped<Karigor.Application.Worker.IWorkerService, Karigor.Application.Worker.WorkerService>();
     builder.Services.AddScoped<Karigor.Application.Customer.ICustomerService, Karigor.Application.Customer.CustomerService>();
+    builder.Services.AddScoped<Karigor.Application.Marketplace.IMarketplaceService, Karigor.Application.Marketplace.MarketplaceService>();
 
     // -------------------------------------------------------------------------
     // CORS — allow Vite dev server with credentials (for httpOnly cookie)
@@ -135,6 +136,34 @@ try
             {
                 roleManager.CreateAsync(new IdentityRole(roleName)).GetAwaiter().GetResult();
             }
+        }
+
+        // Service categories are required during worker registration.  Seed them
+        // here so a new developer database works without manually running SQL.
+        var db = scope.ServiceProvider.GetRequiredService<KarigorDbContext>();
+        var starterCategories = new (string Name, string IconUrl)[]
+        {
+            ("Electrician", "https://cdn.karigor.app/icons/electrician.svg"),
+            ("Plumber", "https://cdn.karigor.app/icons/plumber.svg"),
+            ("Carpenter", "https://cdn.karigor.app/icons/carpenter.svg"),
+            ("Mechanic", "https://cdn.karigor.app/icons/mechanic.svg"),
+            ("AC Technician", "https://cdn.karigor.app/icons/ac-technician.svg"),
+            ("Painter", "https://cdn.karigor.app/icons/painter.svg"),
+            ("Cleaner", "https://cdn.karigor.app/icons/cleaner.svg"),
+            ("Welder", "https://cdn.karigor.app/icons/welder.svg"),
+            ("Mason", "https://cdn.karigor.app/icons/mason.svg"),
+            ("Driver", "https://cdn.karigor.app/icons/driver.svg")
+        };
+        var existingNames = db.ServiceCategories.Select(c => c.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var missingCategories = starterCategories
+            .Where(c => !existingNames.Contains(c.Name))
+            .Select(c => new ServiceCategory { Name = c.Name, IconUrl = c.IconUrl })
+            .ToList();
+        if (missingCategories.Count > 0)
+        {
+            db.ServiceCategories.AddRange(missingCategories);
+            db.SaveChanges();
+            Log.Information("Seeded {CategoryCount} missing service categories", missingCategories.Count);
         }
     }
 

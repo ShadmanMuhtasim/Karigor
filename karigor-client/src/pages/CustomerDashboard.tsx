@@ -4,8 +4,9 @@ import { CustomerOverviewTab } from './customer/CustomerOverviewTab';
 import { CustomerRequestsTab } from './customer/CustomerRequestsTab';
 import { CustomerSearchTab } from './customer/CustomerSearchTab';
 import { CustomerProfileTab } from './customer/CustomerProfileTab';
+import { CustomerBookingsTab } from './customer/CustomerBookingsTab';
 
-type CustomerTabId = 'overview' | 'requests' | 'search' | 'profile';
+type CustomerTabId = 'overview' | 'requests' | 'bookings' | 'search' | 'profile';
 
 export function CustomerDashboard() {
   const [activeTab, setActiveTab] = useState<CustomerTabId>('overview');
@@ -13,6 +14,7 @@ export function CustomerDashboard() {
   const tabs: { id: CustomerTabId; label: string }[] = [
     { id: 'overview', label: 'Overview' },
     { id: 'requests', label: 'My Requests' },
+    { id: 'bookings', label: 'Bookings' },
     { id: 'search', label: 'Search Workers' },
     { id: 'profile', label: 'Profile' },
   ];
@@ -58,6 +60,7 @@ export function CustomerDashboard() {
         <div className="pb-12">
           {activeTab === 'overview' && <CustomerOverviewTab onNavigateTab={setActiveTab} />}
           {activeTab === 'requests' && <CustomerRequestsTab />}
+          {activeTab === 'bookings' && <CustomerBookingsTab />}
           {activeTab === 'search' && <CustomerSearchTab />}
           {activeTab === 'profile' && <CustomerProfileTab />}
         </div>

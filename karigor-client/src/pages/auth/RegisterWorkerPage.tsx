@@ -12,10 +12,14 @@ export function RegisterWorkerPage() {
   const [form, setForm] = useState({ email: '', password: '', fullName: '', bio: '', hourlyRate: '' });
   const [selectedCategories, setSelectedCategories] = useState<number[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [categoriesError, setCategoriesError] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    setCategoriesLoading(true);
+    setCategoriesError('');
     apiClient
       .get<{ value?: Category[] } | Category[]>('/categories')
       .then((r) => {
@@ -26,7 +30,8 @@ export function RegisterWorkerPage() {
           setCategories((raw as any).value);
         }
       })
-      .catch(() => {});
+      .catch(() => setCategoriesError('Could not load service categories. Please make sure the API is running and try again.'))
+      .finally(() => setCategoriesLoading(false));
   }, []);
 
   function onChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
@@ -135,6 +140,9 @@ export function RegisterWorkerPage() {
                   Service Categories <span className="text-rose-500">*</span>
                 </p>
                 <div className="grid grid-cols-2 gap-2 max-h-44 overflow-y-auto pr-1">
+                  {categoriesLoading && <p className="col-span-2 text-sm text-gray-500 dark:text-gray-400">Loading categories...</p>}
+                  {!categoriesLoading && categoriesError && <p className="col-span-2 text-sm text-rose-500">{categoriesError}</p>}
+                  {!categoriesLoading && !categoriesError && categories.length === 0 && <p className="col-span-2 text-sm text-amber-600 dark:text-amber-400">No service categories are available yet. Restart the API to seed the starter categories.</p>}
                   {categories.map((cat) => (
                     <button
                       key={cat.id}
@@ -157,7 +165,7 @@ export function RegisterWorkerPage() {
               <button
                 id="register-worker-submit"
                 type="submit"
-                disabled={loading}
+                disabled={loading || categoriesLoading || categories.length === 0}
                 className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-300 text-white font-bold rounded-xl py-3.5 shadow-lg shadow-emerald-600/25 transition duration-200 cursor-pointer disabled:cursor-not-allowed text-sm"
               >
                 {loading ? 'Creating account…' : 'Create Worker Account'}

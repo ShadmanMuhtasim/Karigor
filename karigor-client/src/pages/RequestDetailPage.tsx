@@ -1,11 +1,20 @@
 import { useParams, Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { customerApi } from '../api/customerApi';
+import { marketplaceApi } from '../api/marketplaceApi';
 import { Navbar } from '../components/Navbar';
 
 export function RequestDetailPage() {
   const { id } = useParams<{ id: string }>();
   const requestId = Number(id);
+  const queryClient = useQueryClient();
+  const [counterFor, setCounterFor] = useState<number | null>(null);
+  const [counterPrice, setCounterPrice] = useState('');
+  const [counterMessage, setCounterMessage] = useState('');
+  const { data: quotations, isLoading: quotesLoading } = useQuery({ queryKey: ['quotations', requestId], queryFn: () => marketplaceApi.getQuotations(requestId), enabled: !isNaN(requestId) });
+  const accept = useMutation({ mutationFn: marketplaceApi.acceptQuotation, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['quotations', requestId] }); queryClient.invalidateQueries({ queryKey: ['serviceRequest', requestId] }); queryClient.invalidateQueries({ queryKey: ['customerBookings'] }); } });
+  const counter = useMutation({ mutationFn: () => marketplaceApi.counterQuotation(counterFor!, Number(counterPrice), counterMessage), onSuccess: () => { setCounterFor(null); setCounterPrice(''); setCounterMessage(''); queryClient.invalidateQueries({ queryKey: ['quotations', requestId] }); } });
 
   const { data: request, isLoading, isError } = useQuery({
     queryKey: ['serviceRequest', requestId],
@@ -163,18 +172,14 @@ export function RequestDetailPage() {
             </span>
           </div>
 
-          {request.quotationsCount === 0 ? (
+          {quotesLoading ? <p className="text-sm text-gray-500 dark:text-gray-400">Loading quotations...</p> : !quotations?.length ? (
             <div className="bg-gray-50 dark:bg-gray-950/60 border border-gray-200 dark:border-gray-800 rounded-2xl p-8 text-center">
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">No quotations received yet for this request.</p>
               <p className="text-xs text-gray-500">
                 Workers in the {request.categoryName} category can review your job and send quotes soon.
               </p>
             </div>
-          ) : (
-            <div className="p-4 bg-sky-50 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-800 rounded-2xl text-sm text-sky-900 dark:text-sky-200">
-              {request.quotationsCount} quotation(s) received. Full negotiation and booking management will be active in Milestone 5!
-            </div>
-          )}
+          ) : <div className="space-y-3">{quotations.map(quote => <div key={quote.id} className="rounded-2xl border border-gray-200 dark:border-gray-800 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-bold text-gray-900 dark:text-white">{quote.workerName} <span className="text-xs font-medium text-amber-500">★ {quote.averageRating.toFixed(1)}</span></p><p className="mt-1 text-sm text-gray-600 dark:text-gray-300">{quote.message || 'No message provided.'}</p></div><div className="text-right"><p className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400">৳ {quote.proposedPrice.toLocaleString()}</p><span className="text-xs text-gray-500">{quote.status}</span></div></div>{quote.status === 'Pending' && request.status === 'Open' && <div className="mt-4 flex flex-wrap gap-2"><button disabled={accept.isPending} onClick={() => accept.mutate(quote.id)} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60">{accept.isPending ? 'Accepting...' : 'Accept & create booking'}</button><button onClick={() => setCounterFor(counterFor === quote.id ? null : quote.id)} className="rounded-xl border border-sky-300 px-4 py-2 text-sm font-bold text-sky-700 dark:border-sky-700 dark:text-sky-300">Counter offer</button></div>}{counterFor === quote.id && <form onSubmit={e => { e.preventDefault(); counter.mutate(); }} className="mt-4 grid gap-2 border-t border-gray-100 dark:border-gray-800 pt-4 sm:grid-cols-3"><input required min="1" type="number" value={counterPrice} onChange={e => setCounterPrice(e.target.value)} placeholder="Your price (৳)" className="rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"/><input value={counterMessage} onChange={e => setCounterMessage(e.target.value)} placeholder="Message (optional)" className="rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"/><button disabled={counter.isPending} className="rounded-xl bg-sky-600 px-3 py-2 text-sm font-bold text-white">{counter.isPending ? 'Sending...' : 'Send counter'}</button></form>}</div>)}{(accept.isError || counter.isError) && <p className="text-sm text-rose-500">Unable to update this quotation. Please refresh and try again.</p>}</div>}
         </div>
       </main>
     </div>

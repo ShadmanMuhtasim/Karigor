@@ -18,6 +18,7 @@ import { CreateRequestPage } from './pages/CreateRequestPage';
 import { RequestDetailPage } from './pages/RequestDetailPage';
 import { SearchWorkersPage } from './pages/SearchWorkersPage';
 import { WorkerProfilePage } from './pages/WorkerProfilePage';
+import { BookingDetailPage } from './pages/BookingDetailPage';
 
 /**
  * RootRouteHandler — implements the routing logic requested:
@@ -127,6 +128,7 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
+        <Route path="/bookings/:id" element={<ProtectedRoute><BookingDetailPage /></ProtectedRoute>} />
 
         {/* Root: When not logged in -> /login; When logged in -> /home */}
         <Route path="/" element={<RootRouteHandler />} />

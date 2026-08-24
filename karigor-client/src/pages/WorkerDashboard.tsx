@@ -5,14 +5,16 @@ import { WorkerProfileTab } from './worker/WorkerProfileTab';
 import { WorkerSkillsTab } from './worker/WorkerSkillsTab';
 import { WorkerAvailabilityTab } from './worker/WorkerAvailabilityTab';
 import { WorkerDocumentsTab } from './worker/WorkerDocumentsTab';
+import { WorkerBookingsTab } from './worker/WorkerBookingsTab';
 
-type TabId = 'overview' | 'profile' | 'skills' | 'availability' | 'documents';
+type TabId = 'overview' | 'jobs' | 'profile' | 'skills' | 'availability' | 'documents';
 
 export function WorkerDashboard() {
   const [activeTab, setActiveTab] = useState<TabId>('overview');
 
   const tabs: { id: TabId; label: string }[] = [
     { id: 'overview', label: 'Overview' },
+    { id: 'jobs', label: 'Jobs & Bookings' },
     { id: 'profile', label: 'Profile' },
     { id: 'skills', label: 'Skills' },
     { id: 'availability', label: 'Availability' },
@@ -59,6 +61,7 @@ export function WorkerDashboard() {
         {/* Tab Content */}
         <div className="pb-12">
           {activeTab === 'overview' && <WorkerOverviewTab />}
+          {activeTab === 'jobs' && <WorkerBookingsTab />}
           {activeTab === 'profile' && <WorkerProfileTab />}
           {activeTab === 'skills' && <WorkerSkillsTab />}
           {activeTab === 'availability' && <WorkerAvailabilityTab />}

@@ -507,5 +507,48 @@
 
 **MILESTONE_6_STATUS=COMPLETE**
 
+## Milestone 7 — Messaging & Notifications (SignalR)
+**Status:** COMPLETE (Build & Integration Verified)
+
+### Completed Milestone 7 Items:
+- [x] SignalR Hub Setup (`KarigorHub.cs`) with `/hubs/chat` WebSocket endpoint (Task 7.1)
+- [x] JWT query string authentication for SignalR (`OnMessageReceived`)
+- [x] `MessageController` with `[Authorize]` protection (Task 7.2)
+- [x] `POST /api/messages` — Send message, persist to DB, broadcast real-time (Task 7.3)
+- [x] `GET /api/messages/booking/{bookingId}` — Fetch booking chat history (Task 7.4)
+- [x] `GET /api/messages/conversations` — List user's active conversations (Task 7.5)
+- [x] In-App Notification Service (`NotificationService.cs`) (Task 7.6)
+- [x] `GET /api/notifications` — List user notifications (Task 7.7)
+- [x] `PUT /api/notifications/{id}/read` & `PUT /api/notifications/read-all` (Task 7.8)
+- [x] Automated notifications on quotes, counters, and booking status updates
+- [x] SignalR Client Setup with auto-reconnect and JWT factory (Task 7.9)
+- [x] Interactive Chat UI Component (`ChatBox.tsx` & `ChatModal.tsx`) (Task 7.10)
+- [x] Active Conversations Overview (`ConversationsList.tsx`) (Task 7.11)
+- [x] Notification Bell with unread count, dropdown, and toast alerts (`NotificationBell.tsx`) (Task 7.12)
+- [x] Real-time live messaging and typing indicators via SignalR (Task 7.13)
+- [x] Backend Build: 0 Errors, 0 Warnings
+- [x] Frontend Build: 0 Errors, 0 Warnings
+
+**MILESTONE_7_STATUS=COMPLETE**
+
+## Post-Milestone 7 Enhancements & Fixes
+**Status:** COMPLETE (Build & Integration Verified)
+
+### Completed Enhancements:
+- [x] **Multi-Turn Negotiation & Alternating Counter-Offers**:
+  - `QuotationDto` with `ProposedBy` and recursive `NegotiationDepth` tracking.
+  - Alternating negotiation turns: Customer counters Worker, Worker counters back, Customer accepts or counters.
+  - Mutual acceptance logic generating bookings immediately for either party upon agreement.
+  - Fixed 403 Forbidden on quotation negotiation endpoints.
+- [x] **Worker Quotations Overview**:
+  - `GET /api/quotations/worker` returning all worker bids, negotiation stages, and counter-offers.
+  - Added dedicated *"📤 My Submitted Quotations & Active Negotiations"* section in Worker Dashboard.
+- [x] **UI Harmonization & Notification Popup Redesign**:
+  - Redesigned floating notification toast: centered at the top (`fixed top-6 left-1/2 -translate-x-1/2`), no bounce, matching app cards.
+  - Harmonized `RequestDetailPage.tsx` and `WorkerBookingsTab.tsx` with standard dashboard container styles.
+  - Streamlined Leaflet map draggable marker and bottom coordinate banner.
+
+
+
 
 

@@ -7,6 +7,7 @@ import type {
   RegisterWorkerPayload,
 } from '../api/authApi';
 import { setAccessToken } from '../api/client';
+import { signalRService } from '../services/signalrService';
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -22,6 +23,15 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Sync SignalR lifecycle with user session
+  useEffect(() => {
+    if (user?.accessToken) {
+      signalRService.startConnection();
+    } else {
+      signalRService.stopConnection();
+    }
+  }, [user]);
 
   // On mount: attempt to restore session via refresh token cookie
   useEffect(() => {
@@ -52,6 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setUser(null);
     setAccessToken(null);
+    signalRService.stopConnection();
   }, [user]);
 
   const registerAsCustomer = useCallback(async (payload: RegisterCustomerPayload) => {

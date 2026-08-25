@@ -78,6 +78,21 @@ try
             IssuerSigningKey         = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
             ClockSkew                = TimeSpan.Zero  // no slack on expiry
         };
+
+        // SignalR sends access token in query string on WebSocket handshake
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            }
+        };
     });
 
     builder.Services.AddAuthorization();
@@ -91,6 +106,8 @@ try
     // Configuration overrides for Application layer
     // Removed hard-coded path override; path will be provided via DI
 
+    builder.Services.AddSignalR();
+
     // -------------------------------------------------------------------------
     // Application services
     // -------------------------------------------------------------------------
@@ -100,6 +117,9 @@ try
     builder.Services.AddScoped<Karigor.Application.Customer.ICustomerService, Karigor.Application.Customer.CustomerService>();
     builder.Services.AddScoped<Karigor.Application.Marketplace.IMarketplaceService, Karigor.Application.Marketplace.MarketplaceService>();
     builder.Services.AddScoped<Karigor.Application.Location.ILocationService, Karigor.Application.Location.LocationService>();
+    builder.Services.AddScoped<Karigor.Application.Realtime.IRealtimeNotifier, Karigor.Api.Realtime.SignalRRealtimeNotifier>();
+    builder.Services.AddScoped<Karigor.Application.Notifications.INotificationService, Karigor.Application.Notifications.NotificationService>();
+    builder.Services.AddScoped<Karigor.Application.Messaging.IMessagingService, Karigor.Application.Messaging.MessagingService>();
 
     // -------------------------------------------------------------------------
     // CORS — allow Vite dev server with credentials (for httpOnly cookie)
@@ -191,6 +211,7 @@ try
     app.UseAuthentication();
     app.UseAuthorization();
     app.MapControllers();
+    app.MapHub<Karigor.Api.Hubs.KarigorHub>("/hubs/chat");
 
     app.Run();
 }

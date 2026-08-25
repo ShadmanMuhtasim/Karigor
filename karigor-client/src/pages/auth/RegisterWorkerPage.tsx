@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { apiClient } from '../../api/client';
 import { Navbar } from '../../components/Navbar';
+import { extractErrorMessage } from '../../lib/errorUtils';
 
 interface Category { id: number; name: string; }
 
@@ -62,10 +63,7 @@ export function RegisterWorkerPage() {
       });
       navigate('/dashboard/worker', { replace: true });
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
-        'Registration failed. Please try again.';
-      setError(msg);
+      setError(extractErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -114,9 +112,15 @@ export function RegisterWorkerPage() {
                     value={form[name as keyof typeof form]}
                     onChange={onChange}
                     required
+                    minLength={name === 'password' ? 8 : undefined}
                     className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm transition"
                     placeholder={placeholder}
                   />
+                  {name === 'password' && (
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+                      Must be at least 8 characters (with uppercase, lowercase & a number).
+                    </p>
+                  )}
                 </div>
               ))}
 

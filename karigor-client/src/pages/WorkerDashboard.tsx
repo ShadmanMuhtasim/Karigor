@@ -6,8 +6,9 @@ import { WorkerSkillsTab } from './worker/WorkerSkillsTab';
 import { WorkerAvailabilityTab } from './worker/WorkerAvailabilityTab';
 import { WorkerDocumentsTab } from './worker/WorkerDocumentsTab';
 import { WorkerBookingsTab } from './worker/WorkerBookingsTab';
+import { ConversationsList } from '../components/chat/ConversationsList';
 
-type TabId = 'overview' | 'jobs' | 'profile' | 'skills' | 'availability' | 'documents';
+type TabId = 'overview' | 'jobs' | 'messages' | 'profile' | 'skills' | 'availability' | 'documents';
 
 export function WorkerDashboard() {
   const [activeTab, setActiveTab] = useState<TabId>('overview');
@@ -15,6 +16,7 @@ export function WorkerDashboard() {
   const tabs: { id: TabId; label: string }[] = [
     { id: 'overview', label: 'Overview' },
     { id: 'jobs', label: 'Jobs & Bookings' },
+    { id: 'messages', label: 'Messages 💬' },
     { id: 'profile', label: 'Profile' },
     { id: 'skills', label: 'Skills' },
     { id: 'availability', label: 'Availability' },
@@ -62,6 +64,7 @@ export function WorkerDashboard() {
         <div className="pb-12">
           {activeTab === 'overview' && <WorkerOverviewTab />}
           {activeTab === 'jobs' && <WorkerBookingsTab />}
+          {activeTab === 'messages' && <ConversationsList />}
           {activeTab === 'profile' && <WorkerProfileTab />}
           {activeTab === 'skills' && <WorkerSkillsTab />}
           {activeTab === 'availability' && <WorkerAvailabilityTab />}

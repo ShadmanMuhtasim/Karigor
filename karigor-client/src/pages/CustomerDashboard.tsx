@@ -5,8 +5,9 @@ import { CustomerRequestsTab } from './customer/CustomerRequestsTab';
 import { CustomerSearchTab } from './customer/CustomerSearchTab';
 import { CustomerProfileTab } from './customer/CustomerProfileTab';
 import { CustomerBookingsTab } from './customer/CustomerBookingsTab';
+import { ConversationsList } from '../components/chat/ConversationsList';
 
-type CustomerTabId = 'overview' | 'requests' | 'bookings' | 'search' | 'profile';
+type CustomerTabId = 'overview' | 'requests' | 'bookings' | 'messages' | 'search' | 'profile';
 
 export function CustomerDashboard() {
   const [activeTab, setActiveTab] = useState<CustomerTabId>('overview');
@@ -15,6 +16,7 @@ export function CustomerDashboard() {
     { id: 'overview', label: 'Overview' },
     { id: 'requests', label: 'My Requests' },
     { id: 'bookings', label: 'Bookings' },
+    { id: 'messages', label: 'Messages 💬' },
     { id: 'search', label: 'Search Workers' },
     { id: 'profile', label: 'Profile' },
   ];
@@ -61,6 +63,7 @@ export function CustomerDashboard() {
           {activeTab === 'overview' && <CustomerOverviewTab onNavigateTab={setActiveTab} />}
           {activeTab === 'requests' && <CustomerRequestsTab />}
           {activeTab === 'bookings' && <CustomerBookingsTab />}
+          {activeTab === 'messages' && <ConversationsList />}
           {activeTab === 'search' && <CustomerSearchTab />}
           {activeTab === 'profile' && <CustomerProfileTab />}
         </div>

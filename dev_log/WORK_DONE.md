@@ -740,5 +740,90 @@ Implemented a complete, high-fidelity UI overhaul for the Karigor client applica
 - **Frontend Build**: `npm run build` → **0 TypeScript errors, Vite production build succeeded.**
 - **Backend Build**: `dotnet build Karigor.slnx` → **0 errors, 0 warnings.**
 
+## 2026-08-25 | Milestone 6 — Location-Based Matching (Maps)
+
+**Status:** IMPLEMENTED + BUILD VERIFIED (Backend: 0 Errors, Frontend: 0 Errors)  
+**Lead:** Md. Saiman Ullah  
+
+### Summary of Implementation
+
+Implemented complete location-based matching and interactive geospatial mapping for Karigor across both backend and frontend, connecting customers and workers through distance-aware discovery, interactive OpenStreetMap/Leaflet components, and coverage radius calculations.
+
+#### 1. Backend Implementation (.NET 10 / C#)
+- **Application Layer (`backend/Karigor.Application/Location/`)**:
+  - `ILocationService.cs` — Interface for location-based operations:
+    - `GetNearbyWorkersAsync(NearbyWorkerParamsDto query)`: Finds active verified workers within search radius or worker service radius using Haversine formula; supports category, minimum rating, and keyword search filters; sorts by closest distance.
+    - `UpdateWorkerLocationAsync(string workerUserId, UpdateWorkerLocationDto dto)`: Updates authenticated worker's latitude, longitude, and service radius.
+    - `GetNearbyRequestsForWorkerAsync(string workerUserId, NearbyRequestParamsDto? query)`: Finds open service requests matching worker's skills located within their coverage radius.
+  - `LocationService.cs` — Service implementation with Haversine distance calculations in kilometers and database queries on `WorkerProfiles` and `ServiceRequests`.
+  - **DTOs (`backend/Karigor.Application/Location/DTOs/`)**:
+    - `NearbyWorkerDto.cs` — Worker details with computed `DistanceKm`, coordinates, rating, hourly rate, and skills.
+    - `NearbyWorkerParamsDto.cs` — Query parameters (Latitude, Longitude, RadiusKm, CategoryId, MinRating, SearchTerm).
+    - `UpdateWorkerLocationDto.cs` — Payload for updating worker coordinates and service radius.
+    - `NearbyRequestDto.cs` — Service request details with computed `DistanceKm`, category icon, preferred date, and coordinates.
+    - `NearbyRequestParamsDto.cs` — Query parameters for worker nearby requests search.
+- **API Layer (`backend/Karigor.Api/`)**:
+  - `Controllers/LocationController.cs` — Controller handling:
+    - `GET /api/workers/nearby` (Task 6.1) — Public/Customer nearby workers search.
+    - `PUT /api/worker/location` (Task 6.2) — `[Authorize(Roles = "Worker")]` worker location update.
+    - `GET /api/requests/nearby` (Task 6.3) — `[Authorize(Roles = "Worker")]` worker nearby requests matching.
+  - `Program.cs` — Registered `ILocationService` in DI (`builder.Services.AddScoped<ILocationService, LocationService>()`).
+
+#### 2. Frontend Implementation (React + TypeScript + Leaflet + Tailwind)
+- **API Client (`karigor-client/src/api/locationApi.ts`)**:
+  - Typed client methods for `getNearbyWorkers`, `updateWorkerLocation`, and `getNearbyRequests`.
+- **Reusable Map System (`karigor-client/src/components/map/KarigorMap.tsx`)**:
+  - High-fidelity Leaflet OpenStreetMap integration with automatic Dark Mode / Light Mode tiles.
+  - Custom styled HTML/SVG markers for Workers (emerald badge with craft icon, rating, and hourly rate), Requests (amber badge with category and distance), and User GPS (pulsing blue radar dot).
+  - Dynamic coverage radius and search radius circle overlays.
+  - Rich interactive popups with direct action buttons ("View Profile", "Send Quotation", "Select Location").
+  - Interactive Pin Picker mode with drag-and-drop marker and map-click coordinate setting.
+  - Geolocation control button with browser GPS integration and error handling.
+- **Customer Search Map (`karigor-client/src/pages/customer/CustomerSearchTab.tsx`)**:
+  - 3 view modes: "Split View", "Map Only", and "Grid Only".
+  - Live radius slider with visual coverage circle on map.
+  - Real-time search filter synchronization (category, rating, keyword).
+  - Selected worker summary card and direct profile navigation.
+- **Worker Location & Radius Management (`karigor-client/src/pages/worker/WorkerProfileTab.tsx`)**:
+  - Embedded interactive Map Location Picker.
+  - Interactive service radius slider (1 km to 50 km) that updates coverage circle in real time.
+  - "Use My GPS Location" one-click button.
+- **Worker Nearby Jobs Map (`karigor-client/src/pages/worker/WorkerBookingsTab.tsx`)**:
+  - Added "Nearby Job Opportunities Map" displaying skill-matched open requests within worker's coverage area.
+  - Clicking any job pin displays details and opens the instant quotation drawer.
+- **Customer Request Pinpoint (`karigor-client/src/pages/CreateRequestPage.tsx`)**:
+  - Embedded interactive map pin picker so customers can pinpoint their exact service location on the map.
+
+### Files Created or Updated
+
+#### Files Created:
+1. `backend/Karigor.Application/Location/DTOs/NearbyWorkerDto.cs`
+2. `backend/Karigor.Application/Location/DTOs/NearbyWorkerParamsDto.cs`
+3. `backend/Karigor.Application/Location/DTOs/UpdateWorkerLocationDto.cs`
+4. `backend/Karigor.Application/Location/DTOs/NearbyRequestDto.cs`
+5. `backend/Karigor.Application/Location/DTOs/NearbyRequestParamsDto.cs`
+6. `backend/Karigor.Application/Location/ILocationService.cs`
+7. `backend/Karigor.Application/Location/LocationService.cs`
+8. `backend/Karigor.Api/Controllers/LocationController.cs`
+9. `karigor-client/src/api/locationApi.ts`
+10. `karigor-client/src/components/map/KarigorMap.tsx`
+
+#### Files Updated:
+1. `backend/Karigor.Api/Program.cs` — Registered `ILocationService` in DI.
+2. `karigor-client/package.json` — Added `leaflet` and `@types/leaflet`.
+3. `karigor-client/src/pages/customer/CustomerSearchTab.tsx` — Added Leaflet map view, dual split view, radius visualizer, and GPS location matching.
+4. `karigor-client/src/pages/worker/WorkerProfileTab.tsx` — Added interactive map location & coverage radius picker.
+5. `karigor-client/src/pages/worker/WorkerBookingsTab.tsx` — Added interactive Nearby Jobs Map & opportunities drawer.
+6. `karigor-client/src/pages/CreateRequestPage.tsx` — Added map pin picker for setting request coordinates.
+7. `dev_log/WORK_DONE.md` — Updated with Milestone 6 documentation.
+8. `dev_log/task_progress.md` — Updated with Milestone 6 completion status.
+
+### Build Verification
+- **Backend Build**: `dotnet build Karigor.slnx` → **0 Warning(s), 0 Error(s)**
+- **Frontend Build**: `npm run build` → **0 TypeScript errors, Vite production build succeeded.**
+
+**MILESTONE_6_STATUS=COMPLETE**
+
+
 
 

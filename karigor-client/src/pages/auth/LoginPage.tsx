@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Navbar } from '../../components/Navbar';
+import { extractErrorMessage } from '../../lib/errorUtils';
 
 export function LoginPage() {
   const { loginUser } = useAuth();
@@ -19,10 +20,7 @@ export function LoginPage() {
       await loginUser({ email, password });
       navigate('/dashboard', { replace: true });
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
-        'Login failed. Check your credentials.';
-      setError(msg);
+      setError(extractErrorMessage(err, 'Login failed. Please check your credentials.'));
     } finally {
       setLoading(false);
     }

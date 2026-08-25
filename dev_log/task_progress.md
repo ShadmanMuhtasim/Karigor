@@ -1,4 +1,4 @@
-﻿# \# Task Progress Tracker - Karigor Project
+# \# Task Progress Tracker - Karigor Project
 
 # 
 
@@ -364,51 +364,6 @@
 
 # 
 
-# \# Overall Current Status
-
-# 
-
-# \## Milestones
-
-# 
-
-# \- \*\*Milestone 1:\*\* COMPLETE
-
-# \- \*\*Milestone 1 ERD Human Review:\*\* PENDING
-
-# \- \*\*Milestone 2:\*\* COMPLETE
-
-# \- \*\*Milestone 2 Browser UI Verification:\*\* PENDING
-
-# \- \*\*Milestone 3:\*\* PENDING
-
-# \- \*\*Milestone 4:\*\* PENDING
-
-# \- \*\*Milestone 5:\*\* PENDING
-
-# \- \*\*Milestone 6:\*\* PENDING
-
-# \- \*\*Milestone 7:\*\* PENDING
-
-# \- \*\*Milestone 8:\*\* PENDING
-
-# \- \*\*Milestone 9:\*\* PENDING
-
-# \- \*\*Milestone 10:\*\* PENDING
-
-# 
-
-# \## Infrastructure
-
-# 
-
-# \- \*\*Database:\*\* Native SQL Server `.\\SQLEXPRESS`
-
-# \- \*\*Database Name:\*\* `KarigorDev`
-
-# \- \*\*Docker SQL Server:\*\* CANCELLED for local development because native SQL Server is being used
-
-# \- \*\*EF Core:\*\* Database-First
 
 # \- \*\*Backend:\*\* Operational and verified
 
@@ -527,5 +482,30 @@
 - [x] Browser verification - PASS
 
 **MILESTONE_3_STATUS=COMPLETE**
+
+## Milestone 4 — Customer Module & Service Requests
+**Status:** COMPLETE (Build Verified)
+
+## Milestone 5 — Quotation, Negotiation & Booking
+**Status:** COMPLETE (Build Verified)
+
+## Milestone 6 — Location-Based Matching (Maps)
+**Status:** COMPLETE (Build Verified)
+
+### Completed Milestone 6 Items:
+- [x] `ILocationService` and `LocationService` with Haversine distance calculation
+- [x] `GET /api/workers/nearby` (Task 6.1) — Find workers within radius with category/keyword filters
+- [x] `PUT /api/worker/location` (Task 6.2) — Authenticated worker updates latitude/longitude/radius
+- [x] `GET /api/requests/nearby` (Task 6.3) — Find open service requests matching worker's skills within coverage radius
+- [x] `KarigorMap` Leaflet/OpenStreetMap component with Dark/Light mode, custom markers, popups, and radius circles (Task 6.4)
+- [x] Customer Search Map with Split/Map/Grid views, distance slider, and live matching (Task 6.5)
+- [x] Worker View Nearby Requests Map with live skill matching and quotation submission drawer (Task 6.6)
+- [x] Geolocation permission handling and GPS auto-locate (Task 6.7)
+- [x] Interactive location pin picker for Worker Profile and Customer Request creation
+- [x] Backend Build Verified: 0 Errors, 0 Warnings
+- [x] Frontend Build Verified: 0 Errors, 0 Warnings
+
+**MILESTONE_6_STATUS=COMPLETE**
+
 
 

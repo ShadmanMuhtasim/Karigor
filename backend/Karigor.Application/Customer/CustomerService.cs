@@ -7,15 +7,19 @@ using Karigor.Application.Worker.DTOs;
 using Karigor.Infrastructure.Models;
 using Microsoft.EntityFrameworkCore;
 
+using Karigor.Application.Realtime;
+
 namespace Karigor.Application.Customer;
 
 public class CustomerService : ICustomerService
 {
     private readonly KarigorDbContext _db;
+    private readonly IRealtimeNotifier _realtimeNotifier;
 
-    public CustomerService(KarigorDbContext db)
+    public CustomerService(KarigorDbContext db, IRealtimeNotifier realtimeNotifier)
     {
         _db = db;
+        _realtimeNotifier = realtimeNotifier;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -97,6 +101,21 @@ public class CustomerService : ICustomerService
 
         _db.ServiceRequests.Add(request);
         await _db.SaveChangesAsync();
+
+        // Broadcast real-time event to all connected workers so their map updates immediately
+        try
+        {
+            await _realtimeNotifier.BroadcastAsync("ServiceRequestCreated", new
+            {
+                id = request.Id,
+                categoryId = request.CategoryId,
+                categoryName = category.Name,
+                latitude = request.Latitude,
+                longitude = request.Longitude,
+                preferredDate = request.PreferredDate
+            });
+        }
+        catch { /* Non-blocking */ }
 
         return MapRequestToDto(request, profile.FullName, category);
     }

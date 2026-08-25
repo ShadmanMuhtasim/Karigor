@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { NotificationBell } from './notifications/NotificationBell';
 
 export function Navbar() {
   const { user, logoutUser } = useAuth();
@@ -142,6 +143,7 @@ export function Navbar() {
           {/* User profile info or Login CTA (hidden when already on login page) */}
           {user ? (
             <div className="flex items-center gap-3 sm:gap-4">
+              <NotificationBell />
               <div className="hidden sm:flex flex-col text-right">
                 <span className="text-sm font-bold text-gray-900 dark:text-white line-clamp-1 max-w-[150px]">
                   {user.email}

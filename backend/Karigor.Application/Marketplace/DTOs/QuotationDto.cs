@@ -12,4 +12,6 @@ public class QuotationDto
     public string? Message { get; set; }
     public string Status { get; set; } = string.Empty;
     public int? ParentQuotationId { get; set; }
+    public string ProposedBy { get; set; } = "Worker"; // "Worker" or "Customer"
+    public int NegotiationDepth { get; set; } = 0;
 }

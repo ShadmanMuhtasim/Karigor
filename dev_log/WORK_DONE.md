@@ -824,6 +824,324 @@ Implemented complete location-based matching and interactive geospatial mapping 
 
 **MILESTONE_6_STATUS=COMPLETE**
 
+---
+
+## 2026-08-25 | Execution Run 8 — Milestone 7: Messaging & Notifications (SignalR)
+
+**Status:** VERIFIED COMPLETE
+
+**Lead:** Mustakim Musa | **Assist:** Ahbab (integration)  
+**Database:** `.\SQLEXPRESS` → `KarigorDev`  
+**Backend:** `http://localhost:5253`  
+**Frontend:** `http://localhost:5173`
+
+### Summary of Implementation
+
+#### 1. Backend Implementation (.NET 10 / C# / SignalR)
+- **SignalR Real-Time Hub (`backend/Karigor.Api/Hubs/KarigorHub.cs`)**:
+  - `[Authorize]` WebSocket hub endpoint at `/hubs/chat`.
+  - Automatic connection registration into personal group `$"user_{userId}"`.
+  - Room joining/leaving methods `JoinBooking(bookingId)` and `LeaveBooking(bookingId)` into `$"booking_{bookingId}"`.
+  - Real-time `SendTyping(bookingId, isTyping)` indicator broadcast.
+- **Decoupled Real-Time Notifier (`backend/Karigor.Application/Realtime/` & `backend/Karigor.Api/Realtime/`)**:
+  - `IRealtimeNotifier` interface in Application layer for clean separation.
+  - `SignalRRealtimeNotifier` implementation in API layer injecting `IHubContext<KarigorHub>`.
+- **Messaging DTOs & Service (`backend/Karigor.Application/Messaging/`)**:
+  - `SendMessageDto.cs`, `MessageDto.cs`, `ConversationSummaryDto.cs`.
+  - `IMessagingService.cs` & `MessagingService.cs`:
+    - **7.3 `SendMessageAsync`**: Validates booking participation (customer or worker), saves message to `Messages` table, creates in-app notification, and broadcasts via SignalR to booking group and user group.
+    - **7.4 `GetBookingMessagesAsync`**: Verifies participant access, fetches conversation history, and marks unread messages as read.
+    - **7.5 `GetConversationsAsync`**: Lists all active chat threads grouped by booking with last message, unread badge count, and recipient details.
+    - **`MarkMessagesAsReadAsync`**: Marks messages as read.
+- **In-App Notification Service (`backend/Karigor.Application/Notifications/`)**:
+  - `NotificationDto.cs`, `CreateNotificationDto.cs`.
+  - `INotificationService.cs` & `NotificationService.cs`:
+    - **7.7 `GetUserNotificationsAsync`**: Retrieves latest 50 notifications for user.
+    - **7.8 `MarkAsReadAsync` & `MarkAllAsReadAsync`**: Marks notifications as read.
+    - **`CreateNotificationAsync`**: Saves notification and dispatches live `ReceiveNotification` SignalR event.
+- **Automated Event Notifications in `MarketplaceService.cs`**:
+  - Worker submits quote → Customer receives in-app & live toast notification.
+  - Customer accepts quote → Worker receives acceptance notification.
+  - Customer counters quote → Worker receives counter-offer notification.
+  - Worker updates booking status → Customer receives status update notification.
+- **API Controllers (`backend/Karigor.Api/Controllers/`)**:
+  - `MessagesController.cs`:
+    - `POST /api/messages` (Task 7.3)
+    - `GET /api/messages/booking/{bookingId}` (Task 7.4)
+    - `GET /api/messages/conversations` (Task 7.5)
+    - `PUT /api/messages/booking/{bookingId}/read`
+  - `NotificationsController.cs`:
+    - `GET /api/notifications` (Task 7.7)
+    - `PUT /api/notifications/{id}/read` (Task 7.8)
+    - `PUT /api/notifications/read-all`
+- **Program.cs & JWT Query String Support**:
+  - Added `builder.Services.AddSignalR()`.
+  - Registered `IRealtimeNotifier`, `INotificationService`, `IMessagingService`.
+  - Configured `JwtBearerEvents.OnMessageReceived` to extract `access_token` from query string for WebSocket connections (`/hubs/*`).
+  - Mapped hub endpoint `app.MapHub<KarigorHub>("/hubs/chat")`.
+
+#### 2. Frontend Implementation (React + TypeScript + SignalR + Tailwind)
+- **Package Installation**: Added `@microsoft/signalr`.
+- **SignalR Client Service (`karigor-client/src/services/signalrService.ts`)**:
+  - Automatic reconnection backoff policy.
+  - Dynamic JWT access token resolution via `accessTokenFactory`.
+  - Event listeners: `onMessage`, `onNotification`, `onTyping`.
+  - Room management: `joinBooking`, `leaveBooking`, `sendTyping`.
+- **API Clients (`karigor-client/src/api/`)**:
+  - `messagingApi.ts` & `notificationApi.ts` with typed methods.
+- **Interactive UI Components**:
+  - `ChatBox.tsx`: Real-time chat box with message history, typing indicator, responsive bubbles (user right / other left), timestamps, auto-scroll, and Enter-to-send.
+  - `ChatModal.tsx`: Floating chat modal for one-click chat initiation anywhere in the application.
+  - `ConversationsList.tsx`: Complete overview of active chats with unread badges, latest message snippets, and quick chat launch.
+  - `NotificationBell.tsx`: Interactive notification bell in Navbar with live unread badge, dropdown menu, time-ago formatting, click-to-navigate actions, and real-time floating toast alerts.
+- **App Integration**:
+  - Integrated `NotificationBell` in `Navbar.tsx`.
+  - Added "Messages 💬" tab in `CustomerDashboard.tsx` and `WorkerDashboard.tsx`.
+  - Added "💬 Chat with Worker" button on `CustomerBookingsTab.tsx`.
+  - Added "💬 Chat with Customer" button on `WorkerBookingsTab.tsx`.
+  - Embedded split-view live `ChatBox` in `BookingDetailPage.tsx`.
+  - Synced SignalR connection lifecycle with user authentication state in `AuthContext.tsx`.
+
+### Files Created or Updated
+
+#### Files Created:
+1. `backend/Karigor.Application/Messaging/DTOs/SendMessageDto.cs`
+2. `backend/Karigor.Application/Messaging/DTOs/MessageDto.cs`
+3. `backend/Karigor.Application/Messaging/DTOs/ConversationSummaryDto.cs`
+4. `backend/Karigor.Application/Notifications/DTOs/NotificationDto.cs`
+5. `backend/Karigor.Application/Notifications/DTOs/CreateNotificationDto.cs`
+6. `backend/Karigor.Application/Realtime/IRealtimeNotifier.cs`
+7. `backend/Karigor.Application/Notifications/INotificationService.cs`
+8. `backend/Karigor.Application/Notifications/NotificationService.cs`
+9. `backend/Karigor.Application/Messaging/IMessagingService.cs`
+10. `backend/Karigor.Application/Messaging/MessagingService.cs`
+11. `backend/Karigor.Api/Hubs/KarigorHub.cs`
+12. `backend/Karigor.Api/Realtime/SignalRRealtimeNotifier.cs`
+13. `backend/Karigor.Api/Controllers/MessagesController.cs`
+14. `backend/Karigor.Api/Controllers/NotificationsController.cs`
+15. `karigor-client/src/api/messagingApi.ts`
+16. `karigor-client/src/api/notificationApi.ts`
+17. `karigor-client/src/services/signalrService.ts`
+18. `karigor-client/src/components/chat/ChatBox.tsx`
+19. `karigor-client/src/components/chat/ChatModal.tsx`
+20. `karigor-client/src/components/chat/ConversationsList.tsx`
+21. `karigor-client/src/components/notifications/NotificationBell.tsx`
+22. `karigor-client/src/lib/errorUtils.ts`
+
+#### Files Updated:
+1. `backend/Karigor.Application/Marketplace/MarketplaceService.cs` — Added automated notifications for quotes, counters, and bookings.
+2. `backend/Karigor.Api/Program.cs` — Registered SignalR, messaging services, JWT query string handler, and `/hubs/chat` route.
+3. `karigor-client/package.json` — Added `@microsoft/signalr`.
+4. `karigor-client/src/context/AuthContext.tsx` — Synced SignalR connection lifecycle on login/logout.
+5. `karigor-client/src/components/Navbar.tsx` — Embedded `NotificationBell`.
+6. `karigor-client/src/pages/CustomerDashboard.tsx` — Added Messages tab.
+7. `karigor-client/src/pages/WorkerDashboard.tsx` — Added Messages tab.
+8. `karigor-client/src/pages/customer/CustomerBookingsTab.tsx` — Added Chat with Worker button and modal.
+9. `karigor-client/src/pages/worker/WorkerBookingsTab.tsx` — Added Chat with Customer button and modal.
+10. `karigor-client/src/pages/BookingDetailPage.tsx` — Embedded live ChatBox in split view.
+11. `karigor-client/src/pages/auth/RegisterCustomerPage.tsx` — Enhanced error extraction and password guidance.
+12. `karigor-client/src/pages/auth/RegisterWorkerPage.tsx` — Enhanced error extraction and password guidance.
+13. `karigor-client/src/pages/auth/LoginPage.tsx` — Enhanced error extraction.
+14. `dev_log/WORK_DONE.md` — Updated with Milestone 7 documentation.
+15. `dev_log/task_progress.md` — Updated with Milestone 7 completion status.
+
+### Build Verification
+- **Backend Build**: `dotnet build Karigor.slnx` → **0 Warning(s), 0 Error(s)**
+- **Frontend Build**: `npm run build` → **0 TypeScript errors, Vite production build succeeded.**
+
+**MILESTONE_7_STATUS=COMPLETE**
+
+---
+
+## 2026-08-26 | Fix: Multi-Turn Quotation Negotiation & Counter-Offer Support
+
+### Issues Resolved
+1. **403 Access Denied on Counter-Offer Notifications**:
+   - `QuotationsController` had `[Authorize(Roles = "Customer")]` restricting `ForRequest`, `Accept`, and `Counter` endpoints. Workers attempting to view quotations or counter-offer were blocked with HTTP 403.
+   - `NotificationBell.tsx` navigated to `/customer/requests/:id` which had `<ProtectedRoute requiredRole="Customer">`, redirecting Workers to `/unauthorized`.
+2. **Missing Multi-Turn Negotiation / Counter-to-Counter Logic**:
+   - `MarketplaceService.cs` assumed only Customers could counter initial Worker quotes and only Customers could accept.
+   - When a Customer countered, the initial quote's status changed to `Countered` but the UI didn't render the negotiation thread properly, making the quotation look "removed".
+
+### Changes Implemented
+1. **Backend**:
+   - **`QuotationDto.cs`**: Added `ProposedBy` ("Worker" vs "Customer") and `NegotiationDepth` to track alternating negotiation turns.
+   - **`MarketplaceService.cs`**:
+     - `GetNegotiationDepth`: Computes chain depth recursively from parent quotation relationships.
+     - `GetServiceRequestDetailsAsync`: Unified endpoint for both Customers and Workers to inspect request details.
+     - `GetRequestQuotationsAsync`: Enabled for both Customer and Worker; workers see their own quotation history and counter-offers.
+     - `CounterQuotationAsync`: Allows Customer to counter Worker proposals AND allows Worker to counter Customer proposals.
+     - `AcceptQuotationAsync`: Allows Customer to accept Worker proposals AND allows Worker to accept Customer counter-offers, immediately scheduling the booking and notifying both parties.
+   - **`QuotationsController.cs`**: Removed rigid single-role authorization on `ForRequest`, `Accept`, and `Counter`. Added `GET /api/quotations/request/{requestId}/details`.
+2. **Frontend**:
+   - **`App.tsx`**: Updated routes `/requests/:id` and `/customer/requests/:id` to allow both Customer and Worker access.
+   - **`NotificationBell.tsx`**: Updated notification click navigation to route to `/requests/${notif.relatedEntityId}` for both roles.
+   - **`marketplaceApi.ts`**: Added `getRequestDetails` and updated `QuotationDto` with `proposedBy` and `negotiationDepth`.
+   - **`RequestDetailPage.tsx`**: Rebuilt into a complete interactive Multi-Turn Negotiation Hub:
+     - Chronological negotiation trail for every proposal (Worker offer → Customer counter → Worker counter).
+     - Role-aware action controls:
+       - Customer can Accept Worker proposals or submit Counter-Offers.
+       - Worker can Accept Customer counter-offers or submit Counter-Proposals.
+       - Worker can also submit initial quotations directly from the page if they haven't quoted yet.
+     - Immediate booking creation and redirect to `/bookings/{id}` upon agreement.
+
+### Build Verification
+- **Backend Build**: `dotnet build Karigor.slnx` → **0 Error(s)**
+- **Frontend Build**: `npm run build` → **0 TypeScript errors, Vite production build succeeded.**
+
+---
+
+## 2026-08-26 | Feature & Fix: Worker Quotations Overview & Negotiation Visibility
+
+### Issues Resolved
+1. **Worker Couldn't View Sent Quotations**:
+   - The Worker Dashboard had no dedicated section or query to list all quotations submitted by the worker across different service requests.
+   - `MarketplaceService.GetRequestQuotationsAsync` had an over-restrictive customer ownership check that blocked workers who also had a customer profile from retrieving quotations.
+
+### Changes Implemented
+1. **Backend**:
+   - **`WorkerQuotationSummaryDto.cs`**: Created DTO summarizing a worker's active negotiation on any service request (Category, Customer Name, Address, Initial Bid, Latest Price, Status, Negotiation Step Count, and Latest Note).
+   - **`MarketplaceService.cs`**:
+     - Added `GetWorkerQuotationsAsync`: Fetches all quotations submitted by the worker grouped by service request.
+     - Fixed `GetRequestQuotationsAsync`: Properly authorizes workers and filters quotations to their active threads on the request.
+   - **`QuotationsController.cs`**: Added `GET /api/quotations/worker` with `[Authorize(Roles = "Worker")]`.
+2. **Frontend**:
+   - **`marketplaceApi.ts`**: Added `getWorkerQuotations` and `WorkerQuotationSummaryDto`.
+   - **`WorkerBookingsTab.tsx`**: Added a new section: **"📤 My Submitted Quotations & Active Negotiations"**:
+     - Lists every bid sent by the worker with live price tracking (Initial Bid vs Latest Countered Price).
+     - Highlights customer counter-offers with an **"⚡ Action Required"** badge.
+     - Direct **"View Negotiation Details / Respond ↗"** button linking directly to `/requests/{id}`.
+     - Auto-refreshes when new quotations are submitted or statuses change.
+
+### Build Verification
+- **Backend Build**: `dotnet build Karigor.slnx` → **0 Error(s)**
+- **Frontend Build**: `npm run build` → **0 TypeScript errors, Vite production build succeeded.**
+
+---
+
+## 2026-08-26 | UI Design Harmonization & Notification Popup Redesign
+
+### User Feedback Addressed
+1. **Notification Popup / Toast**:
+   - Removed distracting `animate-bounce` animation.
+   - Positioned the popup prominently at the **top-center** (`fixed top-6 left-1/2 -translate-x-1/2`) so it is immediately visible without blocking corner navigation.
+   - Redesigned the card using the design system (`bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-4 shadow-2xl`, smooth fade/slide transition, clear title, text snippet, and dismiss button).
+2. **UI Design Harmonization**:
+   - **`RequestDetailPage.tsx`**: Harmonized with `BookingDetailPage.tsx` and dashboard pages using standard rounded cards (`rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900`), uniform typography, consistent pastel status badges, clean vertical negotiation step cards, and standard action buttons.
+   - **`WorkerBookingsTab.tsx`**: Harmonized the "My Submitted Quotations & Active Negotiations" section with the "My Active & Past Bookings" section.
+   - **`KarigorMap.tsx`**: Cleaned up the draggable map pin and bottom instructions banner to match the app's clean card styling without distracting radar ping or bouncing effects.
+
+### Build Verification
+- **Backend Build**: `dotnet build Karigor.slnx` → **0 Error(s)**
+- **Frontend Build**: `npm run build` → **0 TypeScript errors, Vite production build succeeded.**
+
+---
+
+## 2026-08-26 | Fix: Quotation Submission Restrictions & Error Handling
+
+### Issues Resolved
+1. **Unwanted Quotation Restrictions**:
+   - `MarketplaceService.CreateQuotationAsync` had an artificial `hasSkill` check blocking workers from submitting bids on requests whose category was not explicitly assigned in their skills.
+   - Threw an error if a worker tried to submit a second quotation on the same request instead of updating their price proposal.
+2. **Misleading Hardcoded Frontend Error**:
+   - `WorkerBookingsTab.tsx` displayed the hardcoded string `"Could not submit quote. You may already have a pending quote for this job."` regardless of the actual server response.
+
+### Changes Implemented
+1. **Backend (`MarketplaceService.cs`)**:
+   - Removed category/skill restriction from `CreateQuotationAsync` — workers can now submit price quotations for any open job without arbitrary limitations.
+   - Enhanced `CreateQuotationAsync` to automatically update an existing pending quotation with the new proposed price and message if the worker bids again on the same job.
+2. **Frontend (`WorkerBookingsTab.tsx`)**:
+   - Replaced hardcoded error string with dynamic server error extraction (`err.response?.data?.error || err.response?.data?.message || 'Could not submit quotation. Please try again.'`) across both Map and List quotation forms.
+
+### Build Verification
+- **Backend Build**: `dotnet build Karigor.slnx` → **0 Error(s)**
+- **Frontend Build**: `npm run build` → **0 TypeScript errors, Vite production build succeeded.**
+
+---
+
+## 2026-08-26 | Fix: Map Pin Quotation ServiceRequestId Parameter Binding
+
+### Root Cause
+- When clicking a service request pin on the Leaflet map, `onSelectRequest(req)` was setting `selectedReq` but omitted updating `quoteFor(req.id)`.
+- When submitting the quotation form, `quoteFor` evaluated to `null`, causing the client to send `{ serviceRequestId: 0 }`.
+- The backend's `[Range(1, int.MaxValue)]` data validation on `ServiceRequestId` failed with HTTP 400 `ValidationProblemDetails`.
+
+### Fix Implemented
+- Refactored `quote` mutation in `WorkerBookingsTab.tsx` to take an explicit `{ serviceRequestId, proposedPrice, note }` payload object.
+- Both the Map View sidebar form and the List View form now pass `serviceRequestId` directly from the selected request item.
+- Integrated `extractErrorMessage` to extract specific server validation messages.
+
+### Build Verification
+- **Frontend Build**: `npm run build` → **0 TypeScript errors, Vite build succeeded.**
+
+---
+
+## 2026-08-26 | Feature: Instant Real-Time Map & Jobs Synchronization (SignalR Push)
+
+### Context & Need
+- When a customer posted a new service request while a worker was viewing the map or jobs list, there was previously a delay until manual navigation/refresh occurred.
+
+### Implementation
+1. **Backend**:
+   - Extended `IRealtimeNotifier` and `SignalRRealtimeNotifier` with `BroadcastAsync(eventName, data)`.
+   - Updated `CustomerService.CreateServiceRequestAsync` to broadcast a real-time `ServiceRequestCreated` WebSocket event immediately upon database persistence.
+2. **Frontend**:
+   - Added `onServiceRequestCreated` in `signalrService.ts`.
+   - Connected `WorkerBookingsTab.tsx` to listen to `ServiceRequestCreated` and immediately invalidate React Query caches (`nearbyRequests` and `availableRequests`).
+   - Added a 15-second background polling fallback (`refetchInterval: 15000`) for complete network resilience.
+
+### Verification
+- **Backend Build**: `dotnet build Karigor.slnx` → **0 Error(s)**
+- **Frontend Build**: `npm run build` → **0 TypeScript errors, Vite production build succeeded.**
+
+---
+
+## 2026-08-26 | Feature: Real-Time Live Quotation & Negotiation Trail Updates
+
+### Context & Need
+- When a customer is viewing the Request Details page (`/requests/:id`), new quotations, counter-offers, and acceptance status changes submitted by workers required a manual page reload to appear.
+
+### Implementation
+1. **Backend (`MarketplaceService.cs`)**:
+   - Injected `IRealtimeNotifier`.
+   - Added real-time `QuotationUpdated` WebSocket broadcast events whenever a quotation is created, countered, or accepted.
+2. **Frontend (`signalrService.ts`, `RequestDetailPage.tsx`, `CustomerRequestsTab.tsx`)**:
+   - Added `onQuotationUpdated` listener in `signalrService.ts`.
+   - Wired `RequestDetailPage.tsx` to automatically invalidate `quotations` and `serviceRequestDetails` queries on receiving `QuotationUpdated` or quotation-related notifications.
+   - Added an 8-second polling fallback interval (`refetchInterval: 8000`) for active negotiation sessions.
+   - Connected `CustomerRequestsTab.tsx` to update request lists and quotation badge counters live.
+
+### Verification
+- **Backend Build**: `dotnet build Karigor.slnx` → **0 Error(s)**
+- **Frontend Build**: `npm run build` → **0 TypeScript errors, Vite production build succeeded.**
+
+---
+
+## 2026-08-26 | Feature: Instant Worker Quotation & Booking Status Synchronization
+
+### Context & Need
+- When a customer accepted a quotation, the worker's open *"Jobs & Bookings"* dashboard tab did not immediately transition the status from `Pending` to `Accepted` or append the newly scheduled booking without a page refresh.
+
+### Implementation
+1. **Frontend (`WorkerBookingsTab.tsx`, `CustomerBookingsTab.tsx`)**:
+   - Attached real-time SignalR listeners for `QuotationUpdated` and `ReceiveNotification` (`BookingCreated`, `QuotationCountered`, `BookingStatusChanged`).
+   - The instant a customer accepts a quotation:
+     - Worker's *"My Submitted Quotations & Active Negotiations"* list immediately flips the badge from `Pending` to `Accepted` with the green checkmark banner.
+     - Worker's *"My Active & Past Bookings"* section instantly displays the newly scheduled booking card with the "Chat with Customer" and "Start work" buttons.
+   - Added active polling resilience intervals (`refetchInterval: 8000`) on bookings and quotations queries.
+
+### Verification
+- **Frontend Build**: `npm run build` → **0 TypeScript errors, Vite production build succeeded.**
+
+
+
+
+
+
+
+
+
+
 
 
 

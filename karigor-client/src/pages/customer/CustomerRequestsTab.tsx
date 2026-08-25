@@ -1,16 +1,34 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { customerApi } from '../../api/customerApi';
+import { signalRService } from '../../services/signalrService';
 
 const STATUS_OPTIONS = ['All', 'Open', 'InProgress', 'Completed', 'Cancelled'] as const;
 
 export function CustomerRequestsTab() {
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const unsubQuote = signalRService.onQuotationUpdated(() => {
+      queryClient.invalidateQueries({ queryKey: ['customerRequests'] });
+    });
+    const unsubNotif = signalRService.onNotification((n) => {
+      if (n.type === 'NewQuotation' || n.type === 'QuotationCountered' || n.type === 'BookingCreated') {
+        queryClient.invalidateQueries({ queryKey: ['customerRequests'] });
+      }
+    });
+    return () => {
+      unsubQuote();
+      unsubNotif();
+    };
+  }, [queryClient]);
 
   const { data: requests, isLoading, isError } = useQuery({
     queryKey: ['customerRequests', selectedStatus],
     queryFn: () => customerApi.getRequests(selectedStatus === 'All' ? undefined : selectedStatus),
+    refetchInterval: 10000,
   });
 
   return (

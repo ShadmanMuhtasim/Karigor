@@ -1,11 +1,64 @@
 import { apiClient } from './client';
+import type { ServiceRequestDto } from './customerApi';
 
-export interface QuotationDto { id: number; serviceRequestId: number; workerId: number; workerName: string; workerBio?: string; averageRating: number; proposedPrice: number; message?: string; status: string; parentQuotationId?: number; }
-export interface BookingDto { id: number; serviceRequestId: number; categoryName: string; workerId: number; workerName: string; customerId: number; customerName: string; agreedPrice: number; scheduledDate: string; status: string; address: string; description?: string; }
-export interface AvailableRequestDto { id: number; categoryName: string; description: string; address: string; preferredDate: string; }
+export interface QuotationDto {
+  id: number;
+  serviceRequestId: number;
+  workerId: number;
+  workerName: string;
+  workerBio?: string;
+  averageRating: number;
+  proposedPrice: number;
+  message?: string;
+  status: string;
+  parentQuotationId?: number;
+  proposedBy?: 'Worker' | 'Customer' | string;
+  negotiationDepth?: number;
+}
+
+export interface WorkerQuotationSummaryDto {
+  quotationId: number;
+  serviceRequestId: number;
+  categoryName: string;
+  customerName: string;
+  address: string;
+  requestStatus: string;
+  myInitialPrice: number;
+  latestPrice: number;
+  latestStatus: string; // "Pending", "Countered", "Accepted", "Rejected"
+  latestProposedBy: string; // "Worker" or "Customer"
+  latestMessage?: string;
+  negotiationStepsCount: number;
+  preferredDate: string;
+}
+
+export interface BookingDto {
+  id: number;
+  serviceRequestId: number;
+  categoryName: string;
+  workerId: number;
+  workerName: string;
+  customerId: number;
+  customerName: string;
+  agreedPrice: number;
+  scheduledDate: string;
+  status: string;
+  address: string;
+  description?: string;
+}
+
+export interface AvailableRequestDto {
+  id: number;
+  categoryName: string;
+  description: string;
+  address: string;
+  preferredDate: string;
+}
 
 export const marketplaceApi = {
+  getRequestDetails: async (requestId: number) => (await apiClient.get<ServiceRequestDto>(`/quotations/request/${requestId}/details`)).data,
   getQuotations: async (requestId: number) => (await apiClient.get<QuotationDto[]>(`/quotations/request/${requestId}`)).data,
+  getWorkerQuotations: async () => (await apiClient.get<WorkerQuotationSummaryDto[]>('/quotations/worker')).data,
   acceptQuotation: async (id: number) => (await apiClient.post<BookingDto>(`/quotations/${id}/accept`)).data,
   counterQuotation: async (id: number, proposedPrice: number, message?: string) => (await apiClient.post<QuotationDto>(`/quotations/${id}/counter`, { proposedPrice, message })).data,
   getCustomerBookings: async () => (await apiClient.get<BookingDto[]>('/bookings/customer')).data,

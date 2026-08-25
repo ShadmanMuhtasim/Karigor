@@ -97,7 +97,15 @@ function AppContent() {
         <Route
           path="/customer/requests/:id"
           element={
-            <ProtectedRoute requiredRole="Customer">
+            <ProtectedRoute>
+              <RequestDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/requests/:id"
+          element={
+            <ProtectedRoute>
               <RequestDetailPage />
             </ProtectedRoute>
           }

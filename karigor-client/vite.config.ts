@@ -21,6 +21,13 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      // Forward SignalR /hubs/* with WebSocket upgrade support
+      '/hubs': {
+        target: 'http://localhost:5253',
+        changeOrigin: true,
+        ws: true,
+        secure: false,
+      },
     },
   },
 })

@@ -99,6 +99,7 @@ try
     builder.Services.AddScoped<Karigor.Application.Worker.IWorkerService, Karigor.Application.Worker.WorkerService>();
     builder.Services.AddScoped<Karigor.Application.Customer.ICustomerService, Karigor.Application.Customer.CustomerService>();
     builder.Services.AddScoped<Karigor.Application.Marketplace.IMarketplaceService, Karigor.Application.Marketplace.MarketplaceService>();
+    builder.Services.AddScoped<Karigor.Application.Location.ILocationService, Karigor.Application.Location.LocationService>();
 
     // -------------------------------------------------------------------------
     // CORS — allow Vite dev server with credentials (for httpOnly cookie)

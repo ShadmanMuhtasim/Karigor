@@ -37,6 +37,11 @@ export function LoginPage() {
     setPassword('Password123!');
   };
 
+  const fillDemoAdmin = () => {
+    setEmail('admin@karigor.com');
+    setPassword('Admin123!');
+  };
+
   return (
     <div className="min-h-screen bg-white dark:bg-gray-950 text-gray-900 dark:text-white transition-colors duration-200 flex flex-col">
       <Navbar />
@@ -193,20 +198,27 @@ export function LoginPage() {
               <span className="text-[11px] uppercase font-bold text-gray-400 dark:text-gray-500 block mb-2 text-center tracking-wider">
                 Quick Demo Fill
               </span>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
                   onClick={fillDemoCustomer}
-                  className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 rounded-lg text-xs font-semibold border border-indigo-200 dark:border-indigo-800 transition cursor-pointer"
+                  className="px-2 py-1.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 rounded-lg text-xs font-semibold border border-indigo-200 dark:border-indigo-800 transition cursor-pointer text-center"
                 >
                   Customer Demo
                 </button>
                 <button
                   type="button"
                   onClick={fillDemoWorker}
-                  className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 rounded-lg text-xs font-semibold border border-emerald-200 dark:border-emerald-800 transition cursor-pointer"
+                  className="px-2 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 rounded-lg text-xs font-semibold border border-emerald-200 dark:border-emerald-800 transition cursor-pointer text-center"
                 >
                   Worker Demo
+                </button>
+                <button
+                  type="button"
+                  onClick={fillDemoAdmin}
+                  className="px-2 py-1.5 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 hover:bg-purple-100 rounded-lg text-xs font-semibold border border-purple-200 dark:border-purple-800 transition cursor-pointer text-center"
+                >
+                  Admin Demo
                 </button>
               </div>
             </div>

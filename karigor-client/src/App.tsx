@@ -19,6 +19,7 @@ import { RequestDetailPage } from './pages/RequestDetailPage';
 import { SearchWorkersPage } from './pages/SearchWorkersPage';
 import { WorkerProfilePage } from './pages/WorkerProfilePage';
 import { BookingDetailPage } from './pages/BookingDetailPage';
+import { AdminDashboard } from './pages/AdminDashboard';
 
 /**
  * RootRouteHandler — implements the routing logic requested:
@@ -40,6 +41,7 @@ function RootRouteHandler() {
  */
 function SmartDashboard() {
   const { user } = useAuth();
+  if (user?.role === 'Admin') return <Navigate to="/dashboard/admin" replace />;
   if (user?.role === 'Worker') return <Navigate to="/dashboard/worker" replace />;
   return <Navigate to="/dashboard/customer" replace />;
 }
@@ -137,6 +139,24 @@ function AppContent() {
           }
         />
         <Route path="/bookings/:id" element={<ProtectedRoute><BookingDetailPage /></ProtectedRoute>} />
+
+        {/* Admin Routes */}
+        <Route
+          path="/dashboard/admin"
+          element={
+            <ProtectedRoute requiredRole="Admin">
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/dashboard"
+          element={
+            <ProtectedRoute requiredRole="Admin">
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Root: When not logged in -> /login; When logged in -> /home */}
         <Route path="/" element={<RootRouteHandler />} />

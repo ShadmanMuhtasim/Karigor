@@ -490,19 +490,14 @@
 
 
 
-\### Definition of Done
+### Definition of Done
 
-\- \[ ] Admin can view pending worker verifications
-
-\- \[ ] Admin can approve/reject verification
-
-\- \[ ] Admin can manage service categories
-
-\- \[ ] Admin can view platform stats
-
-\- \[ ] Admin can suspend users
-
-\- \[ ] Admin can moderate reviews
+- [x] Admin can view pending worker verifications
+- [x] Admin can approve/reject verification
+- [x] Admin can manage service categories
+- [x] Admin can view platform stats
+- [x] Admin can suspend users
+- [x] Admin can moderate reviews
 
 
 

@@ -1222,6 +1222,117 @@ Implemented the complete end-to-end Reviews and Ratings system for Karigor acros
 
 **MILESTONE_8_STATUS=COMPLETE**
 
+---
+
+## 2026-08-26 | Milestone 9 — Admin Module & Review Moderation (Completed & Verified)
+
+**Status:** IMPLEMENTED + BUILD & RUNTIME VERIFIED (Backend: 0 Errors, Frontend: 0 Errors)  
+**Lead:** Ahbab Hasan | **Assist:** All Team
+
+### Summary of Implementation
+
+Implemented the complete end-to-end Admin Module & Review Moderation for the Karigor marketplace across backend and frontend, providing centralized system governance, artisan identity verification queues, platform user account suspension/reactivation, service category lifecycle management, booking oversight, review moderation with automatic worker rating recalculation, and platform KPI analytics.
+
+#### 1. Backend Implementation (C# / .NET 10)
+- **Application Layer (`backend/Karigor.Application/Admin/`)**:
+  - `IAdminService.cs` & `AdminService.cs`:
+    - **9.9 `GetPlatformStatsAsync`**: Computes platform analytics (Total Users, Customers, Workers, Verified Workers, Pending Verifications, Total Service Requests, Open Requests, Total Bookings, Completed, In-Progress, Cancelled, Gross Transaction Volume in BDT ৳, Average Platform Satisfaction Rating, Total Reviews, and Service Categories count).
+    - **9.2 `GetPendingWorkersAsync`**: Lists artisan profiles with verification statuses, specializations, hourly rates, and submitted identification documents.
+    - **9.3 `VerifyWorkerAsync`**: Updates `WorkerProfile.VerificationStatus` and document statuses to `Verified` or `Rejected`, dispatches in-app notifications (`WorkerVerified` / `WorkerRejected`), and broadcasts real-time WebSocket events.
+    - **9.4 `GetUsersAsync`**: Queries all registered accounts with role filters (`Customer`, `Worker`, `Admin`), search keywords, and active/suspension status.
+    - **9.5 `ToggleUserSuspensionAsync`**: Updates `ApplicationUser.LockoutEnd`, revokes active refresh tokens immediately to terminate existing sessions, and prevents future token acquisition.
+    - **9.6 `GetBookingsAsync`**: Platform-wide booking monitor with status filters (`Scheduled`, `InProgress`, `Completed`, `Cancelled`) and review score summaries.
+    - **9.7 `GetReviewsAsync`**: Retrieves all reviews across the platform with rating filters (5★ to 1★) and keyword search.
+    - **9.8 `ModerateReviewAsync` & `DeleteReviewAsync`**: Allows sanitizing customer review comments/worker replies or permanently deleting inappropriate reviews with automatic recalculation of the worker's `WorkerProfile.AverageRating`.
+    - **9.10–9.13 Service Categories CRUD**:
+      - `GetCategoriesAsync`: Returns categories with real-time artisan count and service request usage counts.
+      - `CreateCategoryAsync`: Creates new service trade category with name and icon URL.
+      - `UpdateCategoryAsync`: Modifies category metadata.
+      - `DeleteCategoryAsync`: Safe category deletion preventing deletion when referenced by active service requests.
+  - **DTOs (`backend/Karigor.Application/Admin/DTOs/AdminDtos.cs`)**:
+    - `AdminStatsDto.cs`, `PendingWorkerDto.cs`, `WorkerVerificationDocumentDto.cs`, `VerifyWorkerDto.cs`, `AdminUserDto.cs`, `UserSuspensionDto.cs`, `AdminBookingDto.cs`, `AdminReviewDto.cs`, `ModerateReviewDto.cs`, `AdminCategoryDto.cs`, `CreateCategoryDto.cs`, `UpdateCategoryDto.cs`.
+- **API Layer (`backend/Karigor.Api/`)**:
+  - `Controllers/AdminController.cs`:
+    - `[Authorize(Roles = "Admin")]` class-level security.
+    - `GET /api/admin/stats` (9.9)
+    - `GET /api/admin/workers/pending` (9.2)
+    - `PUT /api/admin/workers/{id}/verify` (9.3)
+    - `GET /api/admin/users` (9.4)
+    - `PUT /api/admin/users/{id}/suspend` (9.5)
+    - `GET /api/admin/bookings` (9.6)
+    - `GET /api/admin/reviews` (9.7)
+    - `PUT /api/admin/reviews/{id}/moderate` (9.8)
+    - `DELETE /api/admin/reviews/{id}` (9.8 delete)
+    - `GET /api/admin/categories` (9.10)
+    - `POST /api/admin/categories` (9.11)
+    - `PUT /api/admin/categories/{id}` (9.12)
+    - `DELETE /api/admin/categories/{id}` (9.13)
+  - `Program.cs`:
+    - Registered `IAdminService` in DI (`AddScoped<IAdminService, AdminService>()`).
+    - Added idempotent startup seeding for default Administrator account (`admin@karigor.com` / `Admin123!`).
+- **Authentication Suspension Integration**:
+  - `AuthService.cs`: Updated `LoginAsync` and `RefreshAsync` to reject suspended user accounts (`LockoutEnd > UtcNow`).
+
+#### 2. Frontend Implementation (React + TypeScript + Tailwind)
+- **API Client (`karigor-client/src/api/adminApi.ts`)**:
+  - Typed client for all administrative endpoints.
+- **Admin Dashboard Tabs (`karigor-client/src/pages/admin/`)**:
+  - `AdminOverviewTab.tsx`: KPI metric cards (Total Users, Verified Pros, Bookings, Gross Volume, Satisfaction Rating) and quick action jump links.
+  - `AdminVerificationsTab.tsx`: Verification queue with status filters, document inspection preview modal (PDF/images), and Approve / Reject workflows with feedback notes.
+  - `AdminUsersTab.tsx`: Searchable user table with role filters and Account Suspend / Reactivate controls with confirmation modal.
+  - `AdminCategoriesTab.tsx`: Service categories CRUD grid with icon previews, usage counters, Add Category modal, and Edit Category modal.
+  - `AdminBookingsTab.tsx`: Platform booking monitor with status filters (`Scheduled`, `InProgress`, `Completed`, `Cancelled`) and booking inspection modal.
+  - `AdminReviewsTab.tsx`: Review moderation center with rating filters, full comment inspection, Comment Sanitizer modal, and Delete Review confirmation.
+- **Master Admin Dashboard (`karigor-client/src/pages/AdminDashboard.tsx`)**:
+  - Responsive 6-tab workspace with Admin role banner and session controls adhering to the application design system.
+- **App & Navigation Integration**:
+  - `App.tsx`: Added protected routes `/dashboard/admin` and `/admin/dashboard` guarded with `<ProtectedRoute requiredRole="Admin">`, updated `SmartDashboard` to redirect `Admin` users to `/dashboard/admin`.
+  - `LoginPage.tsx`: Added "Admin Demo" quick-fill button (`admin@karigor.com` / `Admin123!`).
+  - `Navbar.tsx`: Added purple Admin role badge and updated back navigation paths.
+
+### Files Created or Updated
+
+#### Files Created:
+1. `backend/Karigor.Application/Admin/DTOs/AdminDtos.cs`
+2. `backend/Karigor.Application/Admin/IAdminService.cs`
+3. `backend/Karigor.Application/Admin/AdminService.cs`
+4. `backend/Karigor.Api/Controllers/AdminController.cs`
+5. `karigor-client/src/api/adminApi.ts`
+6. `karigor-client/src/pages/admin/AdminOverviewTab.tsx`
+7. `karigor-client/src/pages/admin/AdminVerificationsTab.tsx`
+8. `karigor-client/src/pages/admin/AdminUsersTab.tsx`
+9. `karigor-client/src/pages/admin/AdminCategoriesTab.tsx`
+10. `karigor-client/src/pages/admin/AdminBookingsTab.tsx`
+11. `karigor-client/src/pages/admin/AdminReviewsTab.tsx`
+12. `karigor-client/src/pages/AdminDashboard.tsx`
+
+#### Files Updated:
+1. `backend/Karigor.Application/Auth/AuthService.cs` — Added account suspension verification to `LoginAsync` and `RefreshAsync`.
+2. `backend/Karigor.Api/Program.cs` — Registered `IAdminService` and added default Admin user seeding.
+3. `karigor-client/src/App.tsx` — Registered Admin routes and updated smart redirect.
+4. `karigor-client/src/pages/auth/LoginPage.tsx` — Added Admin Demo login helper button.
+5. `karigor-client/src/components/Navbar.tsx` — Added Admin navigation logic and role styling.
+6. `dev_log/OVERALL_PLAN.md` — Updated Milestone 9 completion status.
+7. `dev_log/task_progress.md` — Updated Milestone 9 task checklist.
+8. `dev_log/WORK_DONE.md` — Documented Milestone 9 completion.
+
+### Build & Test Verification
+
+- **Backend Build**: `dotnet build Karigor.slnx` → **0 Warning(s), 0 Error(s)**
+- **Frontend Build**: `npm run build` → **0 TypeScript errors, Vite production build succeeded (219 modules transformed).**
+- **API Runtime Testing**:
+  - Admin Login (`admin@karigor.com`) → **PASS** (Issued JWT with `Role: Admin`).
+  - `GET /api/admin/stats` → **PASS** (Returned 200 OK with KPIs).
+  - `GET /api/admin/workers/pending` → **PASS** (Returned 200 OK).
+  - `GET /api/admin/users` → **PASS** (Returned 200 OK with registered users).
+  - `GET /api/admin/bookings` → **PASS** (Returned 200 OK).
+  - `GET /api/admin/reviews` → **PASS** (Returned 200 OK).
+  - Category CRUD (`POST`, `PUT`, `DELETE /api/admin/categories`) → **PASS**.
+  - Security (Unauthenticated `GET /api/admin/stats` → 401 Unauthorized) → **PASS**.
+
+**MILESTONE_9_STATUS=COMPLETE**
+
+
 
 
 

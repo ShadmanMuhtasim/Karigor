@@ -470,6 +470,7 @@ public class MarketplaceService(
             .Include(b => b.Worker).ThenInclude(w => w.User)
             .Include(b => b.Customer)
             .Include(b => b.ServiceRequest).ThenInclude(r => r.Category)
+            .Include(b => b.Review)
             .Where(b => b.CustomerId == customer.Id)
             .OrderByDescending(b => b.Id)
             .Select(b => new BookingDto
@@ -485,7 +486,21 @@ public class MarketplaceService(
                 ScheduledDate      = b.ScheduledDate,
                 Status             = b.Status,
                 Address            = b.ServiceRequest.Address,
-                Description        = b.ServiceRequest.Description
+                Description        = b.ServiceRequest.Description,
+                Review             = b.Review != null ? new Karigor.Application.Reviews.DTOs.ReviewDto
+                {
+                    Id             = b.Review.Id,
+                    BookingId      = b.Review.BookingId,
+                    WorkerId       = b.WorkerId,
+                    WorkerName     = b.Worker.User.Email,
+                    CustomerId     = b.CustomerId,
+                    CustomerName   = b.Customer.FullName ?? "Customer",
+                    CategoryName   = b.ServiceRequest.Category.Name,
+                    Rating         = b.Review.Rating,
+                    Comment        = b.Review.Comment,
+                    WorkerResponse = b.Review.WorkerResponse,
+                    BookingDate    = b.ScheduledDate
+                } : null
             })
             .ToListAsync();
     }
@@ -497,6 +512,7 @@ public class MarketplaceService(
             .Include(b => b.Worker).ThenInclude(w => w.User)
             .Include(b => b.Customer)
             .Include(b => b.ServiceRequest).ThenInclude(r => r.Category)
+            .Include(b => b.Review)
             .Where(b => b.WorkerId == worker.Id)
             .OrderByDescending(b => b.Id)
             .Select(b => new BookingDto
@@ -512,7 +528,21 @@ public class MarketplaceService(
                 ScheduledDate      = b.ScheduledDate,
                 Status             = b.Status,
                 Address            = b.ServiceRequest.Address,
-                Description        = b.ServiceRequest.Description
+                Description        = b.ServiceRequest.Description,
+                Review             = b.Review != null ? new Karigor.Application.Reviews.DTOs.ReviewDto
+                {
+                    Id             = b.Review.Id,
+                    BookingId      = b.Review.BookingId,
+                    WorkerId       = b.WorkerId,
+                    WorkerName     = b.Worker.User.Email,
+                    CustomerId     = b.CustomerId,
+                    CustomerName   = b.Customer.FullName ?? "Customer",
+                    CategoryName   = b.ServiceRequest.Category.Name,
+                    Rating         = b.Review.Rating,
+                    Comment        = b.Review.Comment,
+                    WorkerResponse = b.Review.WorkerResponse,
+                    BookingDate    = b.ScheduledDate
+                } : null
             })
             .ToListAsync();
     }
@@ -523,6 +553,7 @@ public class MarketplaceService(
             .Include(b => b.Worker).ThenInclude(w => w.User)
             .Include(b => b.Customer)
             .Include(b => b.ServiceRequest).ThenInclude(r => r.Category)
+            .Include(b => b.Review)
             .FirstOrDefaultAsync(b => b.Id == bookingId)
             ?? throw new KeyNotFoundException("Booking not found.");
 
@@ -545,7 +576,21 @@ public class MarketplaceService(
             ScheduledDate      = booking.ScheduledDate,
             Status             = booking.Status,
             Address            = booking.ServiceRequest.Address,
-            Description        = booking.ServiceRequest.Description
+            Description        = booking.ServiceRequest.Description,
+            Review             = booking.Review != null ? new Karigor.Application.Reviews.DTOs.ReviewDto
+            {
+                Id             = booking.Review.Id,
+                BookingId      = booking.Review.BookingId,
+                WorkerId       = booking.WorkerId,
+                WorkerName     = booking.Worker.User?.Email ?? $"Worker #{booking.WorkerId}",
+                CustomerId     = booking.CustomerId,
+                CustomerName   = booking.Customer.FullName ?? "Customer",
+                CategoryName   = booking.ServiceRequest.Category.Name,
+                Rating         = booking.Review.Rating,
+                Comment        = booking.Review.Comment,
+                WorkerResponse = booking.Review.WorkerResponse,
+                BookingDate    = booking.ScheduledDate
+            } : null
         };
     }
 
@@ -591,9 +636,15 @@ public class MarketplaceService(
         return await BookingDtoAsync(bookingId);
     }
 
-    private async Task<BookingDto> BookingDtoAsync(int id)
+    private async Task<BookingDto> BookingDtoAsync(int bookingId)
     {
-        var x = await db.Bookings.Include(b => b.Worker).ThenInclude(w => w.User).Include(b => b.Customer).Include(b => b.ServiceRequest).ThenInclude(r => r.Category).FirstAsync(b => b.Id == id);
+        var x = await db.Bookings
+            .Include(b => b.Worker).ThenInclude(w => w.User)
+            .Include(b => b.Customer)
+            .Include(b => b.ServiceRequest).ThenInclude(r => r.Category)
+            .Include(b => b.Review)
+            .FirstAsync(b => b.Id == bookingId);
+
         return new BookingDto
         {
             Id                 = x.Id,
@@ -607,7 +658,21 @@ public class MarketplaceService(
             ScheduledDate      = x.ScheduledDate,
             Status             = x.Status,
             Address            = x.ServiceRequest.Address,
-            Description        = x.ServiceRequest.Description
+            Description        = x.ServiceRequest.Description,
+            Review             = x.Review != null ? new Karigor.Application.Reviews.DTOs.ReviewDto
+            {
+                Id             = x.Review.Id,
+                BookingId      = x.Review.BookingId,
+                WorkerId       = x.WorkerId,
+                WorkerName     = x.Worker.User?.Email ?? $"Worker #{x.WorkerId}",
+                CustomerId     = x.CustomerId,
+                CustomerName   = x.Customer.FullName ?? "Customer",
+                CategoryName   = x.ServiceRequest.Category.Name,
+                Rating         = x.Review.Rating,
+                Comment        = x.Review.Comment,
+                WorkerResponse = x.Review.WorkerResponse,
+                BookingDate    = x.ScheduledDate
+            } : null
         };
     }
 

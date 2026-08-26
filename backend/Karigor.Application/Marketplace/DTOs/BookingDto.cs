@@ -1,3 +1,6 @@
+using System;
+using Karigor.Application.Reviews.DTOs;
+
 namespace Karigor.Application.Marketplace.DTOs;
 
 public class BookingDto
@@ -14,4 +17,5 @@ public class BookingDto
     public string Status { get; set; } = string.Empty;
     public string Address { get; set; } = string.Empty;
     public string? Description { get; set; }
+    public ReviewDto? Review { get; set; }
 }

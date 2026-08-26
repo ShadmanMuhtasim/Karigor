@@ -1133,6 +1133,96 @@ Implemented complete location-based matching and interactive geospatial mapping 
 ### Verification
 - **Frontend Build**: `npm run build` → **0 TypeScript errors, Vite production build succeeded.**
 
+---
+
+## 2026-08-26 | Milestone 8 — Reviews & Ratings (Completed & Verified)
+
+**Status:** IMPLEMENTED + BUILD VERIFIED (Backend: 0 Errors, Frontend: 0 Errors)  
+**Lead:** Ahbab Hasan | **Assist:** Mustakim Musa
+
+### Summary of Implementation
+
+Implemented the complete end-to-end Reviews and Ratings system for Karigor across backend and frontend, enabling verified customer feedback on completed jobs, automatic aggregate worker rating computation, multi-star visual ratings, and bidirectional worker response capabilities with real-time SignalR broadcasts.
+
+#### 1. Backend Implementation (C# / .NET 10)
+- **Application Layer (`backend/Karigor.Application/Reviews/`)**:
+  - `IReviewService.cs` & `ReviewService.cs`:
+    - **8.2 `CreateReviewAsync`**: Allows customers to review completed bookings (validates customer ownership, enforces `Completed` booking status, prevents duplicate reviews on the same booking, validates rating 1–5 stars).
+    - **8.6 Automatic Rating Recalculation**: Automatically recalculates and updates `WorkerProfile.AverageRating` upon every new review submission (`Round(Average(Rating), 2)`).
+    - **8.3 `GetWorkerReviewsAsync`**: Public endpoint returning all reviews for a worker, with aggregate average rating, total review count, and a 5-star distribution breakdown (`5★, 4★, 3★, 2★, 1★`).
+    - **8.4 `GetBookingReviewAsync`**: Retrieves the review for a specific booking.
+    - **8.5 `RespondToReviewAsync`**: Allows the assigned worker to submit or edit a public `WorkerResponse` to customer feedback.
+    - **8.7 `GetCompletedBookingsEligibleForReviewAsync`**: Lists completed bookings for a customer where no review has been submitted yet.
+    - **Automated Notifications & Real-Time Events**: In-app notifications sent when reviews or replies are submitted (`ReviewCreated`, `ReviewResponse`) and broadcast live via `IRealtimeNotifier`.
+  - **DTOs (`backend/Karigor.Application/Reviews/DTOs/`)**:
+    - `ReviewDto.cs`
+    - `CreateReviewDto.cs`
+    - `WorkerReviewResponseDto.cs`
+    - `WorkerReviewsSummaryDto.cs`
+- **API Layer (`backend/Karigor.Api/`)**:
+  - `Controllers/ReviewsController.cs`:
+    - `POST /api/reviews` — `[Authorize(Roles = "Customer")]`
+    - `GET /api/reviews/worker/{workerId}` — `[AllowAnonymous]` (public)
+    - `GET /api/reviews/booking/{bookingId}` — `[Authorize]`
+    - `PUT /api/reviews/{id}/response` — `[Authorize(Roles = "Worker")]`
+    - `GET /api/reviews/eligible-bookings` — `[Authorize(Roles = "Customer")]`
+  - `Program.cs`: Registered `IReviewService` in dependency injection.
+- **Marketplace Integration**:
+  - Updated `MarketplaceService.cs` to include `Review` in all booking history queries (`GetCustomerBookingsAsync`, `GetWorkerBookingsAsync`, `GetBookingAsync`, and `BookingDtoAsync`).
+
+#### 2. Frontend Implementation (React + TypeScript + Tailwind)
+- **API Client (`karigor-client/src/api/reviewApi.ts`)**:
+  - Typed client for all review operations (`createReview`, `getWorkerReviews`, `getBookingReview`, `respondToReview`, `getEligibleBookings`).
+- **Interactive UI Components**:
+  - `RatingStars.tsx`: Flexible 5-star rating component supporting interactive tap/hover modes, multiple sizes (`sm`, `md`, `lg`, `xl`), and numeric score display.
+  - `ReviewModal.tsx`: Customer modal for rating (1–5 stars with descriptive labels) + written feedback text.
+  - `WorkerReviewResponseModal.tsx`: Worker modal for writing and updating replies to customer feedback.
+  - `WorkerReviewsList.tsx`: Complete satisfaction overview card with overall score, 5-to-1 star percentage distribution bars, and individual review cards with worker replies.
+- **Dashboard & Page Integration**:
+  - `CustomerBookingsTab.tsx`: On completed bookings, displays a prominent **"⭐ Write a Review"** button if unreviewed, or the verified rating badge and worker reply if already reviewed.
+  - `WorkerBookingsTab.tsx`: Displays customer reviews on completed bookings with a direct **"💬 Reply to Review"** action.
+  - `BookingDetailPage.tsx`: Dedicated "⭐ Service Rating & Feedback" card in split view with customer review submission and worker reply actions.
+  - `WorkerProfilePage.tsx`: Integrated full `WorkerReviewsList` and dynamic star counter on public worker profile.
+  - `WorkerDashboard.tsx` & `WorkerReviewsTab.tsx`: Added dedicated **"Reviews ⭐"** tab to the Worker Dashboard for inspecting client feedback and responding directly.
+  - `signalrService.ts`: Added `onReviewCreated` and `onReviewUpdated` real-time listeners for live UI synchronization.
+
+### Files Created or Updated
+
+#### Files Created:
+1. `backend/Karigor.Application/Reviews/DTOs/ReviewDto.cs`
+2. `backend/Karigor.Application/Reviews/DTOs/CreateReviewDto.cs`
+3. `backend/Karigor.Application/Reviews/DTOs/WorkerReviewResponseDto.cs`
+4. `backend/Karigor.Application/Reviews/DTOs/WorkerReviewsSummaryDto.cs`
+5. `backend/Karigor.Application/Reviews/IReviewService.cs`
+6. `backend/Karigor.Application/Reviews/ReviewService.cs`
+7. `backend/Karigor.Api/Controllers/ReviewsController.cs`
+8. `karigor-client/src/api/reviewApi.ts`
+9. `karigor-client/src/components/reviews/RatingStars.tsx`
+10. `karigor-client/src/components/reviews/ReviewModal.tsx`
+11. `karigor-client/src/components/reviews/WorkerReviewResponseModal.tsx`
+12. `karigor-client/src/components/reviews/WorkerReviewsList.tsx`
+13. `karigor-client/src/pages/worker/WorkerReviewsTab.tsx`
+
+#### Files Updated:
+1. `backend/Karigor.Application/Marketplace/DTOs/BookingDto.cs` — Added `ReviewDto? Review`.
+2. `backend/Karigor.Application/Marketplace/MarketplaceService.cs` — Mapped review data into booking queries.
+3. `backend/Karigor.Api/Program.cs` — Registered `IReviewService`.
+4. `karigor-client/src/api/marketplaceApi.ts` — Added `review` property to `BookingDto`.
+5. `karigor-client/src/services/signalrService.ts` — Added `onReviewCreated` & `onReviewUpdated` listeners.
+6. `karigor-client/src/pages/customer/CustomerBookingsTab.tsx` — Added review cards, review trigger button, and modal.
+7. `karigor-client/src/pages/worker/WorkerBookingsTab.tsx` — Added review feedback display and worker reply modal.
+8. `karigor-client/src/pages/BookingDetailPage.tsx` — Added review feedback card and modals.
+9. `karigor-client/src/pages/WorkerProfilePage.tsx` — Added `WorkerReviewsList` and rating score.
+10. `karigor-client/src/pages/WorkerDashboard.tsx` — Added **Reviews ⭐** tab.
+11. `dev_log/WORK_DONE.md` — Documented Milestone 8 completion.
+
+### Build Verification
+- **Backend Build**: `dotnet build Karigor.slnx` → **0 Warning(s), 0 Error(s)**
+- **Frontend Build**: `npm run build` → **0 TypeScript errors, Vite production build succeeded (211 modules transformed).**
+
+**MILESTONE_8_STATUS=COMPLETE**
+
+
 
 
 

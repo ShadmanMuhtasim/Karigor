@@ -548,6 +548,58 @@
   - Harmonized `RequestDetailPage.tsx` and `WorkerBookingsTab.tsx` with standard dashboard container styles.
   - Streamlined Leaflet map draggable marker and bottom coordinate banner.
 
+## Milestone 8 — Reviews & Ratings
+**Status:** COMPLETE (Build & Integration Verified)
+
+### Completed Milestone 8 Items:
+- [x] `ReviewController.cs` with role-based and public endpoints (Task 8.1)
+- [x] `POST /api/reviews` — Customer submits review for completed booking (Task 8.2)
+- [x] `GET /api/reviews/worker/{workerId}` — Public worker reviews and 5-to-1 star distribution (Task 8.3)
+- [x] `GET /api/reviews/booking/{bookingId}` — Get review for a booking (Task 8.4)
+- [x] `PUT /api/reviews/{id}/response` — Worker responds to customer review (Task 8.5)
+- [x] `WorkerProfile.AverageRating` automatic recalculation upon review creation (Task 8.6)
+- [x] `GET /api/reviews/eligible-bookings` — List completed unreviewed customer bookings (Task 8.7)
+- [x] `RatingStars.tsx` flexible star component (Task 8.8)
+- [x] `WorkerReviewsList.tsx` worker reviews showcase (Task 8.9)
+- [x] Customer review modal on completed bookings (Task 8.10)
+- [x] Worker review response modal (Task 8.11)
+- [x] `WorkerReviewsTab.tsx` in Worker Dashboard (Task 8.12)
+- [x] Backend Build: 0 Errors, 0 Warnings
+- [x] Frontend Build: 0 Errors, 0 Warnings
+
+**MILESTONE_8_STATUS=COMPLETE**
+
+## Milestone 9 — Admin Module & Review Moderation
+**Status:** COMPLETE (Build & Integration Verified)
+
+### Completed Milestone 9 Items:
+- [x] `AdminController.cs` with class-level `[Authorize(Roles = "Admin")]` protection (Task 9.1)
+- [x] `GET /api/admin/workers/pending` — Worker verification queue with documents and profiles (Task 9.2)
+- [x] `PUT /api/admin/workers/{id}/verify` — Approve/reject worker verification with in-app notification (Task 9.3)
+- [x] `GET /api/admin/users` — Searchable, filterable list of all registered users (Task 9.4)
+- [x] `PUT /api/admin/users/{id}/suspend` — Account suspension/reactivation with immediate token revocation (Task 9.5)
+- [x] `GET /api/admin/bookings` — Platform-wide booking oversight and status monitoring (Task 9.6)
+- [x] `GET /api/admin/reviews` — Platform review listing for moderation (Task 9.7)
+- [x] `PUT /api/admin/reviews/{id}/moderate` & `DELETE /api/admin/reviews/{id}` — Sanitize/delete reviews with automatic rating recalculation (Task 9.8)
+- [x] `GET /api/admin/stats` — Platform analytics and system KPIs (Task 9.9)
+- [x] `GET /api/admin/categories` — List service categories with usage metrics (Task 9.10)
+- [x] `POST /api/admin/categories` — Create service category (Task 9.11)
+- [x] `PUT /api/admin/categories/{id}` — Update service category (Task 9.12)
+- [x] `DELETE /api/admin/categories/{id}` — Safe category deletion with dependency validation (Task 9.13)
+- [x] Admin authentication, startup seeding (`admin@karigor.com` / `Admin123!`), and quick demo button (Task 9.14)
+- [x] `AdminOverviewTab.tsx` — Platform analytics and KPI metric cards (Task 9.15)
+- [x] `AdminVerificationsTab.tsx` — Verification queue with document preview modal (Task 9.16)
+- [x] `AdminUsersTab.tsx` — User management and suspension controls (Task 9.17)
+- [x] `AdminBookingsTab.tsx` — Platform booking monitoring and inspection modal (Task 9.18)
+- [x] `AdminReviewsTab.tsx` — Review moderation center with sanitization modal (Task 9.19)
+- [x] `AdminCategoriesTab.tsx` — Service category management grid with CRUD modals (Task 9.20)
+- [x] `AdminDashboard.tsx` — Modern 6-tab Admin workspace adhering to the design system (Task 9.21)
+- [x] Backend Build: 0 Errors, 0 Warnings
+- [x] Frontend Build: 0 TypeScript Errors, Vite Production Build Successful
+
+**MILESTONE_9_STATUS=COMPLETE**
+
+
 
 
 

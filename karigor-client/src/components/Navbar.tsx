@@ -30,7 +30,7 @@ export function Navbar() {
     if (path.startsWith('/customer/search')) {
       return { label: 'Back to Dashboard', to: '/dashboard/customer' };
     }
-    if (path.startsWith('/dashboard/customer') || path.startsWith('/dashboard/worker') || path === '/dashboard') {
+    if (path.startsWith('/dashboard') || path.startsWith('/admin')) {
       return { label: 'Back to Home', to: '/home' };
     }
     if (path === '/categories') {
@@ -148,7 +148,7 @@ export function Navbar() {
                 <span className="text-sm font-bold text-gray-900 dark:text-white line-clamp-1 max-w-[150px]">
                   {user.email}
                 </span>
-                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
+                <span className={`text-xs font-semibold ${user.role === 'Admin' ? 'text-purple-600 dark:text-purple-400 font-bold' : 'text-emerald-600 dark:text-emerald-400'}`}>
                   {user.role}
                 </span>
               </div>

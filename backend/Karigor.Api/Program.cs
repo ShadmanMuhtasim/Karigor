@@ -121,6 +121,7 @@ try
     builder.Services.AddScoped<Karigor.Application.Notifications.INotificationService, Karigor.Application.Notifications.NotificationService>();
     builder.Services.AddScoped<Karigor.Application.Messaging.IMessagingService, Karigor.Application.Messaging.MessagingService>();
     builder.Services.AddScoped<Karigor.Application.Reviews.IReviewService, Karigor.Application.Reviews.ReviewService>();
+    builder.Services.AddScoped<Karigor.Application.Admin.IAdminService, Karigor.Application.Admin.AdminService>();
 
     // -------------------------------------------------------------------------
     // CORS — allow Vite dev server with credentials (for httpOnly cookie)
@@ -148,7 +149,7 @@ try
     // -------------------------------------------------------------------------
     var app = builder.Build();
 
-    // Seed roles on startup (idempotent) - inline seed to avoid RoleSeeder dependency
+    // Seed roles and initial admin on startup (idempotent)
     using (var scope = app.Services.CreateScope())
     {
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
@@ -157,6 +158,32 @@ try
             if (!roleManager.RoleExistsAsync(roleName).GetAwaiter().GetResult())
             {
                 roleManager.CreateAsync(new IdentityRole(roleName)).GetAwaiter().GetResult();
+            }
+        }
+
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        const string adminEmail = "admin@karigor.com";
+        var existingAdmin = userManager.FindByEmailAsync(adminEmail).GetAwaiter().GetResult();
+        if (existingAdmin == null)
+        {
+            var adminUser = new ApplicationUser
+            {
+                UserName = adminEmail,
+                Email = adminEmail,
+                EmailConfirmed = true
+            };
+            var createRes = userManager.CreateAsync(adminUser, "Admin123!").GetAwaiter().GetResult();
+            if (createRes.Succeeded)
+            {
+                userManager.AddToRoleAsync(adminUser, "Admin").GetAwaiter().GetResult();
+                Log.Information("Seeded default Administrator account: {AdminEmail}", adminEmail);
+            }
+        }
+        else
+        {
+            if (!userManager.IsInRoleAsync(existingAdmin, "Admin").GetAwaiter().GetResult())
+            {
+                userManager.AddToRoleAsync(existingAdmin, "Admin").GetAwaiter().GetResult();
             }
         }
 

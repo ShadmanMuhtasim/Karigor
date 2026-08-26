@@ -10,6 +10,8 @@ class SignalRService {
   private typingListeners: Array<(data: { bookingId: number; userId: string; isTyping: boolean }) => void> = [];
   private serviceRequestListeners: Array<(data: any) => void> = [];
   private quotationListeners: Array<(data: any) => void> = [];
+  private reviewCreatedListeners: Array<(data: any) => void> = [];
+  private reviewUpdatedListeners: Array<(data: any) => void> = [];
   private joinedBookings = new Set<number>();
   private connectionPromise: Promise<void> | null = null;
 
@@ -90,6 +92,26 @@ class SignalRService {
               listener(data);
             } catch (err) {
               console.error('Error in quotation listener:', err);
+            }
+          });
+        });
+
+        conn.on('ReviewCreated', (data: any) => {
+          this.reviewCreatedListeners.forEach((listener) => {
+            try {
+              listener(data);
+            } catch (err) {
+              console.error('Error in review created listener:', err);
+            }
+          });
+        });
+
+        conn.on('ReviewUpdated', (data: any) => {
+          this.reviewUpdatedListeners.forEach((listener) => {
+            try {
+              listener(data);
+            } catch (err) {
+              console.error('Error in review updated listener:', err);
             }
           });
         });
@@ -201,6 +223,20 @@ class SignalRService {
     this.quotationListeners.push(callback);
     return () => {
       this.quotationListeners = this.quotationListeners.filter((cb) => cb !== callback);
+    };
+  }
+
+  public onReviewCreated(callback: (data: any) => void): () => void {
+    this.reviewCreatedListeners.push(callback);
+    return () => {
+      this.reviewCreatedListeners = this.reviewCreatedListeners.filter((cb) => cb !== callback);
+    };
+  }
+
+  public onReviewUpdated(callback: (data: any) => void): () => void {
+    this.reviewUpdatedListeners.push(callback);
+    return () => {
+      this.reviewUpdatedListeners = this.reviewUpdatedListeners.filter((cb) => cb !== callback);
     };
   }
 }

@@ -226,7 +226,7 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
       }
 
       // Real-time circle sync while dragging
-      pickerMarker.on('drag', (e) => {
+      pickerMarker.on('drag', (e: any) => {
         const latlng = e.target.getLatLng();
         if (coverageCircle) {
           coverageCircle.setLatLng(latlng);
@@ -234,7 +234,7 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
       });
 
       // Persist coordinates when dragging stops
-      pickerMarker.on('dragend', (e) => {
+      pickerMarker.on('dragend', (e: any) => {
         const latlng = e.target.getLatLng();
         const lat = Number(latlng.lat.toFixed(6));
         const lng = Number(latlng.lng.toFixed(6));

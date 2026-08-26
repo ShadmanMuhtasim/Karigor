@@ -7,7 +7,10 @@ import { workerApi } from '../../api/workerApi';
 import { KarigorMap } from '../../components/map/KarigorMap';
 import { ChatModal } from '../../components/chat/ChatModal';
 import { extractErrorMessage } from '../../lib/errorUtils';
+import { RatingStars } from '../../components/reviews/RatingStars';
+import { WorkerReviewResponseModal } from '../../components/reviews/WorkerReviewResponseModal';
 import { signalRService } from '../../services/signalrService';
+import type { ReviewDto } from '../../api/reviewApi';
 import type { NearbyRequestDto } from '../../api/locationApi';
 import type { BookingDto } from '../../api/marketplaceApi';
 
@@ -19,6 +22,7 @@ export function WorkerBookingsTab() {
   const [jobsViewMode, setJobsViewMode] = useState<'map' | 'list'>('map');
   const [selectedReq, setSelectedReq] = useState<NearbyRequestDto | null>(null);
   const [activeChatBooking, setActiveChatBooking] = useState<BookingDto | null>(null);
+  const [selectedReviewForReply, setSelectedReviewForReply] = useState<ReviewDto | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
 
   // Real-time live synchronization for requests, quotations, counter-offers, and bookings
@@ -40,19 +44,32 @@ export function WorkerBookingsTab() {
         notif.type === 'NewQuotation' ||
         notif.type === 'QuotationCountered' ||
         notif.type === 'BookingCreated' ||
-        notif.type === 'BookingStatusChanged'
+        notif.type === 'BookingStatusChanged' ||
+        notif.type === 'ReviewCreated' ||
+        notif.type === 'ReviewResponse'
       ) {
         queryClient.invalidateQueries({ queryKey: ['workerQuotations'] });
         queryClient.invalidateQueries({ queryKey: ['workerBookings'] });
-        queryClient.invalidateQueries({ queryKey: ['availableRequests'] });
-        queryClient.invalidateQueries({ queryKey: ['nearbyRequests'] });
+        queryClient.invalidateQueries({ queryKey: ['workerProfile'] });
       }
+    });
+
+    const unsubRevCreated = signalRService.onReviewCreated(() => {
+      queryClient.invalidateQueries({ queryKey: ['workerBookings'] });
+      queryClient.invalidateQueries({ queryKey: ['workerProfile'] });
+    });
+
+    const unsubRevUpdated = signalRService.onReviewUpdated(() => {
+      queryClient.invalidateQueries({ queryKey: ['workerBookings'] });
+      queryClient.invalidateQueries({ queryKey: ['workerProfile'] });
     });
 
     return () => {
       unsubServiceReq();
       unsubQuotation();
       unsubNotif();
+      unsubRevCreated();
+      unsubRevUpdated();
     };
   }, [queryClient]);
 
@@ -530,6 +547,47 @@ export function WorkerBookingsTab() {
                   </span>
                 </div>
 
+                {/* Review Feedback on Completed Booking */}
+                {b.status === 'Completed' && b.review && (
+                  <div className="mt-3 bg-gray-50 dark:bg-gray-800/60 rounded-2xl p-4 border border-gray-200/80 dark:border-gray-700/60 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-gray-900 dark:text-white">
+                          Customer Review:
+                        </span>
+                        <RatingStars rating={b.review.rating} size="sm" showScore={true} />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedReviewForReply(b.review!)}
+                        className="text-xs font-bold text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>💬</span>
+                        <span>{b.review.workerResponse ? 'Edit Reply' : 'Reply to Review'}</span>
+                      </button>
+                    </div>
+
+                    {b.review.comment ? (
+                      <p className="text-xs text-gray-700 dark:text-gray-300 italic">
+                        "{b.review.comment}"
+                      </p>
+                    ) : (
+                      <p className="text-xs text-gray-400 italic">Rated without written feedback.</p>
+                    )}
+
+                    {b.review.workerResponse && (
+                      <div className="mt-2 bg-sky-50 dark:bg-sky-950/40 rounded-xl p-2.5 border border-sky-200 dark:border-sky-800 text-xs">
+                        <span className="font-bold text-sky-800 dark:text-sky-300 block mb-0.5">
+                          Your Reply:
+                        </span>
+                        <p className="text-sky-900 dark:text-sky-200">
+                          {b.review.workerResponse}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 dark:border-gray-800 pt-3">
                   <button
                     type="button"
@@ -574,6 +632,19 @@ export function WorkerBookingsTab() {
           otherPartyName={activeChatBooking.customerName}
           otherPartyRole="Customer"
           categoryName={activeChatBooking.categoryName}
+        />
+      )}
+
+      {/* Worker Review Response Modal */}
+      {selectedReviewForReply && (
+        <WorkerReviewResponseModal
+          isOpen={!!selectedReviewForReply}
+          review={selectedReviewForReply}
+          onClose={() => setSelectedReviewForReply(null)}
+          onResponseSubmitted={() => {
+            queryClient.invalidateQueries({ queryKey: ['workerBookings'] });
+            setSelectedReviewForReply(null);
+          }}
         />
       )}
     </div>

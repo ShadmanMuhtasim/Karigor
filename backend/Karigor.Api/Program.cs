@@ -120,6 +120,7 @@ try
     builder.Services.AddScoped<Karigor.Application.Realtime.IRealtimeNotifier, Karigor.Api.Realtime.SignalRRealtimeNotifier>();
     builder.Services.AddScoped<Karigor.Application.Notifications.INotificationService, Karigor.Application.Notifications.NotificationService>();
     builder.Services.AddScoped<Karigor.Application.Messaging.IMessagingService, Karigor.Application.Messaging.MessagingService>();
+    builder.Services.AddScoped<Karigor.Application.Reviews.IReviewService, Karigor.Application.Reviews.ReviewService>();
 
     // -------------------------------------------------------------------------
     // CORS — allow Vite dev server with credentials (for httpOnly cookie)

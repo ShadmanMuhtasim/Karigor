@@ -3,6 +3,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { marketplaceApi } from '../../api/marketplaceApi';
 import { Link } from 'react-router-dom';
 import { ChatModal } from '../../components/chat/ChatModal';
+import { ReviewModal } from '../../components/reviews/ReviewModal';
+import { RatingStars } from '../../components/reviews/RatingStars';
 import { signalRService } from '../../services/signalrService';
 import type { BookingDto } from '../../api/marketplaceApi';
 
@@ -14,13 +16,27 @@ export function CustomerBookingsTab() {
       queryClient.invalidateQueries({ queryKey: ['customerBookings'] });
     });
     const unsubNotif = signalRService.onNotification((n) => {
-      if (n.type === 'BookingCreated' || n.type === 'BookingStatusChanged') {
+      if (
+        n.type === 'BookingCreated' ||
+        n.type === 'BookingStatusChanged' ||
+        n.type === 'ReviewCreated' ||
+        n.type === 'ReviewResponse'
+      ) {
         queryClient.invalidateQueries({ queryKey: ['customerBookings'] });
       }
     });
+    const unsubRevCreate = signalRService.onReviewCreated(() => {
+      queryClient.invalidateQueries({ queryKey: ['customerBookings'] });
+    });
+    const unsubRevUpdate = signalRService.onReviewUpdated(() => {
+      queryClient.invalidateQueries({ queryKey: ['customerBookings'] });
+    });
+
     return () => {
       unsubQuote();
       unsubNotif();
+      unsubRevCreate();
+      unsubRevUpdate();
     };
   }, [queryClient]);
 
@@ -31,6 +47,7 @@ export function CustomerBookingsTab() {
   });
 
   const [activeChatBooking, setActiveChatBooking] = useState<BookingDto | null>(null);
+  const [reviewBooking, setReviewBooking] = useState<BookingDto | null>(null);
 
   if (isLoading) {
     return <p className="text-gray-500 dark:text-gray-400 py-8 text-center text-sm">Loading your bookings…</p>;
@@ -57,7 +74,7 @@ export function CustomerBookingsTab() {
       {bookings.map((b) => (
         <article
           key={b.id}
-          className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm hover:shadow-md transition"
+          className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm hover:shadow-md transition space-y-4"
         >
           <div className="flex flex-wrap justify-between items-start gap-3">
             <div>
@@ -98,6 +115,54 @@ export function CustomerBookingsTab() {
             </span>
           </div>
 
+          {/* Review Banner for Completed Bookings */}
+          {b.status === 'Completed' && (
+            <div className="bg-gray-50 dark:bg-gray-800/60 rounded-2xl p-4 border border-gray-200/80 dark:border-gray-700/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              {b.review ? (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                      ✓ Service Reviewed:
+                    </span>
+                    <RatingStars rating={b.review.rating} size="sm" showScore={true} />
+                  </div>
+                  {b.review.comment && (
+                    <p className="text-xs text-gray-600 dark:text-gray-300 italic line-clamp-1">
+                      "{b.review.comment}"
+                    </p>
+                  )}
+                  {b.review.workerResponse && (
+                    <div className="text-[11px] text-sky-600 dark:text-sky-400 flex items-center gap-1 font-medium">
+                      <span>💬 Worker replied:</span>
+                      <span className="italic line-clamp-1">"{b.review.workerResponse}"</span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-0.5">
+                  <span className="text-xs font-bold text-gray-800 dark:text-gray-200 flex items-center gap-1">
+                    <span>🌟</span>
+                    <span>Service Completed — How was your experience?</span>
+                  </span>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                    Rate worker's technical quality and punctuality to help other homeowners.
+                  </p>
+                </div>
+              )}
+
+              {!b.review && (
+                <button
+                  type="button"
+                  onClick={() => setReviewBooking(b)}
+                  className="px-4 py-2 text-xs font-bold rounded-xl bg-amber-500 hover:bg-amber-400 text-white transition shadow-sm hover:scale-105 active:scale-95 flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+                >
+                  <span>⭐</span>
+                  <span>Write a Review</span>
+                </button>
+              )}
+            </div>
+          )}
+
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 dark:border-gray-800 pt-4 text-sm">
             <div>
               <span className="text-xs text-gray-500 dark:text-gray-400 block">Agreed Total</span>
@@ -136,6 +201,21 @@ export function CustomerBookingsTab() {
           otherPartyName={activeChatBooking.workerName}
           otherPartyRole="Worker"
           categoryName={activeChatBooking.categoryName}
+        />
+      )}
+
+      {/* Review Submission Modal */}
+      {reviewBooking && (
+        <ReviewModal
+          isOpen={!!reviewBooking}
+          bookingId={reviewBooking.id}
+          workerName={reviewBooking.workerName}
+          categoryName={reviewBooking.categoryName}
+          onClose={() => setReviewBooking(null)}
+          onReviewSubmitted={() => {
+            queryClient.invalidateQueries({ queryKey: ['customerBookings'] });
+            setReviewBooking(null);
+          }}
         />
       )}
     </div>

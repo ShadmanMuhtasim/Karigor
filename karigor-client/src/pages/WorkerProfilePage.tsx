@@ -1,7 +1,10 @@
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { customerApi } from '../api/customerApi';
+import { reviewApi } from '../api/reviewApi';
 import { Navbar } from '../components/Navbar';
+import { WorkerReviewsList } from '../components/reviews/WorkerReviewsList';
+import { RatingStars } from '../components/reviews/RatingStars';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -12,6 +15,12 @@ export function WorkerProfilePage() {
   const { data: worker, isLoading, isError } = useQuery({
     queryKey: ['workerPublicProfile', workerId],
     queryFn: () => customerApi.getWorkerById(workerId),
+    enabled: !isNaN(workerId),
+  });
+
+  const { data: reviewsSummary, isLoading: isReviewsLoading } = useQuery({
+    queryKey: ['workerReviews', workerId],
+    queryFn: () => reviewApi.getWorkerReviews(workerId),
     enabled: !isNaN(workerId),
   });
 
@@ -89,11 +98,14 @@ export function WorkerProfilePage() {
 
             <div className="flex flex-col sm:items-end">
               <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
-                ${worker.hourlyRate}
+                ৳{worker.hourlyRate}
                 <span className="text-xs text-gray-500 font-normal"> / hour</span>
               </div>
-              <div className="text-sm text-amber-500 font-bold mt-1">
-                ★ {worker.averageRating > 0 ? `${worker.averageRating.toFixed(1)} Rating` : 'New Provider'}
+              <div className="flex items-center gap-1.5 mt-1">
+                <RatingStars rating={worker.averageRating} size="sm" showScore={true} />
+                <span className="text-xs text-gray-400">
+                  ({reviewsSummary?.totalReviews || 0} reviews)
+                </span>
               </div>
             </div>
           </div>
@@ -172,11 +184,22 @@ export function WorkerProfilePage() {
           )}
         </div>
 
+        {/* ── Reviews & Ratings Section ── */}
+        <section className="space-y-4">
+          {isReviewsLoading ? (
+            <div className="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 p-8 text-center text-sm text-gray-500">
+              Loading reviews and ratings…
+            </div>
+          ) : reviewsSummary ? (
+            <WorkerReviewsList summary={reviewsSummary} isWorkerOwner={false} />
+          ) : null}
+        </section>
+
         {/* Actions */}
-        <div className="flex justify-end gap-4">
+        <div className="flex justify-end gap-4 pt-4">
           <Link
             to="/customer/requests/new"
-            className="px-6 py-3.5 bg-sky-500 hover:bg-sky-400 text-white font-bold rounded-2xl shadow-lg shadow-sky-500/25 transition"
+            className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold rounded-2xl shadow-xl shadow-emerald-600/25 transition text-base"
           >
             Post Request to Hire Worker →
           </Link>

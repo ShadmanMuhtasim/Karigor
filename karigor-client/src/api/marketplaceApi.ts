@@ -45,6 +45,20 @@ export interface BookingDto {
   status: string;
   address: string;
   description?: string;
+  review?: {
+    id: number;
+    bookingId: number;
+    workerId: number;
+    workerName: string;
+    customerId: number;
+    customerName: string;
+    customerProfileImageUrl?: string;
+    categoryName: string;
+    rating: number;
+    comment?: string;
+    workerResponse?: string;
+    bookingDate: string;
+  };
 }
 
 export interface AvailableRequestDto {

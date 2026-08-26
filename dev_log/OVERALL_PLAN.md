@@ -1,84 +1,15 @@
 \# Karigor — Team Development Plan
 
 
+| Milestone | Components |
 
-\## Project Status Summary
+|-----------|------------|
 
+| \*\*Milestone 1\*\* | Database schema (20 tables), EF Core scaffolding, API foundation, Swagger, CORS, Serilog, Categories API | 
 
+| \*\*Milestone 2\*\* | JWT Authentication, Role-based Authorization, Registration/Login, Refresh Token rotation, Frontend Auth Context, Protected Routes | 
 
-Based on the files you provided, here's what \*\*Shadman Muhtasim\*\* has already completed:
-
-
-
-\### ✅ Completed Work (Shadman Muhtasim)
-
-
-
-| Milestone | Components | Status |
-
-|-----------|------------|--------|
-
-| \*\*Milestone 1\*\* | Database schema (20 tables), EF Core scaffolding, API foundation, Swagger, CORS, Serilog, Categories API | ✅ COMPLETE |
-
-| \*\*Milestone 2\*\* | JWT Authentication, Role-based Authorization, Registration/Login, Refresh Token rotation, Frontend Auth Context, Protected Routes | ✅ COMPLETE |
-
-| \*\*Milestone 3 (Partial)\*\* | Worker Backend (10 endpoints: profile, skills, availability, documents, dashboard), Worker Frontend (Overview, Profile, Skills, Availability, Documents tabs) | ✅ COMPLETE |
-
-
-
-\---
-
-
-
-\## What Needs to Be Done
-
-
-
-| Area | Status |
-
-|------|--------|
-
-| Customer Module (Backend + Frontend) | ❌ NOT STARTED |
-
-| Service Request Flow | ❌ NOT STARTED |
-
-| Quotation \& Negotiation | ❌ NOT STARTED |
-
-| Booking System | ❌ NOT STARTED |
-
-| Location-Based Matching (Maps) | ❌ NOT STARTED |
-
-| Messaging (SignalR) | ❌ NOT STARTED |
-
-| Reviews \& Ratings | ❌ NOT STARTED |
-
-| Admin Module | ❌ NOT STARTED |
-
-| Payment (V1 skip, manual) | ⏸️ SKIPPED (future) |
-
-| Deployment | ❌ NOT STARTED |
-
-
-
-\---
-
-
-
-\## Team Member Assignments
-
-
-
-| Member | Assigned Modules |
-
-|--------|------------------|
-
-| \*\*Shadman Muhtasim\*\* | Worker Module (✅ DONE), Auth (✅ DONE), Foundation (✅ DONE) — will assist with integration |
-
-| \*\*Md. Saiman Ullah\*\* | Admin Module + Service Requests + Location Matching |
-
-| \*\*Ahbab Hasan\*\* | Quotation/Negotiation + Booking System + Reviews |
-
-| \*\*Mustakim Musa\*\* | Messaging (SignalR) + Customer Module + Deployment |
+| \*\*Milestone 3 (Partial)\*\* | Worker Backend (10 endpoints: profile, skills, availability, documents, dashboard), Worker Frontend (Overview, Profile, Skills, Availability, Documents tabs) | 
 
 
 
@@ -89,14 +20,11 @@ Based on the files you provided, here's what \*\*Shadman Muhtasim\*\* has alread
 \# 📋 Detailed Milestone Plan
 
 
-
 \---
 
 
 
 \## MILESTONE 4 — Customer Module \& Service Requests
-
-\*\*Weeks:\*\* 1–2 | \*\*Lead:\*\* Mustakim Musa | \*\*Assist:\*\* Shadman (guidance)
 
 
 
@@ -188,8 +116,6 @@ Based on the files you provided, here's what \*\*Shadman Muhtasim\*\* has alread
 
 \## MILESTONE 5 — Quotation, Negotiation \& Booking
 
-\*\*Weeks:\*\* 2–3 | \*\*Lead:\*\* Ahbab Hasan | \*\*Assist:\*\* Shadman (integration)
-
 
 
 \### Backend Tasks
@@ -278,8 +204,6 @@ Based on the files you provided, here's what \*\*Shadman Muhtasim\*\* has alread
 
 \## MILESTONE 6 — Location-Based Matching (Maps)
 
-\*\*Weeks:\*\* 3–4 | \*\*Lead:\*\* Saiman Ullah | \*\*Assist:\*\* All
-
 
 
 \### Backend Tasks
@@ -341,8 +265,6 @@ Based on the files you provided, here's what \*\*Shadman Muhtasim\*\* has alread
 
 
 \## MILESTONE 7 — Messaging \& Notifications
-
-\*\*Weeks:\*\* 4–5 | \*\*Lead:\*\* Mustakim Musa | \*\*Assist:\*\* Ahbab (integration)
 
 
 
@@ -420,8 +342,6 @@ Based on the files you provided, here's what \*\*Shadman Muhtasim\*\* has alread
 
 \## MILESTONE 8 — Reviews \& Ratings
 
-\*\*Weeks:\*\* 5 | \*\*Lead:\*\* Ahbab Hasan | \*\*Assist:\*\* Mustakim
-
 
 
 \### Backend Tasks
@@ -495,8 +415,6 @@ Based on the files you provided, here's what \*\*Shadman Muhtasim\*\* has alread
 
 
 \## MILESTONE 9 — Admin Module
-
-\*\*Weeks:\*\* 6 | \*\*Lead:\*\* Saiman Ullah | \*\*Assist:\*\* Musa
 
 
 
@@ -594,9 +512,6 @@ Based on the files you provided, here's what \*\*Shadman Muhtasim\*\* has alread
 
 \## MILESTONE 10 — Testing, Hardening \& Deployment
 
-\*\*Weeks:\*\* 6–7 | \*\*Lead:\*\* All | \*\*Owner:\*\* Mustakim Musa
-
-
 
 \### Tasks
 
@@ -631,6 +546,30 @@ Based on the files you provided, here's what \*\*Shadman Muhtasim\*\* has alread
 | 10.12 | Final Presentation Prep | Slides, demo |
 
 
+## Milestone 10 — Testing, Hardening & Deployment
+
+### Part 1 — Backend & API Testing
+- All endpoint integration tests
+- Validation and error handling
+- Swagger documentation review
+
+### Part 2 — Security & Performance
+- Security audit (JWT, IDOR, authorization)
+- Database indexing and query optimization
+- Load testing basics
+
+### Part 3 — Deployment Preparation
+- Azure SQL Database setup
+- CI/CD pipeline (GitHub Actions + Azure/Render)
+- Environment configuration
+- Health check endpoint
+
+### Part 4 — Documentation & Final Delivery
+- API documentation (Swagger)
+- User guides (Customer, Worker, Admin)
+- Final presentation and demo
+- Deployment guide
+
 
 \### Definition of Done
 
@@ -658,23 +597,27 @@ Based on the files you provided, here's what \*\*Shadman Muhtasim\*\* has alread
 
 |------|-----------|------|
 
-| \*\*Week 1\*\* | Milestone 4 — Customer Module | Mustakim |
+| \*\*Week 1-2\*\* | Milestone 1-2 — Authentication and Databse setup | Shadman |
 
-| \*\*Week 2\*\* | Milestone 4 + 5 (start) | Saiman + Ahbab |
+| \*\*Week 3\*\* | Milestone 3 — Authentication and Worker Module | Shadman |
 
-| \*\*Week 3\*\* | Milestone 5 — Quotation \& Booking | Ahbab |
+| \*\*Week 4\*\* | Milestone 4 — Customer Module | Mustakim |
 
-| \*\*Week 4\*\* | Milestone 6 — Location Matching | Saiman |
+| \*\*Week 5\*\* | Milestone 4 + 5 (start) |  Ahbab |
 
-| \*\*Week 5\*\* | Milestone 7 — Messaging \& Notifications | Mustakim |
+| \*\*Week 6\*\* | Milestone 5 — Quotation \& Booking | Ahbab |
 
-| \*\*Week 6\*\* | Milestone 8 — Reviews | Ahbab |
+| \*\*Week 7\*\* | Milestone 6 — Location Matching | Saiman |
 
-| \*\*Week 7\*\* | Milestone 9 — Admin Module | Saiman |
+| \*\*Week 8\*\* | Milestone 7 — Messaging \& Notifications | Saiman |
 
-| \*\*Week 8\*\* | Milestone 10 — Testing \& Deployment | All |
+| \*\*Week 9\*\* | Milestone 8 — Reviews | Mustakim |
 
-| \*\*Week 9\*\* | Buffer \& Finalization | All |
+| \*\*Week 10\*\* | Milestone 9 — Admin Module | Ahbab |
+
+| \*\*Week 11\*\* | Milestone 10 — Testing \& Deployment | All |
+
+| \*\*Week 12\*\* | Buffer \& Finalization | All |
 
 
 
@@ -764,11 +707,9 @@ npm run dev
 
 |------|---------|
 
-| `MILESTONE\_PLAN.md` | Original plan from Shadman |
+| `OVERALL\_PLAN.md` | basic plan for whole project |
 
 | `WORK\_DONE.md` | Detailed work log |
-
-| `task\_progress.md` | Current status tracker |
 
 | `001\_initial\_schema.sql` | Full database schema |
 

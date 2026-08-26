@@ -127,6 +127,9 @@ public class AuthService : IAuthService
         var user = await _userManager.FindByEmailAsync(dto.Email)
             ?? throw new UnauthorizedAccessException("Invalid email or password.");
 
+        if (user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTimeOffset.UtcNow)
+            throw new UnauthorizedAccessException("Your account has been suspended by an administrator.");
+
         if (!await _userManager.CheckPasswordAsync(user, dto.Password))
             throw new UnauthorizedAccessException("Invalid email or password.");
 
@@ -146,6 +149,9 @@ public class AuthService : IAuthService
 
         if (storedToken is null)
             throw new UnauthorizedAccessException("Invalid refresh token.");
+
+        if (storedToken.User.LockoutEnd.HasValue && storedToken.User.LockoutEnd.Value > DateTimeOffset.UtcNow)
+            throw new UnauthorizedAccessException("Your account has been suspended by an administrator.");
 
         if (storedToken.RevokedAt is not null)
             throw new UnauthorizedAccessException("Refresh token has been revoked.");

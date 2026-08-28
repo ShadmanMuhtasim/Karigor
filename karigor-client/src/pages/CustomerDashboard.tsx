@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import { CustomerOverviewTab } from './customer/CustomerOverviewTab';
 import { CustomerRequestsTab } from './customer/CustomerRequestsTab';
@@ -10,7 +11,15 @@ import { ConversationsList } from '../components/chat/ConversationsList';
 type CustomerTabId = 'overview' | 'requests' | 'bookings' | 'messages' | 'search' | 'profile';
 
 export function CustomerDashboard() {
-  const [activeTab, setActiveTab] = useState<CustomerTabId>('overview');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = (searchParams.get('tab') as CustomerTabId) ?? 'overview';
+  const [activeTab, setActiveTab] = useState<CustomerTabId>(initialTab);
+
+  // Keep URL in sync when tab changes programmatically
+  const handleTabChange = (tab: CustomerTabId) => {
+    setActiveTab(tab);
+    setSearchParams(tab === 'overview' ? {} : { tab }, { replace: true });
+  };
 
   const tabs: { id: CustomerTabId; label: string }[] = [
     { id: 'overview', label: 'Overview' },
@@ -45,7 +54,7 @@ export function CustomerDashboard() {
             {tabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => handleTabChange(tab.id)}
                 className={`pb-3 text-sm font-semibold transition whitespace-nowrap cursor-pointer ${
                   activeTab === tab.id
                     ? 'border-b-2 border-indigo-600 dark:border-sky-500 text-indigo-600 dark:text-sky-400'
@@ -60,7 +69,7 @@ export function CustomerDashboard() {
 
         {/* Tab Content */}
         <div className="pb-12">
-          {activeTab === 'overview' && <CustomerOverviewTab onNavigateTab={setActiveTab} />}
+          {activeTab === 'overview' && <CustomerOverviewTab onNavigateTab={handleTabChange} />}
           {activeTab === 'requests' && <CustomerRequestsTab />}
           {activeTab === 'bookings' && <CustomerBookingsTab />}
           {activeTab === 'messages' && <ConversationsList />}

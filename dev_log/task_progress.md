@@ -619,3 +619,17 @@
 
 - [x] Worker Identity Verification & Booking Check-In
 
+
+### Customer OTP UI Added
+
+Implemented the Customer Worker Verification UI in \BookingDetailPage.tsx\.
+- Integrated OTP generation mutation logic.
+- Displayed securely generated 6-digit OTP for scheduled bookings to Customers.
+- Displayed 'Worker Verified' indicator for InProgress bookings.
+- Verified backend security preventing incorrect workers from checking in.
+
+### Customer OTP UX Implemented (Dashboard visibility)
+
+- Prominently integrated OTP generation inside CustomerBookingsTab.tsx.
+- Handled the Scheduled state with a visually distinct card to generate/show the OTP.
+- Handled the InProgress state with a "Worker Verified" success confirmation displaying checkedInAt.

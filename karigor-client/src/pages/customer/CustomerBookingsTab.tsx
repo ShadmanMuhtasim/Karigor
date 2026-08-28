@@ -180,34 +180,70 @@ export function CustomerBookingsTab() {
           {/* Verification Code for Scheduled Bookings */}
           {b.status === 'Scheduled' && (
             <div className="bg-sky-50/50 dark:bg-sky-950/20 rounded-2xl p-4 border border-sky-100 dark:border-sky-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="space-y-0.5">
-                <span className="text-xs font-bold text-sky-800 dark:text-sky-200 flex items-center gap-1">
+              <div className="space-y-1">
+                <h4 className="text-sm font-bold text-sky-900 dark:text-sky-100 flex items-center gap-1.5">
                   <span>🔐</span>
-                  <span>Worker Verification Required</span>
-                </span>
-                <p className="text-[11px] text-sky-600/80 dark:text-sky-400/80">
-                  Generate a code and give it to the worker when they arrive to check them in.
+                  <span>Worker Verification</span>
+                </h4>
+                <p className="text-[11px] text-sky-700 dark:text-sky-300 font-medium">
+                  Assigned Worker: {b.workerName}
                 </p>
-                {verificationCodes[b.id] && (
-                  <div className="mt-2">
-                    <span className="text-2xl font-black tracking-widest text-sky-700 dark:text-sky-300">
+                <p className="text-[11px] text-sky-600/80 dark:text-sky-400/80">
+                  The worker must verify their identity before starting the job.
+                </p>
+                {verificationCodes[b.id] ? (
+                  <div className="mt-3 bg-white dark:bg-gray-900 p-3 rounded-xl border border-sky-200 dark:border-sky-800 inline-block">
+                    <div className="text-[11px] text-gray-500 mb-1">Verification Code</div>
+                    <span className="text-2xl font-black tracking-[0.2em] text-sky-700 dark:text-sky-300">
                       {verificationCodes[b.id].code}
                     </span>
-                    <p className="text-[10px] text-gray-500 mt-1">
-                      Expires at {new Date(verificationCodes[b.id].expiresAt).toLocaleTimeString()}
+                    <p className="text-[10px] text-rose-500 font-medium mt-1">
+                      Show this code only to the assigned worker.
+                    </p>
+                    <p className="text-[10px] text-gray-500 mt-0.5">
+                      Code expires in: {Math.max(0, Math.floor((new Date(verificationCodes[b.id].expiresAt).getTime() - new Date().getTime()) / 60000))} minutes
                     </p>
                   </div>
-                )}
+                ) : b.hasActiveVerificationCode ? (
+                  <div className="mt-3 bg-white dark:bg-gray-900 p-3 rounded-xl border border-sky-200 dark:border-sky-800 inline-block">
+                    <p className="text-xs text-sky-800 dark:text-sky-200 font-medium mb-1">
+                      An active verification code already exists.
+                    </p>
+                    <p className="text-[10px] text-gray-500 mb-1">
+                      Use the code previously shown to you, or generate a replacement.
+                    </p>
+                    {b.verificationCodeExpiresAt && (
+                      <p className="text-[10px] text-gray-500 mt-0.5">
+                        Code expires in: {Math.max(0, Math.floor((new Date(b.verificationCodeExpiresAt).getTime() - new Date().getTime()) / 60000))} minutes
+                      </p>
+                    )}
+                  </div>
+                ) : null}
               </div>
               <button
                 type="button"
                 onClick={() => generateCodeMutation.mutate(b.id)}
                 disabled={generateCodeMutation.isPending}
-                className="px-4 py-2 text-xs font-bold rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white transition shadow-sm flex items-center justify-center gap-1.5 self-start sm:self-auto cursor-pointer"
+                className="px-4 py-2 text-xs font-bold rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white transition shadow-sm flex items-center justify-center gap-1.5 self-start sm:self-auto cursor-pointer whitespace-nowrap"
               >
                 <span>🔑</span>
-                <span>{verificationCodes[b.id] ? 'Regenerate Code' : 'Generate Code'}</span>
+                <span>{verificationCodes[b.id] || b.hasActiveVerificationCode ? 'Regenerate Code' : 'Generate Verification Code'}</span>
               </button>
+            </div>
+          )}
+
+          {/* Worker Verified for InProgress Bookings */}
+          {b.status === 'InProgress' && (
+            <div className="bg-emerald-50 dark:bg-emerald-950/20 rounded-2xl p-4 border border-emerald-100 dark:border-emerald-900/50 flex items-center gap-3">
+              <span className="text-2xl">✓</span>
+              <div>
+                <h4 className="text-sm font-bold text-emerald-900 dark:text-emerald-100">Worker Verified</h4>
+                {b.checkedInAt && (
+                  <p className="text-[11px] text-emerald-700 dark:text-emerald-300 mt-0.5">
+                    Checked in: {new Date(b.checkedInAt).toLocaleString()}
+                  </p>
+                )}
+              </div>
             </div>
           )}
 

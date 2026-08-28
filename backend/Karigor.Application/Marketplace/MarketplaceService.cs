@@ -35,6 +35,53 @@ public class MarketplaceService(
         return depth;
     }
 
+    private static bool IsTimeOverlapping(DateTime t1, DateTime t2)
+    {
+        return Math.Abs((t1 - t2).TotalMinutes) < 120;
+    }
+
+    private static bool IsSameLocationAndCustomer(
+        int customerId1, double? lat1, double? lon1,
+        int customerId2, double? lat2, double? lon2)
+    {
+        if (customerId1 != customerId2) return false;
+        if (lat1 == null || lat2 == null || lon1 == null || lon2 == null) return false;
+        return Math.Abs(lat1.Value - lat2.Value) < 0.0001
+            && Math.Abs(lon1.Value - lon2.Value) < 0.0001;
+    }
+
+    private async Task<bool> CheckSimultaneousJobWarningAsync(int workerId, ServiceRequest request)
+    {
+        var existingBookings = await db.Bookings
+            .Include(b => b.ServiceRequest)
+            .Where(b => b.WorkerId == workerId
+                     && b.ServiceRequestId != request.Id
+                     && (b.Status == "Scheduled" || b.Status == "InProgress"))
+            .ToListAsync();
+
+        var hasOverlappingBooking = existingBookings.Any(b =>
+            IsTimeOverlapping(b.ScheduledDate, request.PreferredDate) &&
+            IsSameLocationAndCustomer(request.CustomerId, request.Latitude, request.Longitude,
+                                      b.CustomerId, b.ServiceRequest?.Latitude, b.ServiceRequest?.Longitude));
+
+        if (hasOverlappingBooking) return true;
+
+        var existingQuotes = await db.Quotations
+            .Include(q => q.ServiceRequest)
+            .Where(q => q.WorkerId == workerId
+                     && q.ServiceRequestId != request.Id
+                     && q.Status == "Pending"
+                     && q.ServiceRequest.Status == "Open")
+            .ToListAsync();
+
+        var hasOverlappingQuote = existingQuotes.Any(q =>
+            IsTimeOverlapping(q.ServiceRequest.PreferredDate, request.PreferredDate) &&
+            IsSameLocationAndCustomer(request.CustomerId, request.Latitude, request.Longitude,
+                                      q.ServiceRequest.CustomerId, q.ServiceRequest.Latitude, q.ServiceRequest.Longitude));
+
+        return hasOverlappingQuote;
+    }
+
     public async Task<QuotationDto> CreateQuotationAsync(string workerUserId, CreateQuotationDto dto)
     {
         var worker = await WorkerAsync(workerUserId);
@@ -46,6 +93,70 @@ public class MarketplaceService(
 
         if (request.Status != "Open")
             throw new InvalidOperationException("Quotations can only be sent for open requests.");
+
+        // Schedule conflict check:
+        // A worker CAN submit a quotation for a time that overlaps with their existing accepted bookings/active quotes
+        // ONLY IF the Latitude, Longitude, and CustomerId of the new Service Request exactly match the existing one.
+        // If they do not match, block it normally with a time conflict error.
+        var existingBookings = await db.Bookings
+            .Include(b => b.ServiceRequest)
+            .Where(b => b.WorkerId == worker.Id
+                     && b.ServiceRequestId != request.Id
+                     && (b.Status == "Scheduled" || b.Status == "InProgress"))
+            .ToListAsync();
+
+        var existingActiveQuotes = await db.Quotations
+            .Include(q => q.ServiceRequest)
+            .Where(q => q.WorkerId == worker.Id
+                     && q.ServiceRequestId != request.Id
+                     && q.Status == "Pending"
+                     && q.ServiceRequest.Status == "Open")
+            .ToListAsync();
+
+        var overlappingBookings = existingBookings
+            .Where(b => IsTimeOverlapping(b.ScheduledDate, request.PreferredDate))
+            .ToList();
+
+        var overlappingQuotes = existingActiveQuotes
+            .Where(q => IsTimeOverlapping(q.ServiceRequest.PreferredDate, request.PreferredDate))
+            .ToList();
+
+        bool hasOverlap = overlappingBookings.Count > 0 || overlappingQuotes.Count > 0;
+        bool hasSimultaneousJobWarning = false;
+
+        if (hasOverlap)
+        {
+            // Verify whether all overlapping bookings and quotes match CustomerId, Latitude, and Longitude
+            bool allMatchGeoCustomer =
+                overlappingBookings.All(b => IsSameLocationAndCustomer(
+                    request.CustomerId, request.Latitude, request.Longitude,
+                    b.CustomerId, b.ServiceRequest?.Latitude, b.ServiceRequest?.Longitude))
+                &&
+                overlappingQuotes.All(q => IsSameLocationAndCustomer(
+                    request.CustomerId, request.Latitude, request.Longitude,
+                    q.ServiceRequest.CustomerId, q.ServiceRequest.Latitude, q.ServiceRequest.Longitude));
+
+            if (!allMatchGeoCustomer)
+            {
+                throw new InvalidOperationException(
+                    "Schedule conflict: You have an existing booking or quotation overlapping with this scheduled time.");
+            }
+
+            // Exception triggered: same time, location, and customer!
+            hasSimultaneousJobWarning = true;
+
+            // Automatically generate a Notification record for the Customer warning them about the multi-job bid.
+            if (request.Customer != null)
+            {
+                await notificationService.CreateNotificationAsync(new CreateNotificationDto
+                {
+                    UserId          = request.Customer.UserId,
+                    Type            = "MultiJobBidWarning",
+                    Message         = $"⚠️ Worker submitted a quotation for '{request.Category?.Name ?? "Service"}' scheduled at the same time and location as your other request.",
+                    RelatedEntityId = request.Id
+                });
+            }
+        }
 
         // If worker already has an active pending quote for this job, update it; otherwise create a new quote
         var existingPending = await db.Quotations
@@ -94,12 +205,13 @@ public class MarketplaceService(
                 serviceRequestId = request.Id,
                 workerId = worker.Id,
                 status = quotation.Status,
-                price = quotation.ProposedPrice
+                price = quotation.ProposedPrice,
+                hasSimultaneousJobWarning = hasSimultaneousJobWarning
             });
         }
         catch { /* Non-blocking */ }
 
-        return ToDto(quotation, worker, 0);
+        return ToDto(quotation, worker, 0, hasSimultaneousJobWarning);
     }
 
     public async Task<List<AvailableRequestDto>> GetAvailableRequestsAsync(string workerUserId)
@@ -237,10 +349,18 @@ public class MarketplaceService(
             ? allQuotes.Where(q => q.WorkerId == worker.Id).ToList()
             : allQuotes;
 
+        var workerIds = filteredQuotes.Select(q => q.WorkerId).Distinct().ToList();
+        var warningFlags = new Dictionary<int, bool>();
+        foreach (var wId in workerIds)
+        {
+            warningFlags[wId] = await CheckSimultaneousJobWarningAsync(wId, request);
+        }
+
         return filteredQuotes.Select(x =>
         {
             int depth = GetNegotiationDepth(x, quotesDict);
-            return ToDto(x, x.Worker, depth);
+            bool warning = warningFlags.TryGetValue(x.WorkerId, out var hasWarn) && hasWarn;
+            return ToDto(x, x.Worker, depth, warning);
         }).ToList();
     }
 
@@ -445,7 +565,8 @@ public class MarketplaceService(
         }
         catch { /* Non-blocking */ }
 
-        return ToDto(counter, quote.Worker, newDepth);
+        bool warning = await CheckSimultaneousJobWarningAsync(quote.WorkerId, quote.ServiceRequest);
+        return ToDto(counter, quote.Worker, newDepth, warning);
     }
 
     public async Task<BookingDto> CreateBookingAsync(string customerUserId, CreateBookingDto dto)
@@ -768,20 +889,21 @@ public class MarketplaceService(
         };
     }
 
-    private static QuotationDto ToDto(Quotation x, WorkerProfile? worker, int depth) =>
+    private static QuotationDto ToDto(Quotation x, WorkerProfile? worker, int depth, bool hasSimultaneousJobWarning = false) =>
         new()
         {
-            Id                 = x.Id,
-            ServiceRequestId   = x.ServiceRequestId,
-            WorkerId           = x.WorkerId,
-            WorkerName         = worker?.User?.Email ?? $"Worker #{x.WorkerId}",
-            WorkerBio          = worker?.Bio,
-            AverageRating      = worker?.AverageRating ?? 0.0,
-            ProposedPrice      = x.ProposedPrice,
-            Message            = x.Message,
-            Status             = x.Status,
-            ParentQuotationId  = x.ParentQuotationId,
-            NegotiationDepth   = depth,
-            ProposedBy         = (depth % 2 == 0) ? "Worker" : "Customer"
+            Id                          = x.Id,
+            ServiceRequestId            = x.ServiceRequestId,
+            WorkerId                    = x.WorkerId,
+            WorkerName                  = worker?.User?.Email ?? $"Worker #{x.WorkerId}",
+            WorkerBio                   = worker?.Bio,
+            AverageRating               = worker?.AverageRating ?? 0.0,
+            ProposedPrice               = x.ProposedPrice,
+            Message                     = x.Message,
+            Status                      = x.Status,
+            ParentQuotationId           = x.ParentQuotationId,
+            NegotiationDepth            = depth,
+            ProposedBy                  = (depth % 2 == 0) ? "Worker" : "Customer",
+            HasSimultaneousJobWarning   = hasSimultaneousJobWarning
         };
 }

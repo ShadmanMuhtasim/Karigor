@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Navbar } from '../components/Navbar';
 import { marketplaceApi } from '../api/marketplaceApi';
 import { useAuth } from '../context/AuthContext';
@@ -60,6 +60,18 @@ export function BookingDetailPage() {
       : data.customerName
     : '';
   const otherPartyRole = isCustomer ? 'Worker' : 'Customer';
+
+  const [verificationCode, setVerificationCode] = useState<{ code: string; expiresAt: string } | null>(null);
+
+  const generateCodeMutation = useMutation({
+    mutationFn: marketplaceApi.generateVerificationCode,
+    onSuccess: (codeData) => {
+      setVerificationCode({ code: codeData.verificationCode, expiresAt: codeData.expiresAt });
+    },
+    onError: (error: any) => {
+      alert(error.response?.data?.error || 'Failed to generate verification code.');
+    },
+  });
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-white transition-colors duration-200 flex flex-col">
@@ -159,6 +171,82 @@ export function BookingDetailPage() {
                   )}
                 </div>
               </article>
+
+              {/* ── Worker Verification Card (Customer View) ── */}
+              {isCustomer && data.status === 'Scheduled' && (
+                <article className="rounded-3xl border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-900/20 p-6 shadow-sm space-y-4">
+                  <div className="flex items-center gap-2 border-b border-sky-100 dark:border-sky-800/50 pb-3">
+                    <span className="text-xl">🔐</span>
+                    <h3 className="font-bold text-base text-sky-900 dark:text-sky-100">
+                      Worker Verification
+                    </h3>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between p-3 rounded-2xl bg-white/60 dark:bg-gray-900/60">
+                      <span className="text-xs text-sky-700 dark:text-sky-300">Assigned Worker</span>
+                      <span className="font-bold text-sky-900 dark:text-sky-100">{data.workerName}</span>
+                    </div>
+
+                    <div className="text-center space-y-3 py-2">
+                      {verificationCode ? (
+                        <div className="space-y-2">
+                          <p className="text-xs text-sky-800 dark:text-sky-200">
+                            Give this one-time code to the assigned Worker when they arrive.
+                          </p>
+                          <div className="inline-block bg-white dark:bg-gray-900 border-2 border-sky-200 dark:border-sky-700 rounded-2xl px-6 py-3">
+                            <span className="text-3xl font-black tracking-[0.2em] text-sky-600 dark:text-sky-400">
+                              {verificationCode.code}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-sky-600/70 dark:text-sky-400/70 mt-1">
+                            Expires at {new Date(verificationCode.expiresAt).toLocaleTimeString()}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => generateCodeMutation.mutate(data.id)}
+                            disabled={generateCodeMutation.isPending}
+                            className="mt-4 px-4 py-2 text-xs font-bold rounded-xl bg-sky-100 hover:bg-sky-200 dark:bg-sky-800 dark:hover:bg-sky-700 text-sky-700 dark:text-sky-300 transition cursor-pointer"
+                          >
+                            Regenerate Code
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <p className="text-xs text-sky-800 dark:text-sky-200">
+                            Generate a secure code to verify the worker's identity before they start the job.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => generateCodeMutation.mutate(data.id)}
+                            disabled={generateCodeMutation.isPending}
+                            className="px-6 py-2.5 text-sm font-bold rounded-xl bg-sky-600 hover:bg-sky-500 text-white transition shadow-md active:scale-95 cursor-pointer disabled:opacity-50"
+                          >
+                            {generateCodeMutation.isPending ? 'Generating...' : 'Generate Worker Verification Code'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              )}
+
+              {/* ── Checked-in Status (Customer View) ── */}
+              {isCustomer && data.status === 'InProgress' && data.checkedInAt && (
+                <article className="rounded-3xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 p-6 shadow-sm flex items-center gap-4">
+                  <div className="p-3 bg-emerald-100 dark:bg-emerald-800/50 rounded-full">
+                    <span className="text-2xl">✅</span>
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-emerald-900 dark:text-emerald-100 text-base">
+                      Worker Verified
+                    </h3>
+                    <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-0.5">
+                      Checked in at {new Date(data.checkedInAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                </article>
+              )}
 
               {/* ── Review & Feedback Card ── */}
               {data.status === 'Completed' && (

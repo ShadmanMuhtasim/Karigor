@@ -490,6 +490,8 @@ public class MarketplaceService(
                 Address            = b.ServiceRequest.Address,
                 Description        = b.ServiceRequest.Description,
                 CheckedInAt        = b.CheckedInAt,
+                HasActiveVerificationCode = b.VerificationCodeHash != null && b.VerificationCodeExpiresAt > DateTime.UtcNow,
+                VerificationCodeExpiresAt = b.VerificationCodeHash != null && b.VerificationCodeExpiresAt > DateTime.UtcNow ? b.VerificationCodeExpiresAt : null,
                 Review             = b.Review != null ? new Karigor.Application.Reviews.DTOs.ReviewDto
                 {
                     Id             = b.Review.Id,
@@ -533,6 +535,8 @@ public class MarketplaceService(
                 Address            = b.ServiceRequest.Address,
                 Description        = b.ServiceRequest.Description,
                 CheckedInAt        = b.CheckedInAt,
+                HasActiveVerificationCode = false, // worker shouldn't see customer's active code state to avoid confusion, or it can just be false
+                VerificationCodeExpiresAt = null,
                 Review             = b.Review != null ? new Karigor.Application.Reviews.DTOs.ReviewDto
                 {
                     Id             = b.Review.Id,
@@ -582,6 +586,8 @@ public class MarketplaceService(
             Address            = booking.ServiceRequest.Address,
             Description        = booking.ServiceRequest.Description,
             CheckedInAt        = booking.CheckedInAt,
+            HasActiveVerificationCode = isCustomer && booking.VerificationCodeHash != null && booking.VerificationCodeExpiresAt > DateTime.UtcNow,
+            VerificationCodeExpiresAt = isCustomer && booking.VerificationCodeHash != null && booking.VerificationCodeExpiresAt > DateTime.UtcNow ? booking.VerificationCodeExpiresAt : null,
             Review             = booking.Review != null ? new Karigor.Application.Reviews.DTOs.ReviewDto
             {
                 Id             = booking.Review.Id,
@@ -650,7 +656,7 @@ public class MarketplaceService(
         if (booking.Status != "Scheduled")
             throw new InvalidOperationException("Verification code can only be generated for scheduled bookings.");
 
-        var code = new Random().Next(100000, 999999).ToString();
+        var code = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(code));
         
         booking.VerificationCodeHash = Convert.ToBase64String(hash);
@@ -743,6 +749,8 @@ public class MarketplaceService(
             Address            = x.ServiceRequest.Address,
             Description        = x.ServiceRequest.Description,
             CheckedInAt        = x.CheckedInAt,
+            HasActiveVerificationCode = x.VerificationCodeHash != null && x.VerificationCodeExpiresAt > DateTime.UtcNow,
+            VerificationCodeExpiresAt = x.VerificationCodeHash != null && x.VerificationCodeExpiresAt > DateTime.UtcNow ? x.VerificationCodeExpiresAt : null,
             Review             = x.Review != null ? new Karigor.Application.Reviews.DTOs.ReviewDto
             {
                 Id             = x.Review.Id,

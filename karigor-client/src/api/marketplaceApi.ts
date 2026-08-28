@@ -46,6 +46,8 @@ export interface BookingDto {
   address: string;
   description?: string;
   checkedInAt?: string;
+  hasActiveVerificationCode?: boolean;
+  verificationCodeExpiresAt?: string;
   review?: {
     id: number;
     bookingId: number;

@@ -501,10 +501,10 @@ export function RequestDetailPage() {
                           🎉 Offer Accepted at ৳{latestQuote.proposedPrice.toLocaleString()}!
                         </span>
                         <Link
-                          to="/dashboard"
+                          to="/dashboard?tab=bookings"
                           className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold transition"
                         >
-                          View Bookings
+                          View Bookings →
                         </Link>
                       </div>
                     )}

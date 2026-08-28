@@ -14,6 +14,7 @@ export interface QuotationDto {
   parentQuotationId?: number;
   proposedBy?: 'Worker' | 'Customer' | string;
   negotiationDepth?: number;
+  hasSimultaneousJobWarning?: boolean;
 }
 
 export interface WorkerQuotationSummaryDto {

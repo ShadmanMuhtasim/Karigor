@@ -14,4 +14,5 @@ public class QuotationDto
     public int? ParentQuotationId { get; set; }
     public string ProposedBy { get; set; } = "Worker"; // "Worker" or "Customer"
     public int NegotiationDepth { get; set; } = 0;
+    public bool HasSimultaneousJobWarning { get; set; }
 }

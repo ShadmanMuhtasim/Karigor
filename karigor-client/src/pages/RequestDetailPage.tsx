@@ -509,6 +509,21 @@ export function RequestDetailPage() {
                       </div>
                     )}
 
+                    {/* Simultaneous Job Warning */}
+                    {(latestQuote.hasSimultaneousJobWarning || thread.some((q) => q.hasSimultaneousJobWarning)) && (
+                      <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-700/60 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-2.5 shadow-sm">
+                        <span className="text-base leading-none shrink-0">⚠️</span>
+                        <div className="space-y-0.5">
+                          <p className="font-bold text-amber-950 dark:text-amber-100">
+                            Simultaneous Job Warning
+                          </p>
+                          <p className="text-amber-800 dark:text-amber-300 leading-relaxed">
+                            This worker is bidding on multiple jobs at your location at the same time. You may accept or decline this quote based on your preference.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Customer Action Controls */}
                     {canCustomerAct && (
                       <div className="flex flex-wrap gap-2 pt-1">

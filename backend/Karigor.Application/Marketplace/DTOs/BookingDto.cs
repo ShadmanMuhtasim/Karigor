@@ -17,5 +17,6 @@ public class BookingDto
     public string Status { get; set; } = string.Empty;
     public string Address { get; set; } = string.Empty;
     public string? Description { get; set; }
+    public DateTime? CheckedInAt { get; set; }
     public ReviewDto? Review { get; set; }
 }

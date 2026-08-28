@@ -604,3 +604,18 @@
 
 
 
+
+- [x] Fix GPS Location Error / Graceful Geolocation Fallback by replacing blocking alert() calls with inline React state error messaging.
+
+- [x] Fix Admin Worker Document Viewer / Document Preview by resolving relative fileUrl paths to absolute API URLs, avoiding React Router SPA hijacking.
+
+- [x] Category icons render from live iconUrl
+- [x] Category names render correctly
+- [x] Category selection remains functional
+- [x] GPS success path verified
+- [x] GPS permission denial handled correctly
+- [x] GPS timeout/unavailable handling verified
+- [x] Manual location fallback verified
+
+- [x] Worker Identity Verification & Booking Check-In
+

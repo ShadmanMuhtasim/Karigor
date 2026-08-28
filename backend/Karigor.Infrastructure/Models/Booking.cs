@@ -25,6 +25,15 @@ public partial class Booking
     [StringLength(50)]
     public string Status { get; set; } = null!;
 
+    [StringLength(256)]
+    public string? VerificationCodeHash { get; set; }
+
+    public DateTime? VerificationCodeExpiresAt { get; set; }
+
+    public int VerificationAttempts { get; set; }
+
+    public DateTime? CheckedInAt { get; set; }
+
     [ForeignKey("CustomerId")]
     [InverseProperty("Bookings")]
     public virtual CustomerProfile Customer { get; set; } = null!;

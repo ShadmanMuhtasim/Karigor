@@ -1346,3 +1346,86 @@ Implemented the complete end-to-end Admin Module & Review Moderation for the Kar
 
 
 
+
+### GPS Location Fallback Fix
+- **ROOT CAUSE**: Geolocation errors and denials were handled using blocking browser \lert()\ calls, creating a poor user experience when GPS was denied or unavailable.
+- **FIX**: Removed all GPS-related \lert()\ calls across \WorkerProfileTab\, \CustomerSearchTab\, \CreateRequestPage\, and \KarigorMap\. Implemented inline React state (\gpsError\) to gracefully display geolocation failures. Retained existing successful GPS behavior and manual map fallback capabilities.
+- **BROWSER RESULT**: GPS denial now shows a localized, non-blocking UI warning, allowing users to select locations manually via map click/drag.
+- **BUILD RESULT**: Frontend build succeeded with 0 TypeScript errors.
+
+### Admin Worker Document Viewer Fix
+- **ROOT CAUSE**: The Admin Worker Verifications tab used the raw \ileUrl\ relative path for uploaded documents (e.g., \/uploads/worker-documents/...\). Because Vite intercepted this relative route in the SPA, clicking the document navigated the Admin to the Home page instead of loading the document from the API.
+- **FIX**: Imported the \getFileUrl\ helper from \client.ts\ to prepend the correct API base URL. Replaced the generic PDF link with an embedded \iframe\ for inline PDF preview, and kept fallback 'Open in New Tab' links.
+- **SECURITY RESULT**: Verified that \wwwroot/uploads\ is publicly served via ASP.NET Core \UseStaticFiles()\. While the direct fix works as intended, a future enhancement should migrate these documents to an authorized streaming endpoint (e.g., checking Admin/Worker roles) instead of public static files to prevent IDOR/public exposure of sensitive documents.
+- **BUILD RESULT**: Frontend build succeeded with 0 TypeScript errors.
+
+### Frontend QA — Category Icon & GPS Fixes
+
+#### Category Bug
+- **Root cause**: The \iconUrl\ attribute for Service Categories was being rendered directly as visible text inside a \<span>\ element across \Categories.tsx\ and \WorkerProfilePage.tsx\.
+- **Exact file/component**: \karigor-client/src/pages/Categories.tsx\, \karigor-client/src/pages/WorkerProfilePage.tsx\`n- **Fix**: Replaced the text span with a standard \<img>\ tag to render the live URL (\https://cdn.karigor.app/...svg\). Implemented an \onError\ fallback to hide the broken image and seamlessly display the default emoji if the CDN fails, ensuring the category name never disappears.
+- **Browser verification**: Verified that the icon now displays as an image and correctly falls back gracefully on network errors.
+- **Regression verification**: Checked Worker Skills, Customer Search, and Admin categories for other assumptions. Verified that mapping works natively.
+
+#### GPS Bug
+- **Root cause**: \GeolocationPositionError\ constants (like \PERMISSION_DENIED\) exist on the interface prototype but are \undefined\ when referenced on the instance (\err.PERMISSION_DENIED\) in modern TS/JS environments. This caused the expression \err.code === err.PERMISSION_DENIED\ to improperly evaluate due to type coersion/undefined matching when non-permission errors (like TIMEOUT) occurred, producing a false 'permission denied' message despite the browser allowing location access.
+- **Actual Geolocation error code**: Mapped to standard numeric values \1\ (PERMISSION_DENIED), \2\ (POSITION_UNAVAILABLE), and \3\ (TIMEOUT).
+- **Fix**: Changed all error handling checks in \WorkerProfileTab.tsx\, \CustomerSearchTab.tsx\, \CreateRequestPage.tsx\, and \KarigorMap.tsx\ to explicitly check \err.code === 1\, \2\, and \3\. Injected a robust \gpsOptions\ object (\enableHighAccuracy: true, timeout: 10000, maximumAge: 0\) to prevent infinite hanging.
+- **Permission handling**: Properly isolated permission denial from timeout and unavailable positions.
+- **Fallback behavior**: If GPS genuinely times out or fails, the user-facing message now accurately instructs them to use manual map fallback, and the map remains fully interactive.
+- **Browser verification**: Verified that allowing permissions correctly fetches coordinates, and simulated timeouts show the accurate timeout message instead of the permission denied message.
+- **Regression verification**: Ensured that manual map selection, dragging, and coordinate saving continue to work seamlessly.
+
+#### Build
+- **Frontend**: Succeeded with 0 TypeScript errors via Vite.
+- **Backend**: N/A
+
+#### Remaining Issues
+- None.
+
+2026-08-28 | Worker Identity Verification & Booking Check-In
+
+### Problem
+A customer accepts a quotation from a worker, assigning the booking to them. However, another worker could potentially arrive and perform the job while the system treats the original worker as the assigned/performed worker. This could cause payment mismatches, incorrect earnings, and fraudulent substitution. 
+
+### Existing State
+Worker identity was assumed purely based on the initial quotation acceptance. A worker could manually change the booking status to `InProgress` without proving they were physically present at the customer's location or verified by the customer.
+
+### Design
+Implemented a secure booking-bound OTP verification model. The customer generates a short-lived (15 min) 6-digit verification code. The worker must input this code into their dashboard to check-in. The check-in acts as the official gateway to the `InProgress` status.
+
+### Backend
+- **Endpoints:**
+  - `POST /api/bookings/{id}/verification-code` (Customer only)
+  - `POST /api/bookings/{id}/check-in` (Worker only)
+- **Authorization:** Enforced role-based access. Check-in logic validates that the authenticated worker's ID matches the booking's assigned `WorkerId`.
+- **Status Enforcement:** Prevented manual transition from `Scheduled` to `InProgress` via generic status update endpoint.
+
+### Frontend
+- **Customer UI:** Added "Generate Code" functionality for `Scheduled` bookings in `CustomerBookingsTab.tsx`. Displays the 6-digit code and expiry.
+- **Worker UI:** Replaced "Start Job" button with an OTP input field and "Verify & Start Job" button in `WorkerBookingsTab.tsx`.
+
+### Database
+- Applied `003_add_booking_verification.sql` directly to `KarigorDev`.
+- Added fields to `Bookings`: `VerificationCodeHash`, `VerificationCodeExpiresAt`, `VerificationAttempts`, and `CheckedInAt`.
+
+### Security Tests
+- **401/403:** Enforced via ASP.NET Core Identity.
+- **IDOR:** Ensure customers can only generate codes for their bookings, and workers can only check in to their assigned bookings.
+- **OTP Tests:** Validated hash comparison, expiry, and attempt limits (max 5).
+- **Status Bypass:** Verified generic `UpdateBookingStatusAsync` throws when attempting `InProgress`.
+
+### Browser Tests
+- Customer creates booking and generates code.
+- Worker enters code -> successful check-in.
+- Worker enters wrong code -> rejected.
+
+### Bugs Found
+- **Root cause:** Generic status update allowed bypass.
+- **Fix:** Removed `InProgress` from valid transitions in `UpdateBookingStatusAsync`.
+- **Verification:** Tested backend validation logic.
+
+### Build
+- **Backend:** PASS (0 errors, 0 warnings)
+- **Frontend:** PASS (0 TS errors, clean build)
+

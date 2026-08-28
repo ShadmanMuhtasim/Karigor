@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getPendingWorkers, verifyWorker } from '../../api/adminApi';
 import type { PendingWorkerDto, WorkerVerificationDocumentDto } from '../../api/adminApi';
 import { extractErrorMessage } from '../../lib/errorUtils';
+import { getFileUrl } from '../../api/client';
 
 export const AdminVerificationsTab: React.FC = () => {
   const queryClient = useQueryClient();
@@ -263,24 +264,41 @@ export const AdminVerificationsTab: React.FC = () => {
 
             <div className="p-4 bg-gray-50 dark:bg-gray-950 rounded-2xl border border-gray-200 dark:border-gray-800 text-center">
               {selectedDoc.fileUrl.endsWith('.pdf') ? (
-                <div className="space-y-3 py-8">
-                  <div className="text-5xl">📑</div>
-                  <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">PDF Document File</p>
-                  <a
-                    href={selectedDoc.fileUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-block px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-xl text-xs transition"
-                  >
-                    Open PDF in New Tab ↗
-                  </a>
+                <div className="flex flex-col items-center w-full">
+                  <iframe 
+                    src={getFileUrl(selectedDoc.fileUrl)}
+                    className="w-full h-[60vh] rounded-xl border border-gray-200 dark:border-gray-700 bg-white"
+                    title={selectedDoc.documentType}
+                  />
+                  <div className="mt-4">
+                    <a
+                      href={getFileUrl(selectedDoc.fileUrl)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-block px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-xl text-xs transition"
+                    >
+                      Open PDF in New Tab ↗
+                    </a>
+                  </div>
                 </div>
               ) : (
-                <img
-                  src={selectedDoc.fileUrl}
-                  alt={selectedDoc.documentType}
-                  className="max-h-96 mx-auto rounded-xl object-contain shadow-sm"
-                />
+                <div className="flex flex-col items-center w-full">
+                  <img
+                    src={getFileUrl(selectedDoc.fileUrl)}
+                    alt={selectedDoc.documentType}
+                    className="max-h-[60vh] mx-auto rounded-xl object-contain shadow-sm"
+                  />
+                  <div className="mt-4">
+                    <a
+                      href={getFileUrl(selectedDoc.fileUrl)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-block px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-xl text-xs transition"
+                    >
+                      Open Image in New Tab ↗
+                    </a>
+                  </div>
+                </div>
               )}
             </div>
 

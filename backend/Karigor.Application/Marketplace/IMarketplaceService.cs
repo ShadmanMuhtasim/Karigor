@@ -17,4 +17,6 @@ public interface IMarketplaceService
     Task<List<BookingDto>> GetWorkerBookingsAsync(string workerUserId);
     Task<BookingDto> GetBookingAsync(string userId, string role, int bookingId);
     Task<BookingDto> UpdateBookingStatusAsync(string workerUserId, int bookingId, UpdateBookingStatusDto dto);
+    Task<GenerateVerificationCodeResponseDto> GenerateVerificationCodeAsync(string customerUserId, int bookingId);
+    Task<BookingDto> VerifyWorkerCheckInAsync(string workerUserId, int bookingId, WorkerCheckInDto dto);
 }

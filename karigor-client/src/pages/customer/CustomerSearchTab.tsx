@@ -14,6 +14,7 @@ export function CustomerSearchTab() {
   const [radiusKm, setRadiusKm] = useState<number | undefined>(15);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locLoading, setLocLoading] = useState(false);
+  const [gpsError, setGpsError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'split' | 'map' | 'grid'>('split');
   const [selectedWorker, setSelectedWorker] = useState<WorkerSearchResultDto | null>(null);
 
@@ -38,8 +39,9 @@ export function CustomerSearchTab() {
   });
 
   const handleGetLocation = () => {
+    setGpsError(null);
     if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser.');
+      setGpsError('GPS location is not supported by this browser.');
       return;
     }
     setLocLoading(true);
@@ -52,9 +54,18 @@ export function CustomerSearchTab() {
         setLocLoading(false);
       },
       (err) => {
-        alert(`Location error: ${err.message}`);
+        let errorMsg = 'Your location could not be determined.';
+        if (err.code === 1 /* PERMISSION_DENIED */) {
+          errorMsg = 'Location permission was denied. Try map click.';
+        } else if (err.code === 2 /* POSITION_UNAVAILABLE */) {
+          errorMsg = 'Your location could not be determined.';
+        } else if (err.code === 3 /* TIMEOUT */) {
+          errorMsg = 'Location detection timed out. Try map click.';
+        }
+        setGpsError(errorMsg);
         setLocLoading(false);
-      }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   };
 
@@ -214,6 +225,12 @@ export function CustomerSearchTab() {
                 {radiusKm}km
               </span>
             </div>
+            {gpsError && (
+              <div className="mt-2 p-1.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-400 text-[10px] font-medium rounded flex items-start gap-1">
+                <span className="text-amber-500">⚠️</span>
+                <span>{gpsError}</span>
+              </div>
+            )}
           </div>
         </div>
 

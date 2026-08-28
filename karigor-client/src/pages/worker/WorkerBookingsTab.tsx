@@ -24,6 +24,7 @@ export function WorkerBookingsTab() {
   const [activeChatBooking, setActiveChatBooking] = useState<BookingDto | null>(null);
   const [selectedReviewForReply, setSelectedReviewForReply] = useState<ReviewDto | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
+  const [checkInCode, setCheckInCode] = useState<Record<number, string>>({});
 
   // Real-time live synchronization for requests, quotations, counter-offers, and bookings
   useEffect(() => {
@@ -128,6 +129,17 @@ export function WorkerBookingsTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workerBookings'] });
       queryClient.invalidateQueries({ queryKey: ['workerQuotations'] });
+    },
+  });
+
+  const checkInWorker = useMutation({
+    mutationFn: ({ id, code }: { id: number; code: string }) =>
+      marketplaceApi.checkInWorker(id, code),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workerBookings'] });
+    },
+    onError: (err: any) => {
+      alert(extractErrorMessage(err, 'Failed to check in. Invalid or expired code.'));
     },
   });
 
@@ -598,14 +610,29 @@ export function WorkerBookingsTab() {
                     <span>Chat with Customer</span>
                   </button>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                     {b.status === 'Scheduled' && (
-                      <button
-                        onClick={() => updateStatus.mutate({ id: b.id, status: 'InProgress' })}
-                        className="rounded-xl border border-sky-400 px-4 py-2 text-xs font-bold text-sky-700 dark:border-sky-700 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-950/50 transition cursor-pointer"
-                      >
-                        ▶ Start work
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          placeholder="6-digit code"
+                          value={checkInCode[b.id] || ''}
+                          onChange={(e) => setCheckInCode({ ...checkInCode, [b.id]: e.target.value })}
+                          className="w-28 rounded-xl border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:border-sky-500 focus:ring-sky-500"
+                          maxLength={6}
+                        />
+                        <button
+                          onClick={() => {
+                            if (checkInCode[b.id]?.length === 6) {
+                              checkInWorker.mutate({ id: b.id, code: checkInCode[b.id] });
+                            }
+                          }}
+                          disabled={checkInWorker.isPending || checkInCode[b.id]?.length !== 6}
+                          className="rounded-xl border border-sky-400 px-4 py-2 text-xs font-bold text-sky-700 dark:border-sky-700 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-950/50 transition cursor-pointer disabled:opacity-50"
+                        >
+                          {checkInWorker.isPending ? 'Verifying...' : 'Verify & Start Job'}
+                        </button>
+                      </div>
                     )}
                     {b.status === 'InProgress' && (
                       <button

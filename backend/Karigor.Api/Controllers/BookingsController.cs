@@ -57,4 +57,23 @@ public class BookingsController(IMarketplaceService marketplace) : ControllerBas
         catch (KeyNotFoundException e) { return NotFound(new { error = e.Message }); }
         catch (InvalidOperationException e) { return BadRequest(new { error = e.Message }); }
     }
+
+    [HttpPost("{id:int}/verification-code")]
+    [Authorize(Roles = "Customer")]
+    public async Task<IActionResult> GenerateVerificationCode(int id)
+    {
+        try { return Ok(await marketplace.GenerateVerificationCodeAsync(UserId(), id)); }
+        catch (KeyNotFoundException e) { return NotFound(new { error = e.Message }); }
+        catch (InvalidOperationException e) { return BadRequest(new { error = e.Message }); }
+    }
+
+    [HttpPost("{id:int}/check-in")]
+    [Authorize(Roles = "Worker")]
+    public async Task<IActionResult> CheckIn(int id, [FromBody] WorkerCheckInDto dto)
+    {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+        try { return Ok(await marketplace.VerifyWorkerCheckInAsync(UserId(), id, dto)); }
+        catch (KeyNotFoundException e) { return NotFound(new { error = e.Message }); }
+        catch (InvalidOperationException e) { return BadRequest(new { error = e.Message }); }
+    }
 }

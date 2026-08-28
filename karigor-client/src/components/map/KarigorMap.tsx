@@ -62,6 +62,9 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
   const { theme } = useTheme();
   const isDarkMode = theme === 'dark';
 
+  const [gpsError, setGpsError] = React.useState<string | null>(null);
+  const [locLoading, setLocLoading] = React.useState<boolean>(false);
+
   // Calculate effective picker coordinates (ensuring a pin is ALWAYS present in picker mode)
   const effectivePickerCoords: [number, number] = React.useMemo(() => {
     if (pickerLocation && pickerLocation.lat && pickerLocation.lng) {
@@ -129,17 +132,14 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
       map.removeLayer(tileLayerRef.current);
     }
 
-    const tileUrl = isDarkMode
-      ? 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
-      : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+    const tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 
-    const attribution = isDarkMode
-      ? '&copy; <a href="https://carto.com/">CARTO</a>'
-      : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+    const attribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
     tileLayerRef.current = L.tileLayer(tileUrl, {
       attribution,
       maxZoom: 19,
+      className: isDarkMode ? 'map-tiles-dark' : '',
     }).addTo(map);
   }, [isDarkMode]);
 
@@ -473,11 +473,13 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
   // Helper: Locate Me Action
   // ───────────────────────────────────────────────────────────────────────────
   const handleLocateMe = () => {
+    setGpsError(null);
     if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser.');
+      setGpsError('GPS location is not supported by this browser.');
       return;
     }
 
+    setLocLoading(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const coords: [number, number] = [pos.coords.latitude, pos.coords.longitude];
@@ -487,10 +489,21 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
         if (onLocationSelectRef.current) {
           onLocationSelectRef.current(Number(coords[0].toFixed(6)), Number(coords[1].toFixed(6)));
         }
+        setLocLoading(false);
       },
       (err) => {
-        alert(`Could not get GPS location: ${err.message}`);
-      }
+        let errorMsg = 'Your location could not be determined.';
+        if (err.code === 1 /* PERMISSION_DENIED */) {
+          errorMsg = 'Location permission was denied. Try map click.';
+        } else if (err.code === 2 /* POSITION_UNAVAILABLE */) {
+          errorMsg = 'Your location could not be determined.';
+        } else if (err.code === 3 /* TIMEOUT */) {
+          errorMsg = 'Location detection timed out. Try map click.';
+        }
+        setGpsError(errorMsg);
+        setLocLoading(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   };
 
@@ -511,10 +524,11 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
         <button
           type="button"
           onClick={handleLocateMe}
+          disabled={locLoading}
           title="Locate my position (GPS)"
-          className="p-2.5 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition flex items-center justify-center cursor-pointer"
+          className="p-2.5 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition flex items-center justify-center cursor-pointer disabled:opacity-50"
         >
-          <span className="text-base">🎯</span>
+          <span className={`text-base ${locLoading ? 'animate-pulse' : ''}`}>🎯</span>
         </button>
 
         <button
@@ -526,6 +540,15 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
           <span className="text-base">🔄</span>
         </button>
       </div>
+
+      {/* Floating GPS Error Notice */}
+      {gpsError && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[400] bg-amber-50/95 dark:bg-amber-950/95 backdrop-blur-md border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-400 rounded-xl px-4 py-2.5 text-xs shadow-xl font-medium flex items-center gap-2 max-w-[80%]">
+          <span className="text-amber-500">⚠️</span>
+          <span>{gpsError}</span>
+          <button type="button" onClick={() => setGpsError(null)} className="ml-2 text-amber-600 dark:text-amber-400 font-bold hover:opacity-70 cursor-pointer">✕</button>
+        </div>
+      )}
 
       {/* Interactive Picker Instruction Banner */}
       {isPickerMode && (

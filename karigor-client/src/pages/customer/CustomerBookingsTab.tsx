@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { marketplaceApi } from '../../api/marketplaceApi';
 import { Link } from 'react-router-dom';
 import { ChatModal } from '../../components/chat/ChatModal';
@@ -48,6 +48,20 @@ export function CustomerBookingsTab() {
 
   const [activeChatBooking, setActiveChatBooking] = useState<BookingDto | null>(null);
   const [reviewBooking, setReviewBooking] = useState<BookingDto | null>(null);
+  const [verificationCodes, setVerificationCodes] = useState<Record<number, { code: string; expiresAt: string }>>({});
+
+  const generateCodeMutation = useMutation({
+    mutationFn: marketplaceApi.generateVerificationCode,
+    onSuccess: (data, bookingId) => {
+      setVerificationCodes((prev) => ({
+        ...prev,
+        [bookingId]: { code: data.verificationCode, expiresAt: data.expiresAt },
+      }));
+    },
+    onError: (error: any) => {
+      alert(error.response?.data?.error || 'Failed to generate verification code.');
+    },
+  });
 
   if (isLoading) {
     return <p className="text-gray-500 dark:text-gray-400 py-8 text-center text-sm">Loading your bookings…</p>;
@@ -160,6 +174,40 @@ export function CustomerBookingsTab() {
                   <span>Write a Review</span>
                 </button>
               )}
+            </div>
+          )}
+
+          {/* Verification Code for Scheduled Bookings */}
+          {b.status === 'Scheduled' && (
+            <div className="bg-sky-50/50 dark:bg-sky-950/20 rounded-2xl p-4 border border-sky-100 dark:border-sky-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="space-y-0.5">
+                <span className="text-xs font-bold text-sky-800 dark:text-sky-200 flex items-center gap-1">
+                  <span>🔐</span>
+                  <span>Worker Verification Required</span>
+                </span>
+                <p className="text-[11px] text-sky-600/80 dark:text-sky-400/80">
+                  Generate a code and give it to the worker when they arrive to check them in.
+                </p>
+                {verificationCodes[b.id] && (
+                  <div className="mt-2">
+                    <span className="text-2xl font-black tracking-widest text-sky-700 dark:text-sky-300">
+                      {verificationCodes[b.id].code}
+                    </span>
+                    <p className="text-[10px] text-gray-500 mt-1">
+                      Expires at {new Date(verificationCodes[b.id].expiresAt).toLocaleTimeString()}
+                    </p>
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => generateCodeMutation.mutate(b.id)}
+                disabled={generateCodeMutation.isPending}
+                className="px-4 py-2 text-xs font-bold rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white transition shadow-sm flex items-center justify-center gap-1.5 self-start sm:self-auto cursor-pointer"
+              >
+                <span>🔑</span>
+                <span>{verificationCodes[b.id] ? 'Regenerate Code' : 'Generate Code'}</span>
+              </button>
             </div>
           )}
 

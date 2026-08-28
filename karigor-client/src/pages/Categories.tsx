@@ -50,7 +50,20 @@ export function Categories() {
               >
                 <CardHeader>
                   <CardTitle className="flex items-center gap-3 text-base">
-                    <span className="text-2xl">{cat.iconUrl || '🛠️'}</span>
+                    {cat.iconUrl ? (
+                      <img 
+                        src={cat.iconUrl} 
+                        alt="" 
+                        className="w-8 h-8 object-contain"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          if (e.currentTarget.nextElementSibling) {
+                            (e.currentTarget.nextElementSibling as HTMLElement).style.display = 'inline';
+                          }
+                        }}
+                      />
+                    ) : null}
+                    <span className="text-2xl" style={{ display: cat.iconUrl ? 'none' : 'inline' }}>🛠️</span>
                     <span className="text-gray-900 dark:text-white font-bold">{cat.name}</span>
                   </CardTitle>
                 </CardHeader>

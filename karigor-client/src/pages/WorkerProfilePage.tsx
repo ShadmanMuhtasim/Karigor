@@ -149,7 +149,20 @@ export function WorkerProfilePage() {
                   key={skill.categoryId}
                   className="bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700/60 rounded-2xl p-3.5 flex items-center gap-3"
                 >
-                  <span className="text-2xl">{skill.iconUrl || '🔧'}</span>
+                  {skill.iconUrl ? (
+                    <img 
+                      src={skill.iconUrl} 
+                      alt="" 
+                      className="w-8 h-8 object-contain"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        if (e.currentTarget.nextElementSibling) {
+                          (e.currentTarget.nextElementSibling as HTMLElement).style.display = 'inline';
+                        }
+                      }}
+                    />
+                  ) : null}
+                  <span className="text-2xl" style={{ display: skill.iconUrl ? 'none' : 'inline' }}>🔧</span>
                   <div>
                     <h5 className="text-sm font-bold text-gray-900 dark:text-white">{skill.categoryName}</h5>
                     <span className="text-xs text-sky-600 dark:text-sky-400 font-medium">Certified Craft</span>

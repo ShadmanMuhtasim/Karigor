@@ -45,6 +45,7 @@ export interface BookingDto {
   status: string;
   address: string;
   description?: string;
+  checkedInAt?: string;
   review?: {
     id: number;
     bookingId: number;
@@ -81,4 +82,6 @@ export const marketplaceApi = {
   updateBookingStatus: async (id: number, status: 'InProgress' | 'Completed' | 'Cancelled') => (await apiClient.put<BookingDto>(`/bookings/${id}/status`, { status })).data,
   getAvailableRequests: async () => (await apiClient.get<AvailableRequestDto[]>('/quotations/available-requests')).data,
   createQuotation: async (serviceRequestId: number, proposedPrice: number, message?: string) => (await apiClient.post<QuotationDto>('/quotations', { serviceRequestId, proposedPrice, message })).data,
+  generateVerificationCode: async (id: number) => (await apiClient.post<{ verificationCode: string; expiresAt: string }>(`/bookings/${id}/verification-code`)).data,
+  checkInWorker: async (id: number, verificationCode: string) => (await apiClient.post<BookingDto>(`/bookings/${id}/check-in`, { verificationCode })).data,
 };

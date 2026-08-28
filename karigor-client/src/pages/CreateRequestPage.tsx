@@ -20,6 +20,7 @@ export function CreateRequestPage() {
   const [photoUrls, setPhotoUrls] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [locLoading, setLocLoading] = useState(false);
+  const [gpsError, setGpsError] = useState<string | null>(null);
   const [showMapPicker, setShowMapPicker] = useState(true);
 
   // Fetch categories
@@ -53,8 +54,9 @@ export function CreateRequestPage() {
   });
 
   const handleGetLocation = () => {
+    setGpsError(null);
     if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser.');
+      setGpsError('GPS location is not supported by this browser.');
       return;
     }
     setLocLoading(true);
@@ -67,9 +69,18 @@ export function CreateRequestPage() {
         setLocLoading(false);
       },
       (err) => {
-        alert(`Location error: ${err.message}`);
+        let errorMsg = 'Your location could not be determined.';
+        if (err.code === 1 /* PERMISSION_DENIED */) {
+          errorMsg = 'Location permission was denied. Please set your location manually on the map.';
+        } else if (err.code === 2 /* POSITION_UNAVAILABLE */) {
+          errorMsg = 'Your location could not be determined. Please set your location manually on the map.';
+        } else if (err.code === 3 /* TIMEOUT */) {
+          errorMsg = 'Location detection timed out. Please try again or set your location manually on the map.';
+        }
+        setGpsError(errorMsg);
         setLocLoading(false);
-      }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   };
 
@@ -188,7 +199,12 @@ export function CreateRequestPage() {
                   </button>
                 </div>
               </div>
-
+              {gpsError && (
+                <div className="p-2.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-400 text-xs font-medium rounded-lg flex items-start gap-1.5">
+                  <span className="text-amber-500 mt-0.5">⚠️</span>
+                  <span>{gpsError}</span>
+                </div>
+              )}
               <input
                 type="text"
                 value={address}

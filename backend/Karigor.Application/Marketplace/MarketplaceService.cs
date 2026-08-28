@@ -5,6 +5,8 @@ using Karigor.Application.Notifications.DTOs;
 using Karigor.Application.Realtime;
 using Karigor.Infrastructure.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Karigor.Application.Marketplace;
 
@@ -487,6 +489,7 @@ public class MarketplaceService(
                 Status             = b.Status,
                 Address            = b.ServiceRequest.Address,
                 Description        = b.ServiceRequest.Description,
+                CheckedInAt        = b.CheckedInAt,
                 Review             = b.Review != null ? new Karigor.Application.Reviews.DTOs.ReviewDto
                 {
                     Id             = b.Review.Id,
@@ -529,6 +532,7 @@ public class MarketplaceService(
                 Status             = b.Status,
                 Address            = b.ServiceRequest.Address,
                 Description        = b.ServiceRequest.Description,
+                CheckedInAt        = b.CheckedInAt,
                 Review             = b.Review != null ? new Karigor.Application.Reviews.DTOs.ReviewDto
                 {
                     Id             = b.Review.Id,
@@ -577,6 +581,7 @@ public class MarketplaceService(
             Status             = booking.Status,
             Address            = booking.ServiceRequest.Address,
             Description        = booking.ServiceRequest.Description,
+            CheckedInAt        = booking.CheckedInAt,
             Review             = booking.Review != null ? new Karigor.Application.Reviews.DTOs.ReviewDto
             {
                 Id             = booking.Review.Id,
@@ -604,13 +609,13 @@ public class MarketplaceService(
 
         var validTransitions = booking.Status switch
         {
-            "Scheduled" => new[] { "InProgress", "Cancelled" },
+            "Scheduled" => new[] { "Cancelled" }, // InProgress now requires OTP check-in
             "InProgress" => new[] { "Completed", "Cancelled" },
             _ => Array.Empty<string>()
         };
 
         if (!validTransitions.Contains(dto.Status))
-            throw new InvalidOperationException($"Cannot transition booking from {booking.Status} to {dto.Status}.");
+            throw new InvalidOperationException($"Cannot manually transition booking from {booking.Status} to {dto.Status}.");
 
         booking.Status = dto.Status;
         if (dto.Status == "Completed")
@@ -629,6 +634,84 @@ public class MarketplaceService(
                 UserId          = booking.Customer.UserId,
                 Type            = "BookingStatusChanged",
                 Message         = $"🔧 Booking #{booking.Id} status was updated to '{dto.Status}' by worker.",
+                RelatedEntityId = booking.Id
+            });
+        }
+
+        return await BookingDtoAsync(bookingId);
+    }
+
+    public async Task<GenerateVerificationCodeResponseDto> GenerateVerificationCodeAsync(string customerUserId, int bookingId)
+    {
+        var customer = await CustomerAsync(customerUserId);
+        var booking = await db.Bookings.FirstOrDefaultAsync(b => b.Id == bookingId && b.CustomerId == customer.Id)
+            ?? throw new KeyNotFoundException("Booking not found.");
+
+        if (booking.Status != "Scheduled")
+            throw new InvalidOperationException("Verification code can only be generated for scheduled bookings.");
+
+        var code = new Random().Next(100000, 999999).ToString();
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(code));
+        
+        booking.VerificationCodeHash = Convert.ToBase64String(hash);
+        booking.VerificationCodeExpiresAt = DateTime.UtcNow.AddMinutes(15);
+        booking.VerificationAttempts = 0;
+
+        await db.SaveChangesAsync();
+
+        return new GenerateVerificationCodeResponseDto
+        {
+            VerificationCode = code,
+            ExpiresAt = booking.VerificationCodeExpiresAt.Value
+        };
+    }
+
+    public async Task<BookingDto> VerifyWorkerCheckInAsync(string workerUserId, int bookingId, WorkerCheckInDto dto)
+    {
+        var worker = await WorkerAsync(workerUserId);
+        var booking = await db.Bookings
+            .Include(b => b.Customer)
+            .FirstOrDefaultAsync(b => b.Id == bookingId && b.WorkerId == worker.Id)
+            ?? throw new KeyNotFoundException("Booking not found.");
+
+        if (booking.Status != "Scheduled")
+            throw new InvalidOperationException("Booking is not in a check-in state.");
+
+        if (string.IsNullOrEmpty(booking.VerificationCodeHash) || booking.VerificationCodeExpiresAt == null)
+            throw new InvalidOperationException("No active verification code for this booking. Customer must generate one.");
+
+        if (DateTime.UtcNow > booking.VerificationCodeExpiresAt.Value)
+            throw new InvalidOperationException("Verification code has expired.");
+
+        if (booking.VerificationAttempts >= 5)
+            throw new InvalidOperationException("Too many invalid verification attempts. Customer must generate a new code.");
+
+        var inputHash = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(dto.VerificationCode.Trim())));
+        if (inputHash != booking.VerificationCodeHash)
+        {
+            booking.VerificationAttempts++;
+            await db.SaveChangesAsync();
+            throw new InvalidOperationException("Invalid verification code.");
+        }
+
+        booking.Status = "InProgress";
+        booking.CheckedInAt = DateTime.UtcNow;
+        booking.VerificationCodeHash = null;
+        booking.VerificationCodeExpiresAt = null;
+        booking.VerificationAttempts = 0;
+
+        var req = await db.ServiceRequests.FindAsync(booking.ServiceRequestId);
+        if (req != null) req.Status = "InProgress";
+
+        await db.SaveChangesAsync();
+
+        if (booking.Customer != null)
+        {
+            await notificationService.CreateNotificationAsync(new CreateNotificationDto
+            {
+                UserId          = booking.Customer.UserId,
+                Type            = "WorkerCheckedIn",
+                Message         = $"✅ Worker has successfully verified their identity and checked in for Booking #{booking.Id}.",
                 RelatedEntityId = booking.Id
             });
         }
@@ -659,6 +742,7 @@ public class MarketplaceService(
             Status             = x.Status,
             Address            = x.ServiceRequest.Address,
             Description        = x.ServiceRequest.Description,
+            CheckedInAt        = x.CheckedInAt,
             Review             = x.Review != null ? new Karigor.Application.Reviews.DTOs.ReviewDto
             {
                 Id             = x.Review.Id,

@@ -15,6 +15,7 @@ export function WorkerProfileTab() {
   });
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [locLoading, setLocLoading] = useState(false);
+  const [gpsError, setGpsError] = useState<string | null>(null);
 
   const { data: profile, isLoading, isError } = useQuery({
     queryKey: ['workerProfile'],
@@ -55,8 +56,9 @@ export function WorkerProfileTab() {
   };
 
   const handleGetGpsLocation = () => {
+    setGpsError(null);
     if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser.');
+      setGpsError('GPS location is not supported by this browser. Please select your location manually.');
       return;
     }
     setLocLoading(true);
@@ -70,9 +72,18 @@ export function WorkerProfileTab() {
         setLocLoading(false);
       },
       (err) => {
-        alert(`Location error: ${err.message}`);
+        let errorMsg = 'Your location could not be determined. Please select your location manually.';
+        if (err.code === 1 /* PERMISSION_DENIED */) {
+          errorMsg = 'Location permission was denied. You can set your location manually by clicking or dragging the pin.';
+        } else if (err.code === 2 /* POSITION_UNAVAILABLE */) {
+          errorMsg = 'Your location could not be determined. Please select your location manually.';
+        } else if (err.code === 3 /* TIMEOUT */) {
+          errorMsg = 'Location detection timed out. Please try again or select your location manually.';
+        }
+        setGpsError(errorMsg);
         setLocLoading(false);
-      }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   };
 
@@ -195,9 +206,16 @@ export function WorkerProfileTab() {
                 className="px-3.5 py-1.5 bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-700/60 text-emerald-700 dark:text-emerald-300 text-xs font-bold rounded-xl hover:bg-emerald-200 transition flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
               >
                 <span>📍</span>
-                <span>{locLoading ? 'Locating...' : 'Use My GPS Location'}</span>
+                <span>{locLoading ? 'Locating...' : (gpsError ? 'Try GPS Again' : 'Use My GPS Location')}</span>
               </button>
             </div>
+
+            {gpsError && (
+              <div className="mb-3 p-2.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-400 text-xs font-medium rounded-lg flex items-start gap-2">
+                <span className="text-amber-500 mt-0.5">⚠️</span>
+                <span>{gpsError}</span>
+              </div>
+            )}
 
             <KarigorMap
               height="380px"

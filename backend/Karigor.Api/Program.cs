@@ -190,6 +190,19 @@ try
         // Service categories are required during worker registration.  Seed them
         // here so a new developer database works without manually running SQL.
         var db = scope.ServiceProvider.GetRequiredService<KarigorDbContext>();
+
+        // Ensure database schema migrations (idempotent)
+        db.Database.ExecuteSqlRaw(@"
+            IF NOT EXISTS(SELECT 1 FROM sys.columns WHERE Name = N'VerificationCodeHash' AND Object_ID = Object_ID(N'dbo.Bookings'))
+            BEGIN
+                ALTER TABLE [dbo].[Bookings]
+                ADD 
+                    [VerificationCodeHash]      nvarchar(256) NULL,
+                    [VerificationCodeExpiresAt] datetime2     NULL,
+                    [VerificationAttempts]      int           NOT NULL DEFAULT 0,
+                    [CheckedInAt]               datetime2     NULL;
+            END
+        ");
         var starterCategories = new (string Name, string IconUrl)[]
         {
             ("Electrician", "https://cdn.karigor.app/icons/electrician.svg"),

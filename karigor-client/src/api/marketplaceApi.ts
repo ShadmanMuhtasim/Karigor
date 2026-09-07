@@ -1,5 +1,6 @@
 import { apiClient } from './client';
 import type { ServiceRequestDto } from './customerApi';
+import { triggerSos } from './sosApi';
 
 export interface QuotationDto {
   id: number;
@@ -87,4 +88,5 @@ export const marketplaceApi = {
   createQuotation: async (serviceRequestId: number, proposedPrice: number, message?: string) => (await apiClient.post<QuotationDto>('/quotations', { serviceRequestId, proposedPrice, message })).data,
   generateVerificationCode: async (id: number) => (await apiClient.post<{ verificationCode: string; expiresAt: string }>(`/bookings/${id}/verification-code`)).data,
   checkInWorker: async (id: number, verificationCode: string) => (await apiClient.post<BookingDto>(`/bookings/${id}/check-in`, { verificationCode })).data,
+  triggerSos: async (id: number) => triggerSos(id),
 };

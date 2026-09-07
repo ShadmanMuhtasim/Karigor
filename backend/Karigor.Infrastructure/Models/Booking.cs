@@ -51,4 +51,7 @@ public partial class Booking
     [ForeignKey("WorkerId")]
     [InverseProperty("Bookings")]
     public virtual WorkerProfile Worker { get; set; } = null!;
+
+    [InverseProperty("Booking")]
+    public virtual ICollection<SosAlert> SosAlerts { get; set; } = new List<SosAlert>();
 }

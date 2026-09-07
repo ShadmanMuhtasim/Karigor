@@ -24,6 +24,11 @@ public class SignalRRealtimeNotifier : IRealtimeNotifier
         await _hubContext.Clients.Group($"booking_{bookingId}").SendAsync(eventName, data);
     }
 
+    public async Task NotifyAdminsAsync(string eventName, object data)
+    {
+        await _hubContext.Clients.Group("Admins").SendAsync(eventName, data);
+    }
+
     public async Task BroadcastAsync(string eventName, object data)
     {
         await _hubContext.Clients.All.SendAsync(eventName, data);

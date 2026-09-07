@@ -195,3 +195,17 @@ export async function updateAdminCategory(id: number, payload: UpdateCategoryPay
 export async function deleteAdminCategory(id: number): Promise<void> {
   await apiClient.delete(`/admin/categories/${id}`);
 }
+
+// -----------------------------------------------------------------------------
+// Emergency SOS Alert Management (re-exported from dedicated sosApi)
+// -----------------------------------------------------------------------------
+export {
+  getSosAlerts as getAdminSosAlerts,
+  updateSosStatus as updateAdminSosStatus,
+  terminateSosJob as terminateAdminSosJob,
+  type SosAlertDto,
+  type UpdateSosStatusDto as UpdateSosStatusPayload,
+  type TerminateSosJobDto as TerminateSosJobPayload,
+} from './sosApi';
+
+

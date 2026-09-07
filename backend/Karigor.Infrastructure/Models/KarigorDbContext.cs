@@ -42,6 +42,8 @@ public partial class KarigorDbContext : IdentityDbContext<ApplicationUser>
 
     public virtual DbSet<WorkerProfile> WorkerProfiles { get; set; }
 
+    public virtual DbSet<SosAlert> SosAlerts { get; set; }
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
         => optionsBuilder.UseSqlServer("Server=.\\SQLEXPRESS;Database=KarigorDev;Trusted_Connection=True;TrustServerCertificate=True;");
@@ -112,6 +114,37 @@ public partial class KarigorDbContext : IdentityDbContext<ApplicationUser>
                         j.HasKey("WorkerId", "CategoryId");
                         j.ToTable("WorkerSkills");
                     });
+        });
+
+        modelBuilder.Entity<SosAlert>(entity =>
+        {
+            entity.Property(e => e.Status)
+                .HasConversion<string>()
+                .HasMaxLength(50)
+                .HasDefaultValue(SosAlertStatus.Open);
+
+            entity.Property(e => e.TriggeredAt)
+                .HasDefaultValueSql("(sysutcdatetime())");
+
+            entity.HasOne(d => d.Booking)
+                .WithMany(p => p.SosAlerts)
+                .HasForeignKey(d => d.BookingId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(d => d.Customer)
+                .WithMany()
+                .HasForeignKey(d => d.CustomerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(d => d.Worker)
+                .WithMany()
+                .HasForeignKey(d => d.WorkerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(d => d.ResolvedByAdmin)
+                .WithMany()
+                .HasForeignKey(d => d.ResolvedByAdminId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         OnModelCreatingPartial(modelBuilder);

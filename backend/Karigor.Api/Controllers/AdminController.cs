@@ -1,7 +1,11 @@
+using System;
 using System.Collections.Generic;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using Karigor.Application.Admin;
 using Karigor.Application.Admin.DTOs;
+using Karigor.Application.Sos;
+using Karigor.Application.Sos.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -18,11 +22,17 @@ namespace Karigor.Api.Controllers;
 public class AdminController : ControllerBase
 {
     private readonly IAdminService _adminService;
+    private readonly ISosService _sosService;
 
-    public AdminController(IAdminService adminService)
+    public AdminController(IAdminService adminService, ISosService sosService)
     {
         _adminService = adminService;
+        _sosService = sosService;
     }
+
+    private string UserId() =>
+        User.FindFirstValue(ClaimTypes.NameIdentifier) ??
+        throw new InvalidOperationException("Authenticated admin user has no sub claim.");
 
     // -------------------------------------------------------------------------
     // 9.9 Analytics & KPIs
@@ -154,5 +164,44 @@ public class AdminController : ControllerBase
     {
         await _adminService.DeleteCategoryAsync(id);
         return NoContent();
+    }
+
+    // -------------------------------------------------------------------------
+    // Emergency SOS Management
+    // -------------------------------------------------------------------------
+    [HttpGet("sos")]
+    [ProducesResponseType(typeof(List<SosAlertDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetSosAlerts([FromQuery] string? status = null)
+    {
+        var alerts = await _sosService.GetSosAlertsAsync(status);
+        return Ok(alerts);
+    }
+
+    [HttpPut("sos/{id:int}/status")]
+    [ProducesResponseType(typeof(SosAlertDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> UpdateSosStatus(int id, [FromBody] UpdateSosStatusDto dto)
+    {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+        try
+        {
+            var result = await _sosService.UpdateSosStatusAsync(UserId(), id, dto);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException e) { return NotFound(new { error = e.Message }); }
+        catch (InvalidOperationException e) { return BadRequest(new { error = e.Message }); }
+    }
+
+    [HttpPut("sos/{id:int}/terminate")]
+    [HttpPut("sos/{id:int}/terminate-job")]
+    [ProducesResponseType(typeof(SosAlertDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> TerminateSosJob(int id, [FromBody] TerminateSosJobDto? dto = null)
+    {
+        try
+        {
+            var result = await _sosService.TerminateJobAsync(UserId(), id, dto?.AdminNotes);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException e) { return NotFound(new { error = e.Message }); }
+        catch (InvalidOperationException e) { return BadRequest(new { error = e.Message }); }
     }
 }

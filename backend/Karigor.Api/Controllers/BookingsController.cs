@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Karigor.Application.Marketplace;
 using Karigor.Application.Marketplace.DTOs;
+using Karigor.Application.Sos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -9,7 +10,7 @@ namespace Karigor.Api.Controllers;
 [ApiController]
 [Route("api/bookings")]
 [Authorize]
-public class BookingsController(IMarketplaceService marketplace) : ControllerBase
+public class BookingsController(IMarketplaceService marketplace, ISosService sosService) : ControllerBase
 {
     private string UserId() => User.FindFirstValue(ClaimTypes.NameIdentifier) ?? throw new InvalidOperationException("Authenticated user has no sub claim.");
 
@@ -73,6 +74,15 @@ public class BookingsController(IMarketplaceService marketplace) : ControllerBas
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
         try { return Ok(await marketplace.VerifyWorkerCheckInAsync(UserId(), id, dto)); }
+        catch (KeyNotFoundException e) { return NotFound(new { error = e.Message }); }
+        catch (InvalidOperationException e) { return BadRequest(new { error = e.Message }); }
+    }
+
+    [HttpPost("{id:int}/sos")]
+    [Authorize(Roles = "Customer")]
+    public async Task<IActionResult> TriggerSos(int id)
+    {
+        try { return Ok(await sosService.TriggerSosAsync(UserId(), id)); }
         catch (KeyNotFoundException e) { return NotFound(new { error = e.Message }); }
         catch (InvalidOperationException e) { return BadRequest(new { error = e.Message }); }
     }

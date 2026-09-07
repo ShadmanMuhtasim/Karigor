@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { marketplaceApi } from '../../api/marketplaceApi';
 import { locationApi } from '../../api/locationApi';
 import { workerApi } from '../../api/workerApi';
@@ -9,12 +10,25 @@ import { ChatModal } from '../../components/chat/ChatModal';
 import { extractErrorMessage } from '../../lib/errorUtils';
 import { RatingStars } from '../../components/reviews/RatingStars';
 import { WorkerReviewResponseModal } from '../../components/reviews/WorkerReviewResponseModal';
+import { OtpVerificationModal } from '../../components/OtpVerificationModal';
 import { signalRService } from '../../services/signalrService';
 import type { ReviewDto } from '../../api/reviewApi';
 import type { NearbyRequestDto } from '../../api/locationApi';
 import type { BookingDto } from '../../api/marketplaceApi';
+import {
+  MapPinIcon,
+  MapIcon,
+  ListIcon,
+  CalendarIcon,
+  SendIcon,
+  UserIcon,
+  ChatBubbleIcon,
+  KeyIcon,
+  CheckIcon,
+} from '../../components/icons/Icons';
 
 export function WorkerBookingsTab() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [quoteFor, setQuoteFor] = useState<number | null>(null);
   const [price, setPrice] = useState('');
@@ -22,9 +36,9 @@ export function WorkerBookingsTab() {
   const [jobsViewMode, setJobsViewMode] = useState<'map' | 'list'>('map');
   const [selectedReq, setSelectedReq] = useState<NearbyRequestDto | null>(null);
   const [activeChatBooking, setActiveChatBooking] = useState<BookingDto | null>(null);
+  const [verifyingBooking, setVerifyingBooking] = useState<BookingDto | null>(null);
   const [selectedReviewForReply, setSelectedReviewForReply] = useState<ReviewDto | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
-  const [checkInCode, setCheckInCode] = useState<Record<number, string>>({});
 
   // Real-time live synchronization for requests, quotations, counter-offers, and bookings
   useEffect(() => {
@@ -138,8 +152,8 @@ export function WorkerBookingsTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workerBookings'] });
     },
-    onError: (err: any) => {
-      alert(extractErrorMessage(err, 'Failed to check in. Invalid or expired code.'));
+    onError: () => {
+      // Handled inline within OtpVerificationModal
     },
   });
 
@@ -154,7 +168,8 @@ export function WorkerBookingsTab() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h3 className="text-xl font-extrabold text-gray-900 dark:text-white flex items-center gap-2">
-              <span>📍 Nearby Job Opportunities</span>
+              <MapPinIcon className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              <span>Nearby Job Opportunities</span>
               <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold">
                 Live Matching
               </span>
@@ -175,7 +190,7 @@ export function WorkerBookingsTab() {
                   : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
               }`}
             >
-              <span>🗺️</span>
+              <MapIcon className="w-3.5 h-3.5" />
               <span>Map View</span>
             </button>
             <button
@@ -187,7 +202,7 @@ export function WorkerBookingsTab() {
                   : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
               }`}
             >
-              <span>📋</span>
+              <ListIcon className="w-3.5 h-3.5" />
               <span>List View</span>
             </button>
           </div>
@@ -242,8 +257,8 @@ export function WorkerBookingsTab() {
                       {selectedReq.description}
                     </p>
                     <div className="mt-2 text-xs text-gray-500 space-y-1">
-                      <p>📍 {selectedReq.address}</p>
-                      <p>🗓️ {new Date(selectedReq.preferredDate).toLocaleString()}</p>
+                      <p className="flex items-center gap-1.5"><MapPinIcon className="w-3.5 h-3.5 shrink-0" />{selectedReq.address}</p>
+                      <p className="flex items-center gap-1.5"><CalendarIcon className="w-3.5 h-3.5 shrink-0" />{new Date(selectedReq.preferredDate).toLocaleString()}</p>
                     </div>
                   </div>
 
@@ -305,7 +320,7 @@ export function WorkerBookingsTab() {
                 </div>
               ) : (
                 <div className="py-12 text-center text-gray-400 space-y-2">
-                  <span className="text-3xl">📍</span>
+                  <MapPinIcon className="w-8 h-8 mx-auto text-gray-400" />
                   <p className="text-xs font-semibold text-gray-600 dark:text-gray-300">
                     Select a request pin on the map
                   </p>
@@ -332,7 +347,7 @@ export function WorkerBookingsTab() {
                 {openJobsList.data.map((job) => (
                   <div
                     key={job.id}
-                    className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm space-y-3"
+                    className="card-lift rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm space-y-3"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
@@ -342,8 +357,10 @@ export function WorkerBookingsTab() {
                         <p className="mt-1 text-sm font-semibold text-gray-800 dark:text-gray-200">
                           {job.description}
                         </p>
-                        <p className="mt-2 text-xs text-gray-500">
-                          📍 {job.address} · 📅 {new Date(job.preferredDate).toLocaleString()}
+                        <p className="mt-2 text-xs text-gray-500 flex flex-wrap items-center gap-2">
+                          <span className="flex items-center gap-1"><MapPinIcon className="w-3 h-3 shrink-0" />{job.address}</span>
+                          <span>·</span>
+                          <span className="flex items-center gap-1"><CalendarIcon className="w-3 h-3 shrink-0" />{new Date(job.preferredDate).toLocaleString()}</span>
                         </p>
                       </div>
                       <button
@@ -351,7 +368,7 @@ export function WorkerBookingsTab() {
                           setQuoteFor(job.id);
                           setQuoteError(null);
                         }}
-                        className="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-xs font-bold text-white transition shadow-sm cursor-pointer"
+                        className="btn-press rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-xs font-bold text-white shadow-sm cursor-pointer"
                       >
                         Send quote
                       </button>
@@ -387,7 +404,7 @@ export function WorkerBookingsTab() {
                         />
                         <button
                           disabled={quote.isPending}
-                          className="rounded-xl bg-emerald-600 px-3.5 py-2 text-sm font-bold text-white cursor-pointer hover:bg-emerald-500 transition"
+                          className="btn-press rounded-xl bg-emerald-600 px-3.5 py-2 text-sm font-bold text-white cursor-pointer hover:bg-emerald-500"
                         >
                           {quote.isPending ? 'Sending...' : 'Submit quotation'}
                         </button>
@@ -411,7 +428,8 @@ export function WorkerBookingsTab() {
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-xl font-extrabold text-gray-900 dark:text-white flex items-center gap-2">
-              <span>📤 My Submitted Quotations & Active Negotiations</span>
+              <SendIcon className="w-5 h-5 text-sky-600 dark:text-sky-400" />
+              <span>My Submitted Quotations & Active Negotiations</span>
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
               Review all price proposals you sent, customer counter-offers, and negotiation statuses.
@@ -438,7 +456,7 @@ export function WorkerBookingsTab() {
               return (
                 <div
                   key={q.quotationId}
-                  className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm space-y-3"
+                  className="card-lift rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm space-y-3"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="space-y-1">
@@ -454,8 +472,10 @@ export function WorkerBookingsTab() {
                         </span>
                       </div>
 
-                      <p className="text-xs text-gray-500">
-                        📍 {q.address} · 📅 {new Date(q.preferredDate).toLocaleString()}
+                      <p className="text-xs text-gray-500 flex flex-wrap items-center gap-2">
+                        <span className="flex items-center gap-1"><MapPinIcon className="w-3 h-3 shrink-0" />{q.address}</span>
+                        <span>·</span>
+                        <span className="flex items-center gap-1"><CalendarIcon className="w-3 h-3 shrink-0" />{new Date(q.preferredDate).toLocaleString()}</span>
                       </p>
 
                       {q.latestMessage && (
@@ -501,7 +521,7 @@ export function WorkerBookingsTab() {
 
                     <Link
                       to={`/requests/${q.serviceRequestId}`}
-                      className="px-4 py-2 text-xs font-bold rounded-xl bg-sky-600 hover:bg-sky-500 text-white transition shadow-sm cursor-pointer"
+                      className="btn-press px-4 py-2 text-xs font-bold rounded-xl bg-sky-600 hover:bg-sky-500 text-white shadow-sm cursor-pointer"
                     >
                       {isCounterFromCustomer ? 'Respond to Counter-Offer ↗' : 'View Negotiation Details ↗'}
                     </Link>
@@ -527,7 +547,7 @@ export function WorkerBookingsTab() {
             {bookings.data.map((b) => (
               <div
                 key={b.id}
-                className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm"
+                className="card-lift rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm"
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
@@ -539,11 +559,14 @@ export function WorkerBookingsTab() {
                         ৳ {b.agreedPrice.toLocaleString()}
                       </span>
                     </div>
-                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                      👤 {b.customerName} · 📍 {b.address}
+                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400 flex flex-wrap items-center gap-2">
+                      <span className="flex items-center gap-1"><UserIcon className="w-3.5 h-3.5 shrink-0" />{b.customerName}</span>
+                      <span>·</span>
+                      <span className="flex items-center gap-1"><MapPinIcon className="w-3.5 h-3.5 shrink-0" />{b.address}</span>
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      📅 Scheduled: {new Date(b.scheduledDate).toLocaleString()}
+                    <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                      <CalendarIcon className="w-3.5 h-3.5 shrink-0" />
+                      <span>Scheduled: {new Date(b.scheduledDate).toLocaleString()}</span>
                     </p>
                   </div>
                   <span
@@ -572,9 +595,9 @@ export function WorkerBookingsTab() {
                       <button
                         type="button"
                         onClick={() => setSelectedReviewForReply(b.review!)}
-                        className="text-xs font-bold text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1 cursor-pointer"
+                        className="text-xs font-bold text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1.5 cursor-pointer"
                       >
-                        <span>💬</span>
+                        <ChatBubbleIcon className="w-3.5 h-3.5" />
                         <span>{b.review.workerResponse ? 'Edit Reply' : 'Reply to Review'}</span>
                       </button>
                     </div>
@@ -604,42 +627,29 @@ export function WorkerBookingsTab() {
                   <button
                     type="button"
                     onClick={() => setActiveChatBooking(b)}
-                    className="px-4 py-2 text-xs font-bold rounded-xl bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900 border border-sky-200 dark:border-sky-800 transition flex items-center gap-1.5 cursor-pointer"
+                    className="btn-press px-4 py-2 text-xs font-bold rounded-xl bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900 border border-sky-200 dark:border-sky-800 flex items-center gap-1.5 cursor-pointer"
                   >
-                    <span>💬</span>
-                    <span>Chat with Customer</span>
+                    <ChatBubbleIcon className="w-3.5 h-3.5" />
+                    <span>{t('worker.tabs.chat', 'Chat with Customer')}</span>
                   </button>
 
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                     {b.status === 'Scheduled' && (
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          placeholder="6-digit code"
-                          value={checkInCode[b.id] || ''}
-                          onChange={(e) => setCheckInCode({ ...checkInCode, [b.id]: e.target.value })}
-                          className="w-28 rounded-xl border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:border-sky-500 focus:ring-sky-500"
-                          maxLength={6}
-                        />
-                        <button
-                          onClick={() => {
-                            if (checkInCode[b.id]?.length === 6) {
-                              checkInWorker.mutate({ id: b.id, code: checkInCode[b.id] });
-                            }
-                          }}
-                          disabled={checkInWorker.isPending || checkInCode[b.id]?.length !== 6}
-                          className="rounded-xl border border-sky-400 px-4 py-2 text-xs font-bold text-sky-700 dark:border-sky-700 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-950/50 transition cursor-pointer disabled:opacity-50"
-                        >
-                          {checkInWorker.isPending ? 'Verifying...' : 'Verify & Start Job'}
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => setVerifyingBooking(b)}
+                        className="btn-press rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 px-4 py-2 text-xs font-bold text-white shadow-md shadow-sky-500/20 flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <KeyIcon className="w-3.5 h-3.5" />
+                        <span>{t('worker.bookings.verifyAndStart', 'Verify & Start Job')}</span>
+                      </button>
                     )}
                     {b.status === 'InProgress' && (
                       <button
                         onClick={() => updateStatus.mutate({ id: b.id, status: 'Completed' })}
-                        className="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-xs font-bold text-white transition shadow-sm cursor-pointer"
+                        className="btn-press rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-xs font-bold text-white shadow-sm cursor-pointer flex items-center gap-1.5"
                       >
-                        ✓ Mark completed
+                        <CheckIcon className="w-3.5 h-3.5" />
+                        <span>{t('worker.bookings.markCompleted', 'Mark completed')}</span>
                       </button>
                     )}
                   </div>
@@ -671,6 +681,20 @@ export function WorkerBookingsTab() {
           onResponseSubmitted={() => {
             queryClient.invalidateQueries({ queryKey: ['workerBookings'] });
             setSelectedReviewForReply(null);
+          }}
+        />
+      )}
+
+      {/* Check-In OTP Verification Modal */}
+      {verifyingBooking && (
+        <OtpVerificationModal
+          isOpen={!!verifyingBooking}
+          onClose={() => setVerifyingBooking(null)}
+          bookingId={verifyingBooking.id}
+          customerName={verifyingBooking.customerName}
+          categoryName={verifyingBooking.categoryName}
+          onVerify={async (code: string) => {
+            await checkInWorker.mutateAsync({ id: verifyingBooking.id, code });
           }}
         />
       )}

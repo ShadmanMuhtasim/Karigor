@@ -1,9 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { notificationApi, type NotificationDto } from '../../api/notificationApi';
 import { signalRService } from '../../services/signalrService';
+import {
+  BellIcon,
+  ChatBubbleIcon,
+  HardHatIcon,
+  SparklesIcon,
+  WrenchIcon,
+  ScaleIcon,
+  InboxIcon,
+  CloseIcon,
+} from '../icons/Icons';
 
 export function NotificationBell() {
+  const { t } = useTranslation();
   const [notifications, setNotifications] = useState<NotificationDto[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -11,14 +23,14 @@ export function NotificationBell() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
+  const unreadCount = Array.isArray(notifications) ? notifications.filter((n) => !n.isRead).length : 0;
 
   useEffect(() => {
     fetchNotifications();
 
     // Listen for live notifications via SignalR
     const unsubscribe = signalRService.onNotification((newNotif) => {
-      setNotifications((prev) => [newNotif, ...prev]);
+      setNotifications((prev) => Array.isArray(prev) ? [newNotif, ...prev] : [newNotif]);
 
       // Show floating toast in the middle top of screen
       setToastMessage(newNotif.message);
@@ -45,7 +57,7 @@ export function NotificationBell() {
     setLoading(true);
     try {
       const data = await notificationApi.getNotifications();
-      setNotifications(data);
+      setNotifications(Array.isArray(data) ? data : []);
     } catch {
       // Ignored if not logged in
     } finally {
@@ -108,17 +120,17 @@ export function NotificationBell() {
   function getNotificationIcon(type: string) {
     switch (type) {
       case 'NewMessage':
-        return '💬';
+        return <ChatBubbleIcon className="w-4 h-4 sm:w-5 sm:h-5 text-sky-500" />;
       case 'NewQuotation':
-        return '👷';
+        return <HardHatIcon className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />;
       case 'BookingCreated':
-        return '🎉';
+        return <SparklesIcon className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-500" />;
       case 'BookingStatusChanged':
-        return '🔧';
+        return <WrenchIcon className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" />;
       case 'QuotationCountered':
-        return '⚖️';
+        return <ScaleIcon className="w-4 h-4 sm:w-5 sm:h-5 text-purple-500" />;
       default:
-        return '🔔';
+        return <BellIcon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500" />;
     }
   }
 
@@ -126,14 +138,14 @@ export function NotificationBell() {
     <>
       {/* Centered Top Notification Popup (Easily visible, no bounce, perfectly matching UI) */}
       {toastMessage && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] w-[92%] max-w-md bg-white dark:bg-gray-900 text-gray-900 dark:text-white p-4 rounded-3xl shadow-2xl border border-gray-200 dark:border-gray-800 flex items-start gap-3.5 transition-all animate-in fade-in slide-in-from-top-4 duration-200">
-          <div className="w-10 h-10 rounded-2xl bg-sky-50 dark:bg-sky-950/80 text-sky-600 dark:text-sky-400 flex items-center justify-center text-xl shrink-0 border border-sky-200 dark:border-sky-800/60 shadow-sm">
-            🔔
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] w-[92%] max-w-md bg-white dark:bg-gray-900 text-gray-900 dark:text-white p-4 rounded-3xl shadow-2xl border border-gray-200 dark:border-gray-800 flex items-start gap-3.5 animate-dropdown-slide">
+          <div className="w-10 h-10 rounded-2xl bg-sky-50 dark:bg-sky-950/80 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0 border border-sky-200 dark:border-sky-800/60 shadow-sm">
+            <BellIcon className="w-5 h-5 text-sky-600 dark:text-sky-400" />
           </div>
           <div className="flex-1 min-w-0 pt-0.5">
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">
-                New Notification
+                {t('notifications.title', 'Notifications')}
               </span>
               <span className="text-[10px] text-gray-400 font-medium">Just now</span>
             </div>
@@ -142,12 +154,11 @@ export function NotificationBell() {
             </p>
           </div>
           <button
-            type="button"
             onClick={() => setToastMessage(null)}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xs p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition cursor-pointer"
-            aria-label="Close notification"
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition cursor-pointer"
+            aria-label="Dismiss notification"
           >
-            ✕
+            <CloseIcon className="w-4 h-4" />
           </button>
         </div>
       )}
@@ -158,11 +169,11 @@ export function NotificationBell() {
           id="notification-bell-btn"
           type="button"
           onClick={() => setIsOpen(!isOpen)}
-          className="relative p-2 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition focus:outline-none cursor-pointer"
-          aria-label="Notifications"
+          className="relative p-1 sm:p-2 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none cursor-pointer btn-press"
+          aria-label={t('nav.notifications', 'Notifications')}
         >
           <svg
-            className="w-5 h-5"
+            className="w-4 h-4 sm:w-5 sm:h-5"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -178,7 +189,7 @@ export function NotificationBell() {
           {unreadCount > 0 && (
             <span
               id="notification-unread-badge"
-              className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-[10px] font-bold text-white flex items-center justify-center shadow-sm"
+              className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-[10px] font-bold text-white flex items-center justify-center shadow-sm animate-pulse"
             >
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
@@ -189,24 +200,24 @@ export function NotificationBell() {
         {isOpen && (
           <div
             id="notification-dropdown"
-            className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl shadow-2xl overflow-hidden z-50 animate-in fade-in duration-150"
+            className="absolute -right-8 sm:right-0 mt-2 w-[calc(100vw-2rem)] max-w-xs sm:max-w-sm md:w-96 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl shadow-2xl overflow-hidden z-50 animate-dropdown-slide"
           >
             {/* Header */}
             <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between bg-gray-50/50 dark:bg-gray-850/50">
               <div className="flex items-center gap-2">
-                <span className="font-bold text-sm text-gray-900 dark:text-white">Notifications</span>
+                <span className="font-bold text-sm text-gray-900 dark:text-white">{t('notifications.title', 'Notifications')}</span>
                 {unreadCount > 0 && (
                   <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-sky-50 dark:bg-sky-950 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
-                    {unreadCount} new
+                    {unreadCount}
                   </span>
                 )}
               </div>
               {unreadCount > 0 && (
                 <button
                   onClick={handleMarkAllRead}
-                  className="text-xs font-semibold text-sky-600 dark:text-sky-400 hover:underline cursor-pointer"
+                  className="text-xs font-semibold text-sky-600 dark:text-sky-400 hover:underline cursor-pointer btn-press"
                 >
-                  Mark all read
+                  {t('notifications.markAllRead', 'Mark all as read')}
                 </button>
               )}
             </div>
@@ -215,19 +226,20 @@ export function NotificationBell() {
             <div className="max-h-96 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800/60">
               {loading ? (
                 <div className="py-8 text-center text-xs text-gray-500 dark:text-gray-400">
-                  Loading notifications…
+                  {t('common.loading', 'Loading...')}
                 </div>
               ) : notifications.length === 0 ? (
                 <div className="py-10 text-center text-gray-500 dark:text-gray-400">
-                  <span className="text-2xl block mb-1">📭</span>
-                  <p className="text-xs font-medium">No notifications yet</p>
+                  <InboxIcon className="w-10 h-10 mx-auto text-gray-400 dark:text-gray-500 mb-2" />
+                  <p className="text-xs font-medium">{t('notifications.emptyTitle', 'No notifications yet')}</p>
+                  <p className="text-[11px] text-gray-400 mt-1">{t('notifications.emptyDesc', 'You will receive updates here for new bids, bookings, and messages.')}</p>
                 </div>
               ) : (
                 notifications.map((n) => (
                   <div
                     key={n.id}
                     onClick={() => handleNotificationClick(n)}
-                    className={`px-5 py-3.5 hover:bg-gray-50 dark:hover:bg-gray-800/80 transition cursor-pointer flex items-start gap-3 ${
+                    className={`px-5 py-3.5 table-row-hover cursor-pointer flex items-start gap-3 ${
                       !n.isRead ? 'bg-sky-50/40 dark:bg-sky-950/20' : ''
                     }`}
                   >

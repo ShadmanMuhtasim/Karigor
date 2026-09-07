@@ -9,6 +9,16 @@ import { RatingStars } from '../components/reviews/RatingStars';
 import { ReviewModal } from '../components/reviews/ReviewModal';
 import { WorkerReviewResponseModal } from '../components/reviews/WorkerReviewResponseModal';
 import { signalRService } from '../services/signalrService';
+import {
+  SearchIcon,
+  MapPinIcon,
+  LockIcon,
+  CheckCircleIcon,
+  StarIcon,
+  CheckIcon,
+  WrenchIcon,
+  ChatBubbleIcon,
+} from '../components/icons/Icons';
 
 export function BookingDetailPage() {
   const id = Number(useParams<{ id: string }>().id);
@@ -77,21 +87,21 @@ export function BookingDetailPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-white transition-colors duration-200 flex flex-col">
       <Navbar />
 
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-8">
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-8 animate-fade-in-up">
         {isLoading ? (
           <p className="text-gray-500 dark:text-gray-400 py-16 text-center text-sm">
             Loading booking details…
           </p>
         ) : isError || !data ? (
           <div className="text-center py-16 bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 p-8 shadow-sm">
-            <span className="text-4xl block mb-2">🔍</span>
+            <SearchIcon className="w-10 h-10 mx-auto mb-2 text-gray-400" />
             <h3 className="text-base font-bold text-gray-900 dark:text-white">Booking Not Found</h3>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               The requested booking could not be found or you do not have permission to view it.
             </p>
             <Link
               to="/dashboard"
-              className="mt-4 inline-block px-5 py-2.5 bg-sky-500 hover:bg-sky-400 text-white font-bold rounded-xl text-xs shadow-md transition"
+              className="btn-press mt-4 inline-block px-5 py-2.5 bg-sky-500 hover:bg-sky-400 text-white font-bold rounded-xl text-xs shadow-md transition"
             >
               Back to Dashboard
             </Link>
@@ -100,7 +110,7 @@ export function BookingDetailPage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             {/* Left Column: Booking Info & Reviews */}
             <div className="lg:col-span-5 space-y-6">
-              <article className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm space-y-6">
+              <article className="card-lift rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm space-y-6">
                 <div className="flex flex-wrap justify-between items-start gap-3">
                   <div>
                     <span className="text-xs font-bold text-sky-600 dark:text-sky-400 uppercase tracking-wider">
@@ -156,8 +166,9 @@ export function BookingDetailPage() {
 
                   <div className="p-3 rounded-2xl bg-gray-50 dark:bg-gray-800/50 space-y-1">
                     <span className="text-xs text-gray-500 dark:text-gray-400">Service Location</span>
-                    <p className="font-medium text-xs text-gray-800 dark:text-gray-200">
-                      📍 {data.address || 'Address on record'}
+                    <p className="font-medium text-xs text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
+                      <MapPinIcon className="w-3.5 h-3.5 shrink-0 text-gray-500" />
+                      <span>{data.address || 'Address on record'}</span>
                     </p>
                   </div>
 
@@ -174,9 +185,9 @@ export function BookingDetailPage() {
 
               {/* ── Worker Verification Card (Customer View) ── */}
               {isCustomer && data.status === 'Scheduled' && (
-                <article className="rounded-3xl border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-900/20 p-6 shadow-sm space-y-4">
+                <article className="card-lift rounded-3xl border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-900/20 p-6 shadow-sm space-y-4">
                   <div className="flex items-center gap-2 border-b border-sky-100 dark:border-sky-800/50 pb-3">
-                    <span className="text-xl">🔐</span>
+                    <LockIcon className="w-5 h-5 text-sky-600 dark:text-sky-400" />
                     <h3 className="font-bold text-base text-sky-900 dark:text-sky-100">
                       Worker Verification
                     </h3>
@@ -189,7 +200,7 @@ export function BookingDetailPage() {
                     </div>
 
                     <div className="text-center space-y-3 py-2">
-                      {verificationCode ? (
+                       {verificationCode ? (
                         <div className="space-y-2">
                           <p className="text-xs text-sky-800 dark:text-sky-200">
                             Give this one-time code to the assigned Worker when they arrive.
@@ -206,7 +217,7 @@ export function BookingDetailPage() {
                             type="button"
                             onClick={() => generateCodeMutation.mutate(data.id)}
                             disabled={generateCodeMutation.isPending}
-                            className="mt-4 px-4 py-2 text-xs font-bold rounded-xl bg-sky-100 hover:bg-sky-200 dark:bg-sky-800 dark:hover:bg-sky-700 text-sky-700 dark:text-sky-300 transition cursor-pointer"
+                            className="btn-press mt-4 px-4 py-2 text-xs font-bold rounded-xl bg-sky-100 hover:bg-sky-200 dark:bg-sky-800 dark:hover:bg-sky-700 text-sky-700 dark:text-sky-300 transition cursor-pointer"
                           >
                             Regenerate Code
                           </button>
@@ -220,7 +231,7 @@ export function BookingDetailPage() {
                             type="button"
                             onClick={() => generateCodeMutation.mutate(data.id)}
                             disabled={generateCodeMutation.isPending}
-                            className="px-6 py-2.5 text-sm font-bold rounded-xl bg-sky-600 hover:bg-sky-500 text-white transition shadow-md active:scale-95 cursor-pointer disabled:opacity-50"
+                            className="btn-press px-6 py-2.5 text-sm font-bold rounded-xl bg-sky-600 hover:bg-sky-500 text-white transition shadow-md cursor-pointer disabled:opacity-50"
                           >
                             {generateCodeMutation.isPending ? 'Generating...' : 'Generate Worker Verification Code'}
                           </button>
@@ -233,9 +244,9 @@ export function BookingDetailPage() {
 
               {/* ── Checked-in Status (Customer View) ── */}
               {isCustomer && data.status === 'InProgress' && data.checkedInAt && (
-                <article className="rounded-3xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 p-6 shadow-sm flex items-center gap-4">
+                <article className="card-lift rounded-3xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 p-6 shadow-sm flex items-center gap-4">
                   <div className="p-3 bg-emerald-100 dark:bg-emerald-800/50 rounded-full">
-                    <span className="text-2xl">✅</span>
+                    <CheckCircleIcon className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
                   </div>
                   <div>
                     <h3 className="font-bold text-emerald-900 dark:text-emerald-100 text-base">
@@ -250,17 +261,18 @@ export function BookingDetailPage() {
 
               {/* ── Review & Feedback Card ── */}
               {data.status === 'Completed' && (
-                <article className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm space-y-4">
+                <article className="card-lift rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm space-y-4">
                   <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
                     <div className="flex items-center gap-2">
-                      <span className="text-lg">⭐</span>
+                      <StarIcon className="w-5 h-5 text-amber-500 fill-amber-400" />
                       <h3 className="font-bold text-base text-gray-900 dark:text-white">
                         Service Rating & Feedback
                       </h3>
                     </div>
                     {data.review && (
-                      <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                        ✓ Verified Review
+                      <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                        <CheckIcon className="w-3.5 h-3.5" />
+                        <span>Verified Review</span>
                       </span>
                     )}
                   </div>
@@ -286,7 +298,10 @@ export function BookingDetailPage() {
                       {data.review.workerResponse ? (
                         <div className="bg-sky-50 dark:bg-sky-950/40 rounded-2xl p-4 border border-sky-200 dark:border-sky-800 space-y-1">
                           <div className="flex items-center justify-between text-xs font-bold text-sky-800 dark:text-sky-300">
-                            <span>🛠️ Worker's Reply</span>
+                            <span className="flex items-center gap-1.5">
+                              <WrenchIcon className="w-3.5 h-3.5" />
+                              <span>Worker's Reply</span>
+                            </span>
                             {!isCustomer && (
                               <button
                                 type="button"
@@ -307,9 +322,10 @@ export function BookingDetailPage() {
                             <button
                               type="button"
                               onClick={() => setIsResponseModalOpen(true)}
-                              className="w-full py-2.5 rounded-2xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow-md transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                              className="btn-press-full w-full py-2.5 rounded-2xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
                             >
-                              <span>💬 Reply to Customer Review</span>
+                              <ChatBubbleIcon className="w-3.5 h-3.5" />
+                              <span>Reply to Customer Review</span>
                             </button>
                           </div>
                         )
@@ -323,9 +339,10 @@ export function BookingDetailPage() {
                       <button
                         type="button"
                         onClick={() => setIsReviewModalOpen(true)}
-                        className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-sm shadow-lg shadow-emerald-600/25 transition flex items-center justify-center gap-2 cursor-pointer"
+                        className="btn-press-full w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 cursor-pointer"
                       >
-                        <span>⭐ Rate & Write a Review</span>
+                        <StarIcon className="w-4 h-4 fill-white text-white" />
+                        <span>Rate & Write a Review</span>
                       </button>
                     </div>
                   ) : (
@@ -338,7 +355,7 @@ export function BookingDetailPage() {
             </div>
 
             {/* Right Column: Embedded Live Chat */}
-            <div className="lg:col-span-7 h-[560px]">
+            <div className="lg:col-span-7 h-[460px] sm:h-[520px] lg:h-[600px]">
               <ChatBox
                 bookingId={data.id}
                 otherPartyName={otherPartyName}

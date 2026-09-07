@@ -12,6 +12,11 @@ public class KarigorHub : Hub
     private string? GetUserId() =>
         Context.User?.FindFirstValue(ClaimTypes.NameIdentifier);
 
+    private bool IsAdmin() =>
+        Context.User?.IsInRole("Admin") == true ||
+        Context.User?.HasClaim(ClaimTypes.Role, "Admin") == true ||
+        Context.User?.HasClaim("role", "Admin") == true;
+
     public override async Task OnConnectedAsync()
     {
         var userId = GetUserId();
@@ -19,6 +24,12 @@ public class KarigorHub : Hub
         {
             await Groups.AddToGroupAsync(Context.ConnectionId, $"user_{userId}");
         }
+
+        if (IsAdmin())
+        {
+            await Groups.AddToGroupAsync(Context.ConnectionId, "Admins");
+        }
+
         await base.OnConnectedAsync();
     }
 
@@ -29,6 +40,12 @@ public class KarigorHub : Hub
         {
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"user_{userId}");
         }
+
+        if (IsAdmin())
+        {
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, "Admins");
+        }
+
         await base.OnDisconnectedAsync(exception);
     }
 

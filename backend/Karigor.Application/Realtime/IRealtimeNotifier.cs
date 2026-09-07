@@ -6,5 +6,6 @@ public interface IRealtimeNotifier
 {
     Task NotifyUserAsync(string userId, string eventName, object data);
     Task NotifyBookingGroupAsync(int bookingId, string eventName, object data);
+    Task NotifyAdminsAsync(string eventName, object data);
     Task BroadcastAsync(string eventName, object data);
 }

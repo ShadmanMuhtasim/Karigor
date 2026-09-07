@@ -36,11 +36,19 @@ try
             .Enrich.FromLogContext());
 
     // -------------------------------------------------------------------------
-    // DbContext — KarigorDev via Windows Authentication
+    // DbContext — KarigorDev via Windows Authentication with resilience & timeout
     // -------------------------------------------------------------------------
     builder.Services.AddDbContext<KarigorDbContext>(options =>
         options.UseSqlServer(
-            builder.Configuration.GetConnectionString("DefaultConnection")));
+            builder.Configuration.GetConnectionString("DefaultConnection"),
+            sqlOptions =>
+            {
+                sqlOptions.EnableRetryOnFailure(
+                    maxRetryCount: 5,
+                    maxRetryDelay: TimeSpan.FromSeconds(5),
+                    errorNumbersToAdd: null);
+                sqlOptions.CommandTimeout(30);
+            }));
 
     // -------------------------------------------------------------------------
     // ASP.NET Core Identity
@@ -91,6 +99,28 @@ try
                     context.Token = accessToken;
                 }
                 return Task.CompletedTask;
+            },
+            OnAuthenticationFailed = context =>
+            {
+                if (context.Exception is SecurityTokenExpiredException)
+                {
+                    Log.Information("[Auth] Access token expired on {Method} {Path}",
+                        context.Request.Method, context.Request.Path);
+                }
+                else
+                {
+                    Log.Warning(context.Exception, "[Auth] JWT Authentication failed on {Method} {Path}",
+                        context.Request.Method, context.Request.Path);
+                }
+                return Task.CompletedTask;
+            },
+            OnForbidden = context =>
+            {
+                var userSub = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "anonymous";
+                var userRole = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "none";
+                Log.Warning("[Auth 403 Forbidden] User {UserId} (Role: {Role}) lacks permission for {Method} {Path}",
+                    userSub, userRole, context.Request.Method, context.Request.Path);
+                return Task.CompletedTask;
             }
         };
     });
@@ -122,6 +152,7 @@ try
     builder.Services.AddScoped<Karigor.Application.Messaging.IMessagingService, Karigor.Application.Messaging.MessagingService>();
     builder.Services.AddScoped<Karigor.Application.Reviews.IReviewService, Karigor.Application.Reviews.ReviewService>();
     builder.Services.AddScoped<Karigor.Application.Admin.IAdminService, Karigor.Application.Admin.AdminService>();
+    builder.Services.AddScoped<Karigor.Application.Sos.ISosService, Karigor.Application.Sos.SosService>();
 
     // -------------------------------------------------------------------------
     // CORS — allow Vite dev server with credentials (for httpOnly cookie)

@@ -2,6 +2,7 @@ import * as signalR from '@microsoft/signalr';
 import { getAccessToken } from '../api/client';
 import type { MessageDto } from '../api/messagingApi';
 import type { NotificationDto } from '../api/notificationApi';
+import type { SosAlertDto } from '../api/adminApi';
 
 class SignalRService {
   private connection: signalR.HubConnection | null = null;
@@ -12,6 +13,7 @@ class SignalRService {
   private quotationListeners: Array<(data: any) => void> = [];
   private reviewCreatedListeners: Array<(data: any) => void> = [];
   private reviewUpdatedListeners: Array<(data: any) => void> = [];
+  private sosAlertListeners: Array<(alert: SosAlertDto) => void> = [];
   private joinedBookings = new Set<number>();
   private connectionPromise: Promise<void> | null = null;
 
@@ -112,6 +114,16 @@ class SignalRService {
               listener(data);
             } catch (err) {
               console.error('Error in review updated listener:', err);
+            }
+          });
+        });
+
+        conn.on('SosAlertTriggered', (alert: SosAlertDto) => {
+          this.sosAlertListeners.forEach((listener) => {
+            try {
+              listener(alert);
+            } catch (err) {
+              console.error('Error in SOS alert listener:', err);
             }
           });
         });
@@ -237,6 +249,13 @@ class SignalRService {
     this.reviewUpdatedListeners.push(callback);
     return () => {
       this.reviewUpdatedListeners = this.reviewUpdatedListeners.filter((cb) => cb !== callback);
+    };
+  }
+
+  public onSosAlert(callback: (alert: SosAlertDto) => void): () => void {
+    this.sosAlertListeners.push(callback);
+    return () => {
+      this.sosAlertListeners = this.sosAlertListeners.filter((cb) => cb !== callback);
     };
   }
 }

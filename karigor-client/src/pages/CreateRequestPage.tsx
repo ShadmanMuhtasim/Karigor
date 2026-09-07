@@ -6,6 +6,7 @@ import { categoryApi } from '../api/categoryApi';
 import type { CreateServiceRequestDto } from '../api/customerApi';
 import { Navbar } from '../components/Navbar';
 import { KarigorMap } from '../components/map/KarigorMap';
+import { MapPinIcon, AlertTriangleIcon, LightbulbIcon, ChevronDownIcon } from '../components/icons/Icons';
 
 export function CreateRequestPage() {
   const navigate = useNavigate();
@@ -122,18 +123,18 @@ export function CreateRequestPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-white transition-colors duration-200 flex flex-col">
       <Navbar />
 
-      <main className="flex-1 max-w-3xl w-full mx-auto px-4 sm:px-6 py-10">
-        <div className="mb-8">
-          <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2">Create Service Request</h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+      <main className="flex-1 max-w-3xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-10 animate-fade-in-up">
+        <div className="mb-6 sm:mb-8">
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white mb-2">Create Service Request</h2>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
             Provide details about the job and pinpoint your exact location to receive quotations from nearby workers.
           </p>
         </div>
 
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-6 sm:p-8 shadow-xl">
-          <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 shadow-xl">
+          <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
             {errorMsg && (
-              <div className="p-4 bg-rose-50 dark:bg-rose-950/50 border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 rounded-xl text-sm">
+              <div className="p-3.5 sm:p-4 bg-rose-50 dark:bg-rose-950/50 border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 rounded-xl text-xs sm:text-sm">
                 {errorMsg}
               </div>
             )}
@@ -177,31 +178,39 @@ export function CreateRequestPage() {
 
             {/* Service Address & Interactive Map Picker */}
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">
                   Service Address & Map Pin <span className="text-rose-500">*</span>
                 </label>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                   <button
                     type="button"
                     onClick={handleGetLocation}
                     disabled={locLoading}
-                    className="text-xs text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1 font-semibold transition cursor-pointer"
+                    className="text-xs text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1.5 font-semibold transition cursor-pointer"
                   >
-                    {locLoading ? 'Detecting GPS...' : '📍 Auto-detect GPS'}
+                    {locLoading ? (
+                      'Detecting GPS...'
+                    ) : (
+                      <>
+                        <MapPinIcon className="w-3.5 h-3.5" />
+                        <span>Auto-detect GPS</span>
+                      </>
+                    )}
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowMapPicker(!showMapPicker)}
-                    className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition cursor-pointer"
+                    className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition cursor-pointer flex items-center gap-1"
                   >
-                    {showMapPicker ? 'Hide Map ▲' : 'Show Map ▼'}
+                    <span>{showMapPicker ? 'Hide Map' : 'Show Map'}</span>
+                    <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${showMapPicker ? 'rotate-180' : ''}`} />
                   </button>
                 </div>
               </div>
               {gpsError && (
                 <div className="p-2.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-400 text-xs font-medium rounded-lg flex items-start gap-1.5">
-                  <span className="text-amber-500 mt-0.5">⚠️</span>
+                  <AlertTriangleIcon className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
                   <span>{gpsError}</span>
                 </div>
               )}
@@ -218,14 +227,17 @@ export function CreateRequestPage() {
               {showMapPicker && (
                 <div className="space-y-2 pt-1">
                   <KarigorMap
-                    height="300px"
+                    height="280px"
                     center={pickerLocation ? [pickerLocation.lat, pickerLocation.lng] : undefined}
                     isPickerMode={true}
                     pickerLocation={pickerLocation}
                     onLocationSelect={handleMapLocationSelect}
                   />
-                  <div className="flex items-center justify-between text-[11px] text-gray-500">
-                    <span>💡 Click on map or drag pin to set exact service location</span>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1 text-[11px] text-gray-500">
+                    <span className="flex items-center gap-1.5">
+                      <LightbulbIcon className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                      <span>Click on map or drag pin to set exact service location</span>
+                    </span>
                     {latitude && longitude && (
                       <span className="font-mono text-emerald-600 dark:text-emerald-400">
                         GPS: {latitude.toFixed(4)}, {longitude.toFixed(4)}
@@ -266,17 +278,17 @@ export function CreateRequestPage() {
               <p className="text-xs text-gray-500 mt-1">Provide links to photos showing the problem or workspace.</p>
             </div>
 
-            <div className="pt-4 flex items-center justify-end gap-4 border-t border-gray-100 dark:border-gray-800">
+            <div className="pt-4 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 sm:gap-4 border-t border-gray-100 dark:border-gray-800">
               <Link
                 to="/customer/dashboard"
-                className="px-5 py-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-semibold rounded-xl transition"
+                className="btn-press px-5 py-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-semibold rounded-xl text-center"
               >
                 Cancel
               </Link>
               <button
                 type="submit"
                 disabled={mutation.isPending}
-                className="px-6 py-2.5 bg-sky-500 hover:bg-sky-400 text-white text-sm font-bold rounded-xl shadow-lg shadow-sky-500/25 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                className="btn-press px-6 py-2.5 bg-sky-500 hover:bg-sky-400 text-white text-sm font-bold rounded-xl shadow-lg shadow-sky-500/25 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-center"
               >
                 {mutation.isPending ? 'Publishing Request...' : 'Publish Service Request'}
               </button>

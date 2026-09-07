@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { messagingApi, type ConversationSummaryDto } from '../../api/messagingApi';
 import { signalRService } from '../../services/signalrService';
 import { ChatModal } from './ChatModal';
+import { ChatBubbleIcon } from '../icons/Icons';
 
 export function ConversationsList() {
+  const { t } = useTranslation();
   const [conversations, setConversations] = useState<ConversationSummaryDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeChat, setActiveChat] = useState<ConversationSummaryDto | null>(null);
@@ -45,7 +48,7 @@ export function ConversationsList() {
   if (loading) {
     return (
       <div className="text-center py-12 text-sm text-gray-500 dark:text-gray-400">
-        Loading conversations…
+        {t('chat.loadingConversations')}
       </div>
     );
   }
@@ -53,10 +56,10 @@ export function ConversationsList() {
   if (conversations.length === 0) {
     return (
       <div className="text-center py-16 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-8 shadow-sm">
-        <span className="text-4xl block mb-2">💬</span>
-        <h3 className="text-base font-bold text-gray-900 dark:text-white">No active conversations yet</h3>
+        <ChatBubbleIcon className="w-10 h-10 mx-auto mb-2 text-gray-400 dark:text-gray-500" />
+        <h3 className="text-base font-bold text-gray-900 dark:text-white">{t('chat.noConversations')}</h3>
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-sm mx-auto">
-          Conversations are automatically created whenever you book a service or receive quotation agreements.
+          {t('chat.conversationsHint')}
         </p>
       </div>
     );
@@ -78,7 +81,7 @@ export function ConversationsList() {
             <div
               key={bookingId || Math.random()}
               onClick={() => setActiveChat(c)}
-              className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 hover:border-sky-500/50 hover:shadow-md transition cursor-pointer flex items-center justify-between gap-4"
+              className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 hover:border-sky-500/50 shadow-sm card-lift active:scale-[0.99] cursor-pointer flex items-center justify-between gap-4"
             >
               <div className="flex items-center gap-3.5 min-w-0">
                 <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-sky-500 to-indigo-600 text-white flex items-center justify-center font-bold text-base shrink-0 shadow-md">
@@ -112,7 +115,7 @@ export function ConversationsList() {
                 </span>
                 {unread > 0 && (
                   <span className="px-2 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-black shadow-xs animate-pulse">
-                    {unread} new
+                    {unread} {t('chat.newBadge')}
                   </span>
                 )}
               </div>

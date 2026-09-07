@@ -1,10 +1,21 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { getAdminUsers, toggleUserSuspension } from '../../api/adminApi';
 import type { AdminUserDto } from '../../api/adminApi';
 import { extractErrorMessage } from '../../lib/errorUtils';
+import { Modal } from '../../components/ui/Modal';
+import {
+  CloseIcon,
+  CheckCircleIcon,
+  AlertTriangleIcon,
+  UsersIcon,
+  WrenchIcon,
+  UserIcon,
+} from '../../components/icons/Icons';
 
 export const AdminUsersTab: React.FC = () => {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [roleFilter, setRoleFilter] = useState<string>('All');
   const [statusFilter, setStatusFilter] = useState<string>('All');
@@ -29,7 +40,7 @@ export const AdminUsersTab: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['adminStats'] });
       setSelectedUser(null);
       setReason('');
-      setSuccessMsg(`User ${updated.email} has been ${updated.isSuspended ? 'SUSPENDED' : 'REACTIVATED'} successfully.`);
+      setSuccessMsg(`User ${updated.email} status updated.`);
       setTimeout(() => setSuccessMsg(''), 4000);
     },
     onError: (err) => {
@@ -63,43 +74,52 @@ export const AdminUsersTab: React.FC = () => {
       {/* Header & Filter Controls */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h3 className="text-xl font-black text-gray-900 dark:text-white">Platform User Management</h3>
+          <h3 className="text-xl font-black text-gray-900 dark:text-white">{t('admin.users.title')}</h3>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-            Manage user permissions, review roles, and moderate platform accounts.
+            {t('admin.users.subtitle')}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           {/* Role Filter */}
           <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800/80 p-1 rounded-2xl">
-            {['All', 'Customer', 'Worker', 'Admin'].map((r) => (
+            {[
+              { id: 'All', label: t('common.all') },
+              { id: 'Customer', label: t('nav.customer') },
+              { id: 'Worker', label: t('nav.worker') },
+              { id: 'Admin', label: t('nav.admin') },
+            ].map(({ id, label }) => (
               <button
-                key={r}
-                onClick={() => setRoleFilter(r)}
-                className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
-                  roleFilter === r
+                key={id}
+                onClick={() => setRoleFilter(id)}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition active:scale-95 cursor-pointer ${
+                  roleFilter === id
                     ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm'
                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                 }`}
               >
-                {r}
+                {label}
               </button>
             ))}
           </div>
 
           {/* Status Filter */}
           <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800/80 p-1 rounded-2xl">
-            {['All', 'Active', 'Suspended'].map((s) => (
+            {[
+              { id: 'All', label: t('common.all') },
+              { id: 'Active', label: t('common.active') },
+              { id: 'Suspended', label: t('common.suspended') },
+            ].map(({ id, label }) => (
               <button
-                key={s}
-                onClick={() => setStatusFilter(s)}
-                className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
-                  statusFilter === s
+                key={id}
+                onClick={() => setStatusFilter(id)}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition active:scale-95 cursor-pointer ${
+                  statusFilter === id
                     ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm'
                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                 }`}
               >
-                {s}
+                {label}
               </button>
             ))}
           </div>
@@ -112,15 +132,16 @@ export const AdminUsersTab: React.FC = () => {
           type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Search by email address or full name..."
+          placeholder={t('admin.users.searchPlaceholder')}
           className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl px-4 py-3 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 transition"
         />
         {searchTerm && (
           <button
             onClick={() => setSearchTerm('')}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600"
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1"
           >
-            ✕ Clear
+            <CloseIcon className="w-3.5 h-3.5" />
+            <span>{t('common.clear')}</span>
           </button>
         )}
       </div>
@@ -128,14 +149,14 @@ export const AdminUsersTab: React.FC = () => {
       {/* Messages */}
       {successMsg && (
         <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 rounded-2xl text-xs font-semibold flex items-center gap-2">
-          <span>✓</span>
+          <CheckCircleIcon className="w-4 h-4 text-emerald-600" />
           <span>{successMsg}</span>
         </div>
       )}
 
       {errorMsg && (
         <div className="p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200 rounded-2xl text-xs font-semibold flex items-center gap-2">
-          <span>⚠️</span>
+          <AlertTriangleIcon className="w-4 h-4 text-rose-600" />
           <span>{errorMsg}</span>
         </div>
       )}
@@ -144,13 +165,12 @@ export const AdminUsersTab: React.FC = () => {
       {isLoading ? (
         <div className="flex flex-col items-center justify-center py-16">
           <div className="w-10 h-10 border-4 border-sky-500 border-t-transparent rounded-full animate-spin mb-3" />
-          <p className="text-xs text-gray-500">Loading user accounts...</p>
+          <p className="text-xs text-gray-500">{t('common.loading')}</p>
         </div>
       ) : users?.length === 0 ? (
         <div className="p-12 text-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl">
-          <div className="text-4xl mb-3">👥</div>
-          <h4 className="text-base font-bold text-gray-900 dark:text-white">No users found</h4>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">No user records match your search criteria.</p>
+          <UsersIcon className="w-10 h-10 mx-auto mb-3 text-gray-400" />
+          <h4 className="text-base font-bold text-gray-900 dark:text-white">{t('admin.users.noUsersFound')}</h4>
         </div>
       ) : (
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl overflow-hidden shadow-sm">
@@ -158,16 +178,16 @@ export const AdminUsersTab: React.FC = () => {
             <table className="w-full text-left text-xs">
               <thead className="bg-gray-50 dark:bg-gray-800/60 border-b border-gray-200 dark:border-gray-800 uppercase tracking-wider text-[10px] font-bold text-gray-500 dark:text-gray-400">
                 <tr>
-                  <th className="py-3.5 px-4 sm:px-6">User / Email</th>
-                  <th className="py-3.5 px-4">Role</th>
-                  <th className="py-3.5 px-4">Associated Profile</th>
-                  <th className="py-3.5 px-4">Status</th>
-                  <th className="py-3.5 px-4 sm:px-6 text-right">Account Actions</th>
+                  <th className="py-3.5 px-4 sm:px-6">{t('admin.users.userColumn')}</th>
+                  <th className="py-3.5 px-4">{t('admin.users.roleColumn')}</th>
+                  <th className="py-3.5 px-4">Profile</th>
+                  <th className="py-3.5 px-4">{t('admin.users.statusColumn')}</th>
+                  <th className="py-3.5 px-4 sm:px-6 text-right">{t('admin.users.actionsColumn')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                 {users?.map((u) => (
-                  <tr key={u.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition">
+                  <tr key={u.id} className="table-row-hover">
                     <td className="py-4 px-4 sm:px-6">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center font-bold text-gray-700 dark:text-gray-300">
@@ -188,9 +208,15 @@ export const AdminUsersTab: React.FC = () => {
 
                     <td className="py-4 px-4">
                       {u.workerProfileId ? (
-                        <span className="text-emerald-600 dark:text-emerald-400 font-medium">🛠️ Worker #{u.workerProfileId}</span>
+                        <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                          <WrenchIcon className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Worker #{u.workerProfileId}</span>
+                        </span>
                       ) : u.customerProfileId ? (
-                        <span className="text-sky-600 dark:text-sky-400 font-medium">👤 Customer #{u.customerProfileId}</span>
+                        <span className="text-sky-600 dark:text-sky-400 font-medium flex items-center gap-1">
+                          <UserIcon className="w-3.5 h-3.5 text-sky-600" />
+                          <span>Customer #{u.customerProfileId}</span>
+                        </span>
                       ) : (
                         <span className="text-gray-400">—</span>
                       )}
@@ -200,12 +226,12 @@ export const AdminUsersTab: React.FC = () => {
                       {u.isSuspended ? (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
                           <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                          Suspended
+                          {t('common.suspended')}
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                          Active
+                          {t('common.active')}
                         </span>
                       )}
                     </td>
@@ -216,16 +242,16 @@ export const AdminUsersTab: React.FC = () => {
                       ) : u.isSuspended ? (
                         <button
                           onClick={() => setSelectedUser({ user: u, targetSuspend: false })}
-                          className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 rounded-xl text-xs font-bold border border-emerald-200 dark:border-emerald-800 transition cursor-pointer"
+                          className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 rounded-xl text-xs font-bold border border-emerald-200 dark:border-emerald-800 btn-press cursor-pointer"
                         >
-                          Reactivate Account
+                          {t('admin.users.reactivate')}
                         </button>
                       ) : (
                         <button
                           onClick={() => setSelectedUser({ user: u, targetSuspend: true })}
-                          className="px-3 py-1.5 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 hover:bg-rose-100 rounded-xl text-xs font-bold border border-rose-200 dark:border-rose-800 transition cursor-pointer"
+                          className="px-3 py-1.5 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 hover:bg-rose-100 rounded-xl text-xs font-bold border border-rose-200 dark:border-rose-800 btn-press cursor-pointer"
                         >
-                          Suspend Account
+                          {t('admin.users.suspend')}
                         </button>
                       )}
                     </td>
@@ -239,10 +265,24 @@ export const AdminUsersTab: React.FC = () => {
 
       {/* Confirmation Modal */}
       {selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
-            <h4 className="text-lg font-black text-gray-900 dark:text-white">
-              {selectedUser.targetSuspend ? '⚠️ Suspend User Account' : '✓ Reactivate User Account'}
+        <Modal
+          isOpen={!!selectedUser}
+          onClose={() => setSelectedUser(null)}
+          backdropClassName="bg-black/70 backdrop-blur-sm"
+        >
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl max-w-md w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl space-y-4 animate-modal-pop">
+            <h4 className="text-lg font-black text-gray-900 dark:text-white flex items-center gap-2">
+              {selectedUser.targetSuspend ? (
+                <>
+                  <AlertTriangleIcon className="w-5 h-5 text-rose-500" />
+                  <span>{t('admin.users.suspendModalTitle')}</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircleIcon className="w-5 h-5 text-emerald-500" />
+                  <span>{t('admin.users.reactivateModalTitle')}</span>
+                </>
+              )}
             </h4>
             <p className="text-xs text-gray-600 dark:text-gray-300">
               {selectedUser.targetSuspend
@@ -253,12 +293,12 @@ export const AdminUsersTab: React.FC = () => {
             {selectedUser.targetSuspend && (
               <div>
                 <label className="block text-[11px] uppercase font-bold text-gray-400 dark:text-gray-500 mb-1">
-                  Reason for Suspension (Optional)
+                  {t('admin.users.reasonLabel')}
                 </label>
                 <textarea
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  placeholder="Terms of service violation, fraudulent quotation, etc..."
+                  placeholder={t('admin.users.reasonPlaceholder')}
                   rows={3}
                   className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl p-3 text-xs text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
                 />
@@ -269,23 +309,23 @@ export const AdminUsersTab: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSelectedUser(null)}
-                className="px-4 py-2 bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 text-gray-700 dark:text-gray-300 font-bold rounded-xl text-xs transition cursor-pointer"
+                className="px-4 py-2 bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 text-gray-700 dark:text-gray-300 font-bold rounded-xl text-xs btn-press cursor-pointer"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 type="button"
                 onClick={handleConfirmAction}
                 disabled={suspendMutation.isPending}
-                className={`px-5 py-2 text-white font-bold rounded-xl text-xs transition shadow-md cursor-pointer disabled:opacity-50 ${
+                className={`px-5 py-2 text-white font-bold rounded-xl text-xs btn-press shadow-md cursor-pointer disabled:opacity-50 ${
                   selectedUser.targetSuspend ? 'bg-rose-500 hover:bg-rose-400' : 'bg-emerald-500 hover:bg-emerald-400'
                 }`}
               >
-                {suspendMutation.isPending ? 'Updating…' : selectedUser.targetSuspend ? 'Confirm Suspension' : 'Confirm Reactivation'}
+                {suspendMutation.isPending ? t('common.loading') : selectedUser.targetSuspend ? t('admin.users.confirmSuspend') : t('admin.users.confirmReactivate')}
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

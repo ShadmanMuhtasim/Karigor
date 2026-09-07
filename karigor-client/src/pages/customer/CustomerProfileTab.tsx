@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { customerApi } from '../../api/customerApi';
 import type { UpdateCustomerProfileDto } from '../../api/customerApi';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/card';
 
 export function CustomerProfileTab() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState<UpdateCustomerProfileDto>({
     fullName: '',
@@ -31,7 +33,7 @@ export function CustomerProfileTab() {
   const mutation = useMutation({
     mutationFn: customerApi.updateProfile,
     onSuccess: (updatedProfile) => {
-      setSaveMessage({ type: 'success', text: 'Profile updated successfully!' });
+      setSaveMessage({ type: 'success', text: t('common.success', 'Profile updated successfully!') });
       queryClient.setQueryData(['customerProfile'], updatedProfile);
       queryClient.invalidateQueries({ queryKey: ['customerStats'] });
       setTimeout(() => setSaveMessage(null), 3000);
@@ -39,7 +41,7 @@ export function CustomerProfileTab() {
     onError: (error: any) => {
       setSaveMessage({
         type: 'error',
-        text: error.response?.data?.error || 'Failed to update profile.',
+        text: error.response?.data?.error || t('common.error', 'Failed to update profile.'),
       });
     },
   });
@@ -62,32 +64,31 @@ export function CustomerProfileTab() {
     });
   };
 
-  if (isLoading) return <div className="text-gray-400 py-8">Loading profile...</div>;
-  if (isError || !profile) return <div className="text-red-400 py-8">Failed to load profile.</div>;
+  if (isLoading) return <div className="text-gray-400 py-8">{t('common.loading', 'Loading profile...')}</div>;
+  if (isError || !profile) return <div className="text-red-400 py-8">{t('common.error', 'Failed to load profile.')}</div>;
 
   return (
-    <Card className="bg-gray-900 border-gray-800 max-w-2xl">
+    <Card className="card-lift bg-gray-900 border-gray-800 max-w-2xl">
       <CardHeader>
-        <CardTitle className="text-indigo-400">Customer Profile</CardTitle>
+        <CardTitle className="text-indigo-400">{t('customer.profile.title', 'Profile Settings')}</CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Email (read-only) */}
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Email Address</label>
+            <label className="block text-sm font-medium text-gray-400 mb-1">{t('customer.profile.email', 'Email Address')}</label>
             <input
               type="email"
               value={profile.email}
               disabled
               className="w-full px-3 py-2 bg-gray-800/50 border border-gray-800 rounded-lg text-gray-400 cursor-not-allowed text-sm"
             />
-            <p className="text-xs text-gray-500 mt-1">Email is managed by your account authentication.</p>
           </div>
 
           {/* Full Name */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">
-              Full Name <span className="text-rose-400">*</span>
+              {t('customer.profile.name', 'Full Name')} <span className="text-rose-400">*</span>
             </label>
             <input
               type="text"
@@ -103,7 +104,7 @@ export function CustomerProfileTab() {
 
           {/* Address */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Default Service Address</label>
+            <label className="block text-sm font-medium text-gray-300 mb-1">{t('customer.profile.address', 'Default Address')}</label>
             <textarea
               name="address"
               value={formData.address || ''}
@@ -144,9 +145,9 @@ export function CustomerProfileTab() {
             <button
               type="submit"
               disabled={mutation.isPending}
-              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-indigo-900/20"
+              className="btn-press px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-indigo-900/20 cursor-pointer"
             >
-              {mutation.isPending ? 'Saving Changes...' : 'Save Profile'}
+              {mutation.isPending ? t('common.loading', 'Saving Changes...') : t('customer.profile.saveButton', 'Save Profile')}
             </button>
           </div>
         </form>

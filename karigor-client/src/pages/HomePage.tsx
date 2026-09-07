@@ -1,6 +1,17 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { Navbar } from '../components/Navbar';
+import {
+  ShieldCheckIcon,
+  ZapIcon,
+  MedalIcon,
+  SmartphoneIcon,
+  WrenchIcon,
+  CheckCircleIcon,
+  type IconProps,
+} from '../components/icons/Icons';
 
 // Assets
 import workersInLineImg from '../assets/workers-in-line.jpg';
@@ -9,9 +20,12 @@ import insidePainterImg from '../assets/inside-wall-painterimages.jpg';
 import outsidePainterImg from '../assets/outside-wall-painterimages.jpg';
 import electricianImg from '../assets/electrician-with-gloves.jpg';
 import alltypeImg from '../assets/alltype.png';
+import alltypeNightImg from '../assets/alltype_nightmode.png';
 
 export function HomePage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
+  const { theme } = useTheme();
 
   const workerStories = [
     {
@@ -56,26 +70,30 @@ export function HomePage() {
     },
   ];
 
-  const platformBenefits = [
+  const platformBenefits: {
+    icon: React.ComponentType<IconProps>;
+    title: string;
+    desc: string;
+  }[] = [
     {
-      icon: '🛡️',
-      title: 'Dignity & Fair Compensation',
-      desc: 'Workers set their own hourly rates and price proposals. No extortionate middleman brokerage or commission cuts.',
+      icon: ShieldCheckIcon,
+      title: t('home.benefit1Title', 'Dignity & Fair Compensation'),
+      desc: t('home.benefit1Desc', 'Workers set their own hourly rates and price proposals. No extortionate middleman brokerage or commission cuts.'),
     },
     {
-      icon: '⚡',
-      title: 'Direct Client Connection',
-      desc: 'Instant notifications when jobs open in your local radius. Direct chat and scheduling with homeowners.',
+      icon: ZapIcon,
+      title: t('home.benefit2Title', 'Direct Client Connection'),
+      desc: t('home.benefit2Desc', 'Instant notifications when jobs open in your local radius. Direct chat and scheduling with homeowners.'),
     },
     {
-      icon: '🏅',
-      title: 'Verified Badges & Trust Score',
-      desc: 'NID-backed digital profiles with verified reviews that help skilled workers earn up to 3x more steady income.',
+      icon: MedalIcon,
+      title: t('home.benefit3Title', 'Verified Badges & Trust Score'),
+      desc: t('home.benefit3Desc', 'NID-backed digital profiles with verified reviews that help skilled workers earn up to 3x more steady income.'),
     },
     {
-      icon: '📱',
-      title: 'Transparent Digital Bookings',
-      desc: 'Clear scope of work, photos of the repair area upfront, and guaranteed agreed prices before travel.',
+      icon: SmartphoneIcon,
+      title: t('home.benefit4Title', 'Transparent Digital Bookings'),
+      desc: t('home.benefit4Desc', 'Clear scope of work, photos of the repair area upfront, and guaranteed agreed prices before travel.'),
     },
   ];
 
@@ -86,61 +104,73 @@ export function HomePage() {
       {/* ── Top Half Hero: alltype.png as Full-Bleed Panoramic Background ── */}
       <section className="relative min-h-[60vh] sm:min-h-[70vh] flex items-center justify-center overflow-hidden border-b border-gray-300 dark:border-gray-800">
         
-        {/* Clear, High-Visibility Background Image */}
+        {/* Clear, High-Visibility Background Image with Smooth Theme Crossfade */}
         <div className="absolute inset-0 z-0">
+          {/* Day / Light Mode Background */}
           <img
             src={alltypeImg}
-            alt="Karigor Artisans and City Life"
-            className="w-full h-full object-cover object-center"
+            alt="Karigor Artisans and City Life - Day"
+            className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-500 ease-in-out ${
+              theme === 'dark' ? 'opacity-0' : 'opacity-100'
+            }`}
+          />
+          {/* Night / Dark Mode Background */}
+          <img
+            src={alltypeNightImg}
+            alt="Karigor Artisans and City Life - Night"
+            className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-500 ease-in-out ${
+              theme === 'dark' ? 'opacity-100' : 'opacity-0'
+            }`}
           />
           {/* Balanced cinematic scrim ensuring rich image visibility + crystal clear text */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/60" />
         </div>
 
         {/* Hero Content on Top */}
-        <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-28 text-center space-y-6">
+        <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24 lg:py-28 text-center space-y-4 sm:space-y-6">
           
           {/* Big Dominant Brand Name in Cambria / Serif */}
-          <h1 className="font-['Cambria',Georgia,serif] text-7xl sm:text-8xl lg:text-9xl font-black tracking-tight leading-none text-white drop-shadow-[0_6px_30px_rgba(0,0,0,0.9)] select-none">
-            Karigor
+          <h1 className="font-['Cambria',Georgia,serif] text-5xl sm:text-7xl md:text-8xl lg:text-9xl font-black tracking-tight leading-none text-white drop-shadow-[0_6px_30px_rgba(0,0,0,0.9)] select-none">
+            {t('home.heroTitle', 'Karigor')}
           </h1>
 
           {/* Clean, Simple Tagline with High-Contrast Glow */}
-          <p className="text-xl sm:text-2xl md:text-3xl text-emerald-300 font-bold max-w-3xl mx-auto leading-relaxed drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">
-            Connect with trusted local service professionals
+          <p className="text-base sm:text-xl md:text-2xl lg:text-3xl text-emerald-300 font-bold max-w-3xl mx-auto leading-relaxed drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)] px-2">
+            {t('home.heroTagline', 'Connect with trusted local service professionals')}
           </p>
 
-          {/* Main Action Buttons (All pointing to /login for seamless flow) */}
-          <div className="pt-6 flex flex-wrap items-center justify-center gap-5">
+          {/* Main Action Buttons (Responsive stacking on mobile) */}
+          <div className="pt-4 sm:pt-6 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 max-w-md sm:max-w-none mx-auto w-full">
             {user ? (
               <Link
                 to="/dashboard"
-                className="px-8 py-4 bg-emerald-500 hover:bg-emerald-400 active:scale-95 hover:scale-105 text-white font-black rounded-2xl shadow-2xl shadow-emerald-900/60 transition-all duration-200 text-lg flex items-center gap-2"
+                className="btn-press w-full sm:w-auto px-6 sm:px-8 py-3.5 sm:py-4 bg-emerald-500 hover:bg-emerald-400 text-white font-black rounded-2xl shadow-2xl shadow-emerald-900/60 text-base sm:text-lg flex items-center justify-center gap-2"
               >
-                <span>Go to My Dashboard</span>
+                <span>{t('home.goToDashboard', 'Go to My Dashboard')}</span>
                 <span>→</span>
               </Link>
             ) : (
               <>
                 <Link
                   to="/login"
-                  className="px-8 py-4 bg-emerald-500 hover:bg-emerald-400 active:scale-95 hover:scale-105 text-white font-black rounded-2xl shadow-2xl shadow-emerald-900/60 transition-all duration-200 text-lg flex items-center gap-2"
+                  className="btn-press w-full sm:w-auto px-6 sm:px-8 py-3.5 sm:py-4 bg-emerald-500 hover:bg-emerald-400 text-white font-black rounded-2xl shadow-2xl shadow-emerald-900/60 text-base sm:text-lg flex items-center justify-center gap-2"
                 >
-                  <span>Hire a Skilled Worker</span>
+                  <span>{t('home.findSkilledArtisan', 'Find a Skilled Artisan')}</span>
                 </Link>
                 <Link
                   to="/login"
-                  className="px-8 py-4 bg-sky-500 hover:bg-sky-400 active:scale-95 hover:scale-105 text-white font-black rounded-2xl shadow-2xl shadow-sky-900/60 transition-all duration-200 text-lg flex items-center gap-2"
+                  className="btn-press w-full sm:w-auto px-6 sm:px-8 py-3.5 sm:py-4 bg-sky-500 hover:bg-sky-400 text-white font-black rounded-2xl shadow-2xl shadow-sky-900/60 text-base sm:text-lg flex items-center justify-center gap-2"
                 >
-                  <span>Join as a Pro Worker 🛠️</span>
+                  <span>{t('home.becomeWorker', 'Register as a Worker')}</span>
+                  <WrenchIcon className="w-5 h-5 text-white" />
                 </Link>
               </>
             )}
             <Link
               to="/categories"
-              className="px-8 py-4 bg-black/50 hover:bg-black/70 active:scale-95 hover:scale-105 text-white font-bold rounded-2xl border border-white/40 backdrop-blur-md transition-all duration-200 text-lg shadow-xl"
+              className="btn-press w-full sm:w-auto px-6 sm:px-8 py-3.5 sm:py-4 bg-black/50 hover:bg-black/70 text-white font-bold rounded-2xl border border-white/40 backdrop-blur-md text-base sm:text-lg shadow-xl flex items-center justify-center text-center"
             >
-              Browse Services
+              {t('home.categoriesLink', 'Browse Trades')}
             </Link>
           </div>
         </div>
@@ -151,13 +181,13 @@ export function HomePage() {
         
         <div className="text-center space-y-3 max-w-3xl mx-auto">
           <span className="text-xs font-extrabold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
-            Worker First Philosophy
+            {t('home.heroTitle', 'Karigor')}
           </span>
           <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 dark:text-white">
-            How Karigor Creates Real Value for Workers
+            {t('home.benefitsTitle', 'Why Karigor?')}
           </h2>
           <p className="text-base text-gray-600 dark:text-gray-400">
-            For decades, skilled blue-collar workers in Bangladesh faced unfair commission cuts, late payments, and zero social recognition. Karigor is engineered to change that reality.
+            {t('home.benefitsSubtitle', 'A platform built on fairness, dignity, and real-time reliability.')}
           </p>
         </div>
 
@@ -166,11 +196,11 @@ export function HomePage() {
           {platformBenefits.map((b) => (
             <div
               key={b.title}
-              className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-6 shadow-md hover:shadow-xl transition flex flex-col justify-between"
+              className="card-lift bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-6 shadow-md flex flex-col justify-between"
             >
               <div>
-                <div className="w-12 h-12 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-2xl mb-4">
-                  {b.icon}
+                <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-sky-400 flex items-center justify-center mb-4">
+                  <b.icon className="w-6 h-6" />
                 </div>
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">{b.title}</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{b.desc}</p>
@@ -184,14 +214,14 @@ export function HomePage() {
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-gray-200 dark:border-gray-800 pb-4">
             <div>
               <span className="text-xs font-extrabold uppercase tracking-widest text-sky-600 dark:text-sky-400">
-                Visual Showcase & Gallery
+                {t('home.heroTitle', 'Karigor')}
               </span>
               <h3 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white mt-1">
-                The Faces & Craft Behind Karigor
+                {t('home.storiesTitle', 'Real Craftsmen, Real Respect')}
               </h3>
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm">
-              Real craftsmen with real skills transforming homes and building lasting careers.
+              {t('home.storiesSubtitle', "Empowering Bangladesh's Skilled Trades with Digital Trust")}
             </p>
           </div>
 
@@ -199,7 +229,7 @@ export function HomePage() {
             {workerStories.map((story) => (
               <div
                 key={story.title}
-                className="group bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl hover:border-indigo-400 dark:hover:border-sky-500 transition duration-300 flex flex-col"
+                className="card-lift group bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl overflow-hidden shadow-lg hover:border-indigo-400 dark:hover:border-sky-500 flex flex-col"
               >
                 {/* Image Container */}
                 <div className="relative aspect-[4/3] w-full overflow-hidden bg-gray-100 dark:bg-gray-800">
@@ -231,13 +261,14 @@ export function HomePage() {
 
                   <div className="pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between text-xs">
                     <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
-                      ✓ Verified Skilled Pro
+                      <CheckCircleIcon className="w-3.5 h-3.5" />
+                      <span>{t('nav.worker', 'Artisan')}</span>
                     </span>
                     <Link
                       to="/login"
                       className="text-indigo-600 dark:text-sky-400 hover:underline font-semibold"
                     >
-                      Book category →
+                      {t('home.categoriesLink', 'Browse Trades')} →
                     </Link>
                   </div>
                 </div>
@@ -250,24 +281,24 @@ export function HomePage() {
         <div className="bg-gradient-to-r from-emerald-600 via-sky-600 to-indigo-700 rounded-3xl p-8 sm:p-12 text-white shadow-2xl flex flex-col md:flex-row items-center justify-between gap-8">
           <div className="space-y-2 max-w-xl text-center md:text-left">
             <h3 className="text-2xl sm:text-3xl font-black">
-              Ready to experience dependable, trusted repairs?
+              {t('home.benefitsTitle', 'Why Karigor?')}
             </h3>
             <p className="text-sm text-sky-100">
-              Join thousands of satisfied households and verified workers on Karigor today.
+              {t('home.footerTagline', 'Karigor is Bangladesh’s premier artisan-first local service marketplace.')}
             </p>
           </div>
           <div className="flex flex-wrap gap-4">
             <Link
               to="/login"
-              className="px-7 py-3.5 bg-white text-gray-900 hover:bg-gray-100 active:scale-95 hover:scale-105 font-bold rounded-2xl shadow-lg transition-all duration-200 text-sm"
+              className="btn-press px-7 py-3.5 bg-white text-gray-900 hover:bg-gray-100 font-bold rounded-2xl shadow-lg text-sm"
             >
-              Get Started as Customer
+              {t('home.findSkilledArtisan', 'Find a Skilled Artisan')}
             </Link>
             <Link
               to="/login"
-              className="px-7 py-3.5 bg-emerald-950/80 hover:bg-emerald-950 active:scale-95 hover:scale-105 text-white font-bold rounded-2xl border border-emerald-400/50 shadow-lg transition-all duration-200 text-sm"
+              className="btn-press px-7 py-3.5 bg-emerald-950/80 hover:bg-emerald-950 text-white font-bold rounded-2xl border border-emerald-400/50 shadow-lg text-sm"
             >
-              Become a Worker
+              {t('home.becomeWorker', 'Register as a Worker')}
             </Link>
           </div>
         </div>
@@ -278,12 +309,12 @@ export function HomePage() {
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <span className="font-bold text-sm text-gray-900 dark:text-white">Karigor (কারিগর)</span>
-            <span>• Empowering Skilled Labor</span>
+            <span>• {t('home.copyright', 'Dedicated to the dignity of skilled labor in Bangladesh.')}</span>
           </div>
           <div className="flex gap-6">
-            <Link to="/home" className="hover:text-gray-900 dark:hover:text-white transition">Home</Link>
-            <Link to="/categories" className="hover:text-gray-900 dark:hover:text-white transition">Categories</Link>
-            <Link to="/login" className="hover:text-gray-900 dark:hover:text-white transition">Login</Link>
+            <Link to="/home" className="hover:text-gray-900 dark:hover:text-white transition">{t('nav.home', 'Home')}</Link>
+            <Link to="/categories" className="hover:text-gray-900 dark:hover:text-white transition">{t('nav.categories', 'Categories')}</Link>
+            <Link to="/login" className="hover:text-gray-900 dark:hover:text-white transition">{t('nav.signIn', 'Sign In')}</Link>
           </div>
         </div>
       </footer>

@@ -1,3 +1,4 @@
+import { Modal } from '../ui/Modal';
 import { ChatBox } from './ChatBox';
 
 interface ChatModalProps {
@@ -17,11 +18,13 @@ export function ChatModal({
   otherPartyRole,
   categoryName,
 }: ChatModalProps) {
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      backdropClassName="bg-black/60 backdrop-blur-sm"
+    >
+      <div className="w-full max-w-lg max-h-[90vh] shadow-2xl animate-modal-pop">
         <ChatBox
           bookingId={bookingId}
           otherPartyName={otherPartyName}
@@ -30,6 +33,6 @@ export function ChatModal({
           onClose={onClose}
         />
       </div>
-    </div>
+    </Modal>
   );
 }

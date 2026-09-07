@@ -3,6 +3,16 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { NearbyWorkerDto, NearbyRequestDto } from '../../api/locationApi';
 import { useTheme } from '../../context/ThemeContext';
+import { TargetIcon, RefreshCwIcon, AlertTriangleIcon, CloseIcon, MapPinIcon } from '../icons/Icons';
+
+const SVG_PIN_ICON = `<svg class="w-2.5 h-2.5 inline-block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`;
+const SVG_TARGET_ICON = `<svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>`;
+const SVG_USER_MARKER_ICON = `<svg class="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`;
+const SVG_WRENCH_ICON = `<svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`;
+const SVG_HARDHAT_ICON = `<svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 18a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v2z"/><path d="M10 10V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5"/><path d="M4 15v-3a8 8 0 0 1 16 0v3"/></svg>`;
+const SVG_STAR_ICON = `<svg class="w-2.5 h-2.5 inline text-amber-400 fill-amber-400" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
+const SVG_CLIPBOARD_ICON = `<svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="M9 12h6"/><path d="M9 16h6"/></svg>`;
+const SVG_POPUP_PIN_ICON = `<svg class="w-3 h-3 inline text-gray-400 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`;
 
 export interface KarigorMapProps {
   center?: [number, number];
@@ -97,7 +107,7 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
         zoomControl: false,
       });
 
-      L.control.zoom({ position: 'bottomright' }).addTo(map);
+      L.control.zoom({ position: 'topleft' }).addTo(map);
 
       mapInstanceRef.current = map;
       markersLayerRef.current = L.layerGroup().addTo(map);
@@ -154,7 +164,16 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
       map.invalidateSize();
     }, 150);
 
-    return () => clearTimeout(timer);
+    const handleResize = () => {
+      map.invalidateSize();
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', handleResize);
+    };
   }, [height]);
 
   useEffect(() => {
@@ -190,12 +209,13 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
         html: `
           <div class="relative flex flex-col items-center select-none cursor-grab active:cursor-grabbing group">
             <!-- Floating Drag Me Badge -->
-            <div class="absolute -top-7 whitespace-nowrap px-2.5 py-0.5 bg-rose-600 text-white text-[10px] font-bold rounded-full shadow-md border-2 border-white dark:border-gray-900 uppercase tracking-wide">
-              📍 DRAG ME
+            <div class="absolute -top-7 whitespace-nowrap px-2.5 py-0.5 bg-rose-600 text-white text-[10px] font-bold rounded-full shadow-md border-2 border-white dark:border-gray-900 uppercase tracking-wide flex items-center gap-1">
+              ${SVG_PIN_ICON}
+              <span>DRAG ME</span>
             </div>
             <!-- Main Pin Badge -->
             <div class="relative w-10 h-10 bg-rose-600 rounded-full border-2 border-white dark:border-gray-900 shadow-xl flex items-center justify-center text-white text-base font-black group-hover:scale-105 transition-transform">
-              🎯
+              ${SVG_TARGET_ICON}
             </div>
             <!-- Pin Pointer / Arrow Tip -->
             <div class="w-3 h-3 bg-rose-600 rotate-45 -mt-1.5 border-r-2 border-b-2 border-white dark:border-gray-900"></div>
@@ -265,7 +285,7 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
           <div class="relative flex items-center justify-center">
             <div class="absolute -inset-2 bg-sky-500/30 rounded-full animate-ping"></div>
             <div class="w-6 h-6 bg-sky-500 rounded-full border-2 border-white dark:border-gray-900 shadow-lg flex items-center justify-center text-white text-xs">
-              📍
+              ${SVG_USER_MARKER_ICON}
             </div>
           </div>
         `,
@@ -306,7 +326,7 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
           <div class="relative flex items-center justify-center">
             <div class="absolute -inset-2 bg-emerald-500/30 rounded-full animate-pulse"></div>
             <div class="w-7 h-7 bg-emerald-600 rounded-full border-2 border-white dark:border-gray-900 shadow-xl flex items-center justify-center text-white text-xs font-bold">
-              🛠️
+              ${SVG_WRENCH_ICON}
             </div>
           </div>
         `,
@@ -350,10 +370,11 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
           html: `
             <div class="relative flex items-center justify-center transition-transform hover:scale-125 ${isSelected ? 'scale-125 z-50' : ''}">
               <div class="w-9 h-9 bg-emerald-600 text-white rounded-full border-2 border-white dark:border-gray-900 shadow-xl flex flex-col items-center justify-center">
-                <span class="text-xs">👷</span>
+                ${SVG_HARDHAT_ICON}
               </div>
-              <div class="absolute -bottom-1 px-1.5 py-0.2 bg-gray-900 text-amber-400 text-[9px] font-black rounded-full shadow-md">
-                ★ ${worker.averageRating > 0 ? worker.averageRating.toFixed(1) : 'New'}
+              <div class="absolute -bottom-1 px-1.5 py-0.2 bg-gray-900 text-amber-400 text-[9px] font-black rounded-full shadow-md flex items-center gap-0.5">
+                ${SVG_STAR_ICON}
+                <span>${worker.averageRating > 0 ? worker.averageRating.toFixed(1) : 'New'}</span>
               </div>
             </div>
           `,
@@ -368,7 +389,7 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
         popupContent.innerHTML = `
           <div class="flex items-center gap-2">
             <span class="font-bold text-xs text-gray-900 dark:text-white">${worker.email || 'Skilled Artisan'}</span>
-            <span class="text-[10px] text-amber-500 font-bold">★ ${worker.averageRating > 0 ? worker.averageRating.toFixed(1) : 'New'}</span>
+            <span class="text-[10px] text-amber-500 font-bold flex items-center gap-0.5">${SVG_STAR_ICON} <span>${worker.averageRating > 0 ? worker.averageRating.toFixed(1) : 'New'}</span></span>
           </div>
           <p class="text-[11px] text-gray-600 dark:text-gray-300 line-clamp-1">${skillsHtml || 'General Artisan'}</p>
           <div class="flex items-center justify-between text-[11px] pt-1 border-t border-gray-200 dark:border-gray-700">
@@ -408,7 +429,7 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
           html: `
             <div class="relative flex items-center justify-center transition-transform hover:scale-125 ${isSelected ? 'scale-125 z-50' : ''}">
               <div class="w-9 h-9 bg-amber-500 text-white rounded-full border-2 border-white dark:border-gray-900 shadow-xl flex flex-col items-center justify-center">
-                <span class="text-xs">📋</span>
+                ${SVG_CLIPBOARD_ICON}
               </div>
               <div class="absolute -bottom-1 px-1.5 py-0.2 bg-gray-900 text-white text-[9px] font-black rounded-full shadow-md truncate max-w-[60px]">
                 ${req.categoryName}
@@ -429,8 +450,9 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
             <span class="text-[10px] text-gray-500 font-bold">${req.distanceKm} km away</span>
           </div>
           <p class="text-[11px] text-gray-700 dark:text-gray-300 font-medium line-clamp-2">${req.description}</p>
-          <div class="text-[10px] text-gray-400">
-            📍 ${req.address}
+          <div class="text-[10px] text-gray-400 flex items-center">
+            ${SVG_POPUP_PIN_ICON}
+            <span>${req.address}</span>
           </div>
           <button id="quote-btn-${req.id}" class="w-full mt-1 px-2 py-1 bg-amber-500 hover:bg-amber-400 text-white text-[11px] font-bold rounded-lg transition cursor-pointer text-center">
             Send Quotation
@@ -528,7 +550,7 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
           title="Locate my position (GPS)"
           className="p-2.5 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition flex items-center justify-center cursor-pointer disabled:opacity-50"
         >
-          <span className={`text-base ${locLoading ? 'animate-pulse' : ''}`}>🎯</span>
+          <TargetIcon className={`w-5 h-5 ${locLoading ? 'animate-pulse' : ''}`} />
         </button>
 
         <button
@@ -537,29 +559,31 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
           title="Reset map view"
           className="p-2.5 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition flex items-center justify-center cursor-pointer"
         >
-          <span className="text-base">🔄</span>
+          <RefreshCwIcon className="w-5 h-5" />
         </button>
       </div>
 
       {/* Floating GPS Error Notice */}
       {gpsError && (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[400] bg-amber-50/95 dark:bg-amber-950/95 backdrop-blur-md border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-400 rounded-xl px-4 py-2.5 text-xs shadow-xl font-medium flex items-center gap-2 max-w-[80%]">
-          <span className="text-amber-500">⚠️</span>
+          <AlertTriangleIcon className="w-4 h-4 text-amber-500 shrink-0" />
           <span>{gpsError}</span>
-          <button type="button" onClick={() => setGpsError(null)} className="ml-2 text-amber-600 dark:text-amber-400 font-bold hover:opacity-70 cursor-pointer">✕</button>
+          <button type="button" onClick={() => setGpsError(null)} className="ml-2 text-amber-600 dark:text-amber-400 font-bold hover:opacity-70 cursor-pointer p-0.5">
+            <CloseIcon className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
 
       {/* Interactive Picker Instruction Banner */}
       {isPickerMode && (
-        <div className="absolute bottom-4 left-4 right-4 z-[400] bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white rounded-2xl px-4 py-3 text-xs shadow-xl flex flex-wrap items-center justify-between gap-2">
+        <div className="absolute bottom-3 sm:bottom-4 left-3 sm:left-4 right-3 sm:right-4 z-[400] bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white rounded-2xl p-3 sm:px-4 sm:py-3 text-xs shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pointer-events-auto">
           <div className="flex items-center gap-2">
-            <span className="text-rose-500 text-base">📍</span>
-            <span className="font-semibold text-gray-700 dark:text-gray-200">
+            <MapPinIcon className="w-4 h-4 text-rose-500 shrink-0" />
+            <span className="font-semibold text-gray-700 dark:text-gray-200 text-[11px] sm:text-xs">
               Click anywhere on the map or drag the <strong className="text-rose-600 dark:text-rose-400">pin</strong> to set your exact coordinates.
             </span>
           </div>
-          <div className="font-mono text-emerald-600 dark:text-emerald-400 font-bold bg-gray-100 dark:bg-gray-800 px-2.5 py-1 rounded-xl border border-gray-200 dark:border-gray-700">
+          <div className="font-mono text-emerald-600 dark:text-emerald-400 font-bold bg-gray-100 dark:bg-gray-800 px-2.5 py-1 rounded-xl border border-gray-200 dark:border-gray-700 text-[11px] sm:text-xs shrink-0 self-end sm:self-auto">
             {effectivePickerCoords[0].toFixed(5)}, {effectivePickerCoords[1].toFixed(5)}
           </div>
         </div>

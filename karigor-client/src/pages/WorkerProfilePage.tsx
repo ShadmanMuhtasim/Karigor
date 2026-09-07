@@ -5,6 +5,7 @@ import { reviewApi } from '../api/reviewApi';
 import { Navbar } from '../components/Navbar';
 import { WorkerReviewsList } from '../components/reviews/WorkerReviewsList';
 import { RatingStars } from '../components/reviews/RatingStars';
+import { CheckCircleIcon, MapPinIcon, WrenchIcon } from '../components/icons/Icons';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -71,20 +72,21 @@ export function WorkerProfilePage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-white transition-colors duration-200 flex flex-col">
       <Navbar />
 
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-10 space-y-8">
+      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-10 space-y-8 animate-fade-in-up">
         {/* Worker Header Card */}
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-xl">
+        <div className="card-lift bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 space-y-6 shadow-xl">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center text-2xl font-bold text-indigo-600 dark:text-indigo-300">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="w-14 h-14 sm:w-16 sm:h-16 shrink-0 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-300">
                 W#{worker.id}
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-2xl font-black text-gray-900 dark:text-white">Worker #{worker.id}</h2>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">Worker #{worker.id}</h2>
                   {worker.verificationStatus === 'Verified' ? (
-                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold">
-                      ✓ Verified Pro
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold flex items-center gap-1">
+                      <CheckCircleIcon className="w-3.5 h-3.5" />
+                      <span>Verified Pro</span>
                     </span>
                   ) : (
                     <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 font-bold">
@@ -92,12 +94,12 @@ export function WorkerProfilePage() {
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{worker.email}</p>
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-0.5 truncate max-w-[200px] sm:max-w-xs md:max-w-md">{worker.email}</p>
               </div>
             </div>
 
-            <div className="flex flex-col sm:items-end">
-              <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+            <div className="flex flex-row sm:flex-col items-baseline sm:items-end justify-between sm:justify-start w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-0 border-gray-100 dark:border-gray-800">
+              <div className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400">
                 ৳{worker.hourlyRate}
                 <span className="text-xs text-gray-500 font-normal"> / hour</span>
               </div>
@@ -126,8 +128,15 @@ export function WorkerProfilePage() {
             </div>
             <div>
               <span className="text-gray-500 dark:text-gray-400 text-xs block mb-0.5">Location</span>
-              <span className="text-gray-900 dark:text-gray-200 font-bold">
-                {worker.latitude && worker.longitude ? '📍 GPS Registered' : 'Not Specified'}
+              <span className="text-gray-900 dark:text-gray-200 font-bold flex items-center gap-1">
+                {worker.latitude && worker.longitude ? (
+                  <>
+                    <MapPinIcon className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                    <span>GPS Registered</span>
+                  </>
+                ) : (
+                  'Not Specified'
+                )}
               </span>
             </div>
             <div>
@@ -138,8 +147,8 @@ export function WorkerProfilePage() {
         </div>
 
         {/* Skills & Categories */}
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-6 sm:p-8 space-y-4 shadow-xl">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white">Skills & Services Offered</h3>
+        <div className="card-lift bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 space-y-4 shadow-xl">
+          <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">Skills & Services Offered</h3>
           {worker.skills.length === 0 ? (
             <p className="text-sm text-gray-500 dark:text-gray-400">No specific skills listed.</p>
           ) : (
@@ -157,12 +166,14 @@ export function WorkerProfilePage() {
                       onError={(e) => {
                         e.currentTarget.style.display = 'none';
                         if (e.currentTarget.nextElementSibling) {
-                          (e.currentTarget.nextElementSibling as HTMLElement).style.display = 'inline';
+                          (e.currentTarget.nextElementSibling as HTMLElement).style.display = 'inline-flex';
                         }
                       }}
                     />
                   ) : null}
-                  <span className="text-2xl" style={{ display: skill.iconUrl ? 'none' : 'inline' }}>🔧</span>
+                  <span className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0" style={{ display: skill.iconUrl ? 'none' : 'inline-flex' }}>
+                    <WrenchIcon className="w-4 h-4" />
+                  </span>
                   <div>
                     <h5 className="text-sm font-bold text-gray-900 dark:text-white">{skill.categoryName}</h5>
                     <span className="text-xs text-sky-600 dark:text-sky-400 font-medium">Certified Craft</span>
@@ -174,8 +185,8 @@ export function WorkerProfilePage() {
         </div>
 
         {/* Availability Schedule */}
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-6 sm:p-8 space-y-4 shadow-xl">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white">Weekly Availability Schedule</h3>
+        <div className="card-lift bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 space-y-4 shadow-xl">
+          <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">Weekly Availability Schedule</h3>
           {worker.availability.length === 0 ? (
             <p className="text-sm text-gray-500 dark:text-gray-400">No scheduled hours published.</p>
           ) : (
@@ -200,7 +211,7 @@ export function WorkerProfilePage() {
         {/* ── Reviews & Ratings Section ── */}
         <section className="space-y-4">
           {isReviewsLoading ? (
-            <div className="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 p-8 text-center text-sm text-gray-500">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl sm:rounded-3xl border border-gray-200 dark:border-gray-800 p-6 sm:p-8 text-center text-sm text-gray-500">
               Loading reviews and ratings…
             </div>
           ) : reviewsSummary ? (
@@ -212,7 +223,7 @@ export function WorkerProfilePage() {
         <div className="flex justify-end gap-4 pt-4">
           <Link
             to="/customer/requests/new"
-            className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold rounded-2xl shadow-xl shadow-emerald-600/25 transition text-base"
+            className="btn-press w-full sm:w-auto text-center px-6 sm:px-8 py-3.5 sm:py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-2xl shadow-xl shadow-emerald-600/25 text-sm sm:text-base"
           >
             Post Request to Hire Worker →
           </Link>

@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { workerApi } from '../../api/workerApi';
 import type { UpdateWorkerProfileDto } from '../../api/workerApi';
 import { KarigorMap } from '../../components/map/KarigorMap';
+import { MapPinIcon, AlertTriangleIcon, CheckCircleIcon } from '../../components/icons/Icons';
 
 export function WorkerProfileTab() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState<UpdateWorkerProfileDto>({
     bio: '',
@@ -37,13 +40,13 @@ export function WorkerProfileTab() {
   const mutation = useMutation({
     mutationFn: workerApi.updateProfile,
     onSuccess: () => {
-      setSaveMessage({ type: 'success', text: 'Profile & service location updated successfully!' });
+      setSaveMessage({ type: 'success', text: t('worker.profileTab.updateSuccess') });
       queryClient.invalidateQueries({ queryKey: ['workerProfile'] });
       queryClient.invalidateQueries({ queryKey: ['workerStats'] });
       setTimeout(() => setSaveMessage(null), 3500);
     },
     onError: (error: any) => {
-      setSaveMessage({ type: 'error', text: error.response?.data?.error || 'Failed to update profile.' });
+      setSaveMessage({ type: 'error', text: error.response?.data?.error || t('worker.profileTab.updateFailed') });
     },
   });
 
@@ -108,8 +111,8 @@ export function WorkerProfileTab() {
     mutation.mutate(payload);
   };
 
-  if (isLoading) return <div className="text-gray-500 py-8 text-center">Loading profile...</div>;
-  if (isError || !profile) return <div className="text-rose-500 py-8 text-center">Failed to load profile.</div>;
+  if (isLoading) return <div className="text-gray-500 py-8 text-center">{t('common.loading')}</div>;
+  if (isError || !profile) return <div className="text-rose-500 py-8 text-center">{t('common.error')}</div>;
 
   const currentCoords = {
     lat: formData.latitude || 23.8103,
@@ -118,12 +121,12 @@ export function WorkerProfileTab() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-6 sm:p-8 shadow-xl">
+      <div className="card-lift bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 shadow-xl">
         <div className="mb-6 pb-4 border-b border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
-            <h3 className="text-xl font-extrabold text-gray-900 dark:text-white">Edit Professional Profile</h3>
+            <h3 className="text-lg sm:text-xl font-extrabold text-gray-900 dark:text-white">{t('worker.profileTab.title')}</h3>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Update your bio, hourly rate, and service coverage location on the map.
+              {t('worker.profileTab.subtitle')}
             </p>
           </div>
           <span className="text-xs px-3 py-1 bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold rounded-full self-start sm:self-auto">
@@ -135,7 +138,7 @@ export function WorkerProfileTab() {
           {/* Bio */}
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-2">
-              Professional Bio
+              {t('worker.profileTab.bioLabel')}
             </label>
             <textarea
               name="bio"
@@ -144,7 +147,7 @@ export function WorkerProfileTab() {
               rows={4}
               maxLength={2000}
               className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm transition"
-              placeholder="Tell customers about your craftsmanship, experience, and services..."
+              placeholder={t('worker.profileTab.bioPlaceholder')}
             />
           </div>
 
@@ -152,7 +155,7 @@ export function WorkerProfileTab() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-2">
-                Hourly Rate ($ USD / ৳ BDT)
+                {t('worker.profileTab.hourlyRateLabel')}
               </label>
               <input
                 type="number"
@@ -169,10 +172,10 @@ export function WorkerProfileTab() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                  Service Radius ({formData.serviceRadiusKm} km)
+                  {t('worker.profileTab.serviceRadiusLabel', { radius: formData.serviceRadiusKm })}
                 </label>
                 <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
-                  Coverage Area
+                  {t('worker.profileTab.coverageArea')}
                 </span>
               </div>
               <input
@@ -193,26 +196,26 @@ export function WorkerProfileTab() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                  Service Base Location & Radius Pin
+                  {t('worker.profileTab.mapTitle')}
                 </label>
                 <p className="text-xs text-gray-500">
-                  Click on the map or drag the pin to set your workshop or home base coordinates.
+                  {t('worker.profileTab.mapSubtitle')}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={handleGetGpsLocation}
                 disabled={locLoading}
-                className="px-3.5 py-1.5 bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-700/60 text-emerald-700 dark:text-emerald-300 text-xs font-bold rounded-xl hover:bg-emerald-200 transition flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+                className="btn-press px-3.5 py-1.5 bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-700/60 text-emerald-700 dark:text-emerald-300 text-xs font-bold rounded-xl hover:bg-emerald-200 flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
               >
-                <span>📍</span>
-                <span>{locLoading ? 'Locating...' : (gpsError ? 'Try GPS Again' : 'Use My GPS Location')}</span>
+                <MapPinIcon className="w-3.5 h-3.5" />
+                <span>{locLoading ? t('worker.profileTab.locating') : (gpsError ? t('worker.profileTab.tryGpsAgain') : t('worker.profileTab.useGps'))}</span>
               </button>
             </div>
 
             {gpsError && (
               <div className="mb-3 p-2.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-400 text-xs font-medium rounded-lg flex items-start gap-2">
-                <span className="text-amber-500 mt-0.5">⚠️</span>
+                <AlertTriangleIcon className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
                 <span>{gpsError}</span>
               </div>
             )}
@@ -228,9 +231,9 @@ export function WorkerProfileTab() {
             />
 
             {/* Coordinate display inputs */}
-            <div className="grid grid-cols-2 gap-4 mt-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-3">
               <div>
-                <label className="block text-[11px] font-semibold text-gray-500 mb-1">Latitude</label>
+                <label className="block text-[11px] font-semibold text-gray-500 mb-1">{t('worker.profileTab.latitude')}</label>
                 <input
                   type="number"
                   name="latitude"
@@ -241,7 +244,7 @@ export function WorkerProfileTab() {
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-gray-500 mb-1">Longitude</label>
+                <label className="block text-[11px] font-semibold text-gray-500 mb-1">{t('worker.profileTab.longitude')}</label>
                 <input
                   type="number"
                   name="longitude"
@@ -263,7 +266,11 @@ export function WorkerProfileTab() {
                   : 'bg-rose-50 dark:bg-rose-950/50 border border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-300'
               }`}
             >
-              <span>{saveMessage.type === 'success' ? '✓' : '⚠️'}</span>
+              {saveMessage.type === 'success' ? (
+                <CheckCircleIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              ) : (
+                <AlertTriangleIcon className="w-4 h-4 text-rose-500 shrink-0" />
+              )}
               <span>{saveMessage.text}</span>
             </div>
           )}
@@ -273,9 +280,9 @@ export function WorkerProfileTab() {
             <button
               type="submit"
               disabled={mutation.isPending}
-              className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm rounded-xl shadow-lg shadow-emerald-600/25 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center gap-2"
+              className="btn-press w-full sm:w-auto justify-center px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm rounded-xl shadow-lg shadow-emerald-600/25 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center gap-2 text-center"
             >
-              {mutation.isPending ? 'Saving Changes...' : 'Save Profile & Location'}
+              {mutation.isPending ? t('worker.profileTab.savingButton') : t('worker.profileTab.saveButton')}
             </button>
           </div>
         </form>

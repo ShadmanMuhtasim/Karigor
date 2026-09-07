@@ -1,4 +1,12 @@
-import axios from 'axios';
+import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
+
+export interface AuthUserResponse {
+  userId: string;
+  email: string;
+  role: string;
+  accessToken: string;
+  accessTokenExpiry: string;
+}
 
 // Access token stored in module-level variable — never in localStorage
 let accessToken: string | null = null;
@@ -33,58 +41,107 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-// On 401, attempt a single token refresh, then retry the original request
-let isRefreshing = false;
-let refreshSubscribers: Array<(token: string) => void> = [];
-
-function subscribeTokenRefresh(cb: (token: string) => void) {
-  refreshSubscribers.push(cb);
+// Callback synchronization with AuthContext
+interface AuthSyncCallbacks {
+  onTokenUpdated?: (user: AuthUserResponse) => void;
+  onSessionExpired?: () => void;
 }
 
-function onTokenRefreshed(token: string) {
-  refreshSubscribers.forEach((cb) => cb(token));
+let authSyncCallbacks: AuthSyncCallbacks = {};
+
+export function registerAuthSync(callbacks: AuthSyncCallbacks) {
+  authSyncCallbacks = { ...authSyncCallbacks, ...callbacks };
+}
+
+// Mutex & Subscriber Queue for Token Refresh
+let isRefreshing = false;
+interface RefreshSubscriber {
+  resolve: (user: AuthUserResponse) => void;
+  reject: (err: unknown) => void;
+}
+let refreshSubscribers: RefreshSubscriber[] = [];
+
+function subscribeTokenRefresh(subscriber: RefreshSubscriber) {
+  refreshSubscribers.push(subscriber);
+}
+
+function onTokenRefreshed(user: AuthUserResponse) {
+  refreshSubscribers.forEach((s) => s.resolve(user));
   refreshSubscribers = [];
 }
 
+function onTokenRefreshFailed(err: unknown) {
+  refreshSubscribers.forEach((s) => s.reject(err));
+  refreshSubscribers = [];
+}
+
+/**
+ * Execute a single-flight token refresh with deduplication and locking.
+ * Proactive refresh timers and reactive 401 interceptors share this flight.
+ */
+export async function refreshAuthToken(): Promise<AuthUserResponse> {
+  if (isRefreshing) {
+    return new Promise<AuthUserResponse>((resolve, reject) => {
+      subscribeTokenRefresh({ resolve, reject });
+    });
+  }
+
+  isRefreshing = true;
+
+  try {
+    const { data } = await axios.post<AuthUserResponse>('/api/auth/refresh', {}, { withCredentials: true });
+    setAccessToken(data.accessToken);
+    authSyncCallbacks.onTokenUpdated?.(data);
+    onTokenRefreshed(data);
+    return data;
+  } catch (refreshErr) {
+    setAccessToken(null);
+    onTokenRefreshFailed(refreshErr);
+    authSyncCallbacks.onSessionExpired?.();
+    throw refreshErr;
+  } finally {
+    isRefreshing = false;
+  }
+}
+
+// Response Interceptor
 apiClient.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
+  async (error: AxiosError) => {
+    const originalRequest = error.config as (InternalAxiosRequestConfig & { _retry?: boolean }) | undefined;
 
-    // If the 401 came from the refresh endpoint itself, don't retry
+    // Handle 403 Forbidden:
+    // Indicates valid authentication but insufficient permissions (role mismatch).
+    // NEVER attempt token refresh or session termination on 403. Pass error to caller.
+    if (error.response?.status === 403) {
+      console.warn(
+        `[API 403 Forbidden] Access denied to: ${originalRequest?.method?.toUpperCase()} ${originalRequest?.url}`,
+        error.response?.data
+      );
+      return Promise.reject(error);
+    }
+
+    // Handle 401 Unauthorized:
+    // Indicates expired or invalid access token. Attempt silent refresh and retry.
     if (
       error.response?.status === 401 &&
+      originalRequest &&
       !originalRequest._retry &&
       !originalRequest.url?.includes('/auth/refresh') &&
       !originalRequest.url?.includes('/auth/login')
     ) {
-      if (isRefreshing) {
-        return new Promise((resolve) => {
-          subscribeTokenRefresh((token) => {
-            originalRequest.headers.Authorization = `Bearer ${token}`;
-            resolve(apiClient(originalRequest));
-          });
-        });
-      }
-
       originalRequest._retry = true;
-      isRefreshing = true;
 
       try {
-        const { data } = await axios.post('/api/auth/refresh', {}, { withCredentials: true });
-        setAccessToken(data.accessToken);
-        onTokenRefreshed(data.accessToken);
-        originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
+        const refreshedUser = await refreshAuthToken();
+        originalRequest.headers.Authorization = `Bearer ${refreshedUser.accessToken}`;
         return apiClient(originalRequest);
-      } catch {
-        // Refresh failed — clear access token, let caller handle 401
-        setAccessToken(null);
-        return Promise.reject(error);
-      } finally {
-        isRefreshing = false;
+      } catch (refreshError) {
+        return Promise.reject(refreshError);
       }
     }
 
     return Promise.reject(error);
   }
 );
+

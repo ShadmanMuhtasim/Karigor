@@ -5,6 +5,16 @@ import { marketplaceApi, type QuotationDto } from '../api/marketplaceApi';
 import { Navbar } from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
 import { signalRService } from '../services/signalrService';
+import {
+  SearchIcon,
+  MapPinIcon,
+  PencilIcon,
+  AlertTriangleIcon,
+  StarIcon,
+  UserIcon,
+  HardHatIcon,
+  SparklesIcon,
+} from '../components/icons/Icons';
 
 export function RequestDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -168,7 +178,7 @@ export function RequestDetailPage() {
         <Navbar />
         <div className="flex-1 flex items-center justify-center p-4 text-center">
           <div className="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 p-8 shadow-sm">
-            <span className="text-3xl block mb-2">🔍</span>
+            <SearchIcon className="w-10 h-10 mx-auto mb-2 text-gray-400" />
             <h3 className="font-bold text-sm text-gray-900 dark:text-white mb-1">Service Request Not Found</h3>
             <p className="text-xs text-gray-500 mb-4">
               This request does not exist or you do not have permission to view it.
@@ -200,7 +210,7 @@ export function RequestDetailPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-white transition-colors duration-200 flex flex-col">
       <Navbar />
 
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8 space-y-6">
+      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8 space-y-6 animate-fade-in-up">
         {/* Breadcrumb / Back */}
         <div className="flex items-center justify-between">
           <Link
@@ -214,13 +224,13 @@ export function RequestDetailPage() {
         </div>
 
         {/* ── Card 1: Service Request Info ────────────────────────────── */}
-        <article className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 sm:p-8 shadow-sm space-y-6">
+        <article className="rounded-2xl sm:rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 sm:p-6 md:p-8 shadow-sm space-y-5 sm:space-y-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <span className="text-xs font-bold text-sky-600 dark:text-sky-400 uppercase tracking-wider">
                 {request.categoryName}
               </span>
-              <h1 className="text-2xl font-black text-gray-900 dark:text-white mt-1">
+              <h1 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white mt-1">
                 {request.categoryName} Service Request
               </h1>
             </div>
@@ -258,8 +268,9 @@ export function RequestDetailPage() {
 
             <div className="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-800/50">
               <span className="text-xs text-gray-500 dark:text-gray-400 block mb-0.5">Location</span>
-              <span className="font-medium text-xs text-gray-800 dark:text-gray-200">
-                📍 {request.address}
+              <span className="font-medium text-xs text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
+                <MapPinIcon className="w-3.5 h-3.5 shrink-0 text-gray-500" />
+                <span>{request.address}</span>
               </span>
             </div>
           </div>
@@ -306,18 +317,25 @@ export function RequestDetailPage() {
 
         {/* ── Card 2: Worker Bid Placement (If worker hasn't quoted yet) ── */}
         {isWorker && !workerHasQuoted && request.status === 'Open' && (
-          <article className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 sm:p-8 shadow-sm space-y-4">
+          <article className="rounded-2xl sm:rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 sm:p-6 md:p-8 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-base font-bold text-gray-900 dark:text-white">Submit Quotation</h2>
+                <h2 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white">Submit Quotation</h2>
                 <p className="text-xs text-gray-500">Provide your price proposal for this customer request.</p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowQuoteForm(!showQuoteForm)}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition cursor-pointer"
+                className="btn-press px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5"
               >
-                {showQuoteForm ? 'Cancel' : 'Place Bid 📝'}
+                {showQuoteForm ? (
+                  'Cancel'
+                ) : (
+                  <>
+                    <PencilIcon className="w-3.5 h-3.5" />
+                    <span>Place Bid</span>
+                  </>
+                )}
               </button>
             </div>
 
@@ -330,8 +348,9 @@ export function RequestDetailPage() {
                 className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800"
               >
                 {quoteError && (
-                  <div className="p-3 bg-rose-50 dark:bg-rose-950 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 rounded-xl text-xs">
-                    ⚠️ {quoteError}
+                  <div className="p-3 bg-rose-50 dark:bg-rose-950 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 rounded-xl text-xs flex items-center gap-1.5">
+                    <AlertTriangleIcon className="w-3.5 h-3.5 shrink-0" />
+                    <span>{quoteError}</span>
                   </div>
                 )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -367,7 +386,7 @@ export function RequestDetailPage() {
                   <button
                     type="submit"
                     disabled={createQuoteMutation.isPending || !initialPrice}
-                    className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition cursor-pointer"
+                    className="btn-press w-full sm:w-auto px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition cursor-pointer text-center"
                   >
                     {createQuoteMutation.isPending ? 'Submitting…' : 'Submit Quotation'}
                   </button>
@@ -378,10 +397,10 @@ export function RequestDetailPage() {
         )}
 
         {/* ── Card 3: Quotations & Multi-Turn Negotiation ────────────── */}
-        <article className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 sm:p-8 shadow-sm space-y-6">
-          <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-4">
+        <article className="rounded-2xl sm:rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 sm:p-6 md:p-8 shadow-sm space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 dark:border-gray-800 pb-4">
             <div>
-              <h2 className="text-base font-bold text-gray-900 dark:text-white">
+              <h2 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white">
                 Quotations & Negotiation History
               </h2>
               <p className="text-xs text-gray-500">
@@ -416,7 +435,7 @@ export function RequestDetailPage() {
                 return (
                   <div
                     key={workerInfo.workerId}
-                    className="rounded-2xl border border-gray-200 dark:border-gray-800 p-5 bg-gray-50/50 dark:bg-gray-800/40 space-y-4"
+                    className="card-lift rounded-2xl border border-gray-200 dark:border-gray-800 p-5 bg-gray-50/50 dark:bg-gray-800/40 space-y-4"
                   >
                     {/* Header: Worker Profile & Current Offer */}
                     <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-gray-200/80 dark:border-gray-700/60">
@@ -425,8 +444,9 @@ export function RequestDetailPage() {
                           <span className="font-bold text-sm text-gray-900 dark:text-white">
                             {workerInfo.workerName}
                           </span>
-                          <span className="text-xs text-amber-500 font-bold">
-                            ★ {workerInfo.averageRating > 0 ? workerInfo.averageRating.toFixed(1) : 'New'}
+                          <span className="text-xs text-amber-500 font-bold flex items-center gap-1">
+                            <StarIcon className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
+                            <span>{workerInfo.averageRating > 0 ? workerInfo.averageRating.toFixed(1) : 'New'}</span>
                           </span>
                         </div>
                         {workerInfo.workerBio && (
@@ -470,8 +490,18 @@ export function RequestDetailPage() {
                             >
                               <div className="space-y-0.5">
                                 <div className="flex items-center gap-2">
-                                  <span className="font-bold text-gray-900 dark:text-white">
-                                    {isCustomerOffer ? '👤 Customer Counter-Offer' : `👷 ${q.workerName} (Offer)`}
+                                  <span className="font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                                    {isCustomerOffer ? (
+                                      <>
+                                        <UserIcon className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
+                                        <span>Customer Counter-Offer</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <HardHatIcon className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                                        <span>{q.workerName} (Offer)</span>
+                                      </>
+                                    )}
                                   </span>
                                   <span className="text-[10px] text-gray-400">Step #{idx + 1}</span>
                                   <span className="text-[10px] px-1.5 py-0.2 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
@@ -496,13 +526,14 @@ export function RequestDetailPage() {
 
                     {/* Action Banners */}
                     {isAccepted && (
-                      <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex items-center justify-between gap-3 text-xs">
-                        <span className="font-bold text-emerald-700 dark:text-emerald-300">
-                          🎉 Offer Accepted at ৳{latestQuote.proposedPrice.toLocaleString()}!
+                      <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                        <span className="font-bold text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
+                          <SparklesIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                          <span>Offer Accepted at ৳{latestQuote.proposedPrice.toLocaleString()}!</span>
                         </span>
                         <Link
                           to="/dashboard?tab=bookings"
-                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold transition"
+                          className="btn-press w-full sm:w-auto text-center px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold transition"
                         >
                           View Bookings →
                         </Link>
@@ -512,7 +543,7 @@ export function RequestDetailPage() {
                     {/* Simultaneous Job Warning */}
                     {(latestQuote.hasSimultaneousJobWarning || thread.some((q) => q.hasSimultaneousJobWarning)) && (
                       <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-700/60 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-2.5 shadow-sm">
-                        <span className="text-base leading-none shrink-0">⚠️</span>
+                        <AlertTriangleIcon className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                         <div className="space-y-0.5">
                           <p className="font-bold text-amber-950 dark:text-amber-100">
                             Simultaneous Job Warning
@@ -526,12 +557,12 @@ export function RequestDetailPage() {
 
                     {/* Customer Action Controls */}
                     {canCustomerAct && (
-                      <div className="flex flex-wrap gap-2 pt-1">
+                      <div className="flex flex-col sm:flex-row flex-wrap gap-2 pt-1">
                         <button
                           type="button"
                           disabled={acceptMutation.isPending}
                           onClick={() => acceptMutation.mutate(latestQuote.id)}
-                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition cursor-pointer"
+                          className="btn-press w-full sm:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition cursor-pointer text-center"
                         >
                           {acceptMutation.isPending
                             ? 'Accepting…'
@@ -540,7 +571,7 @@ export function RequestDetailPage() {
                         <button
                           type="button"
                           onClick={() => setCounterFor(counterFor === latestQuote.id ? null : latestQuote.id)}
-                          className="px-4 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 text-gray-800 dark:text-gray-200 rounded-xl text-xs font-bold transition cursor-pointer"
+                          className="btn-press w-full sm:w-auto px-4 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 text-gray-800 dark:text-gray-200 rounded-xl text-xs font-bold transition cursor-pointer text-center"
                         >
                           Counter-Offer
                         </button>
@@ -553,12 +584,12 @@ export function RequestDetailPage() {
                         <p className="text-xs text-sky-600 dark:text-sky-400 font-semibold">
                           Customer countered with ৳{latestQuote.proposedPrice.toLocaleString()}. You can accept or counter back.
                         </p>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-col sm:flex-row flex-wrap gap-2">
                           <button
                             type="button"
                             disabled={acceptMutation.isPending}
                             onClick={() => acceptMutation.mutate(latestQuote.id)}
-                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition cursor-pointer"
+                            className="btn-press w-full sm:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition cursor-pointer text-center"
                           >
                             {acceptMutation.isPending
                               ? 'Accepting…'
@@ -567,7 +598,7 @@ export function RequestDetailPage() {
                           <button
                             type="button"
                             onClick={() => setCounterFor(counterFor === latestQuote.id ? null : latestQuote.id)}
-                            className="px-4 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 text-gray-800 dark:text-gray-200 rounded-xl text-xs font-bold transition cursor-pointer"
+                            className="btn-press w-full sm:w-auto px-4 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 text-gray-800 dark:text-gray-200 rounded-xl text-xs font-bold transition cursor-pointer text-center"
                           >
                             Counter Back
                           </button>
@@ -598,8 +629,9 @@ export function RequestDetailPage() {
                         </h4>
 
                         {counterError && (
-                          <div className="p-2.5 bg-rose-50 dark:bg-rose-950 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 rounded-lg text-xs">
-                            ⚠️ {counterError}
+                          <div className="p-2.5 bg-rose-50 dark:bg-rose-950 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 rounded-lg text-xs flex items-center gap-1.5">
+                            <AlertTriangleIcon className="w-3.5 h-3.5 shrink-0" />
+                            <span>{counterError}</span>
                           </div>
                         )}
 
@@ -637,14 +669,14 @@ export function RequestDetailPage() {
                           <button
                             type="button"
                             onClick={() => setCounterFor(null)}
-                            className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 cursor-pointer"
+                            className="btn-press px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 cursor-pointer"
                           >
                             Cancel
                           </button>
                           <button
                             type="submit"
                             disabled={counterMutation.isPending || !counterPrice}
-                            className="px-4 py-1.5 bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs rounded-xl transition cursor-pointer"
+                            className="btn-press px-4 py-1.5 bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs rounded-xl transition cursor-pointer"
                           >
                             {counterMutation.isPending ? 'Sending…' : 'Submit'}
                           </button>

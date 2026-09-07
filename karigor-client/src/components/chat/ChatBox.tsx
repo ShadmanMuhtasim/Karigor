@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { messagingApi, type MessageDto } from '../../api/messagingApi';
 import { signalRService } from '../../services/signalrService';
 import { useAuth } from '../../context/AuthContext';
+import { CloseIcon, ChatBubbleIcon, AlertTriangleIcon } from '../icons/Icons';
 
 interface ChatBoxProps {
   bookingId: number;
@@ -18,6 +20,7 @@ export function ChatBox({
   categoryName,
   onClose,
 }: ChatBoxProps) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [messages, setMessages] = useState<MessageDto[]>([]);
   const [inputMessage, setInputMessage] = useState('');
@@ -183,10 +186,10 @@ export function ChatBox({
         {onClose && (
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition cursor-pointer"
+            className="w-8 h-8 rounded-lg text-gray-400 hover:text-gray-700 dark:hover:white hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center btn-press cursor-pointer"
             aria-label="Close Chat"
           >
-            ✕
+            <CloseIcon className="w-4 h-4" />
           </button>
         )}
       </div>
@@ -195,16 +198,16 @@ export function ChatBox({
       <div className="flex-1 p-4 overflow-y-auto space-y-3 min-h-[300px] max-h-[460px] bg-gray-50/50 dark:bg-gray-950/50">
         {loading ? (
           <div className="flex items-center justify-center h-full text-xs text-gray-400">
-            Loading chat messages…
+            {t('chat.loadingMessages')}
           </div>
         ) : messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center text-gray-400 dark:text-gray-500 p-6">
-            <span className="text-3xl mb-2">👋</span>
+            <ChatBubbleIcon className="w-10 h-10 mb-2 text-gray-400 dark:text-gray-500" />
             <p className="text-xs font-semibold text-gray-600 dark:text-gray-300">
-              Start a direct conversation with {otherPartyName}
+              {t('chat.noMessagesTitle')}
             </p>
             <p className="text-[11px] text-gray-400 mt-0.5">
-              Coordinate schedule, task specifics, and requirements in real time
+              {t('chat.noMessagesDesc')}
             </p>
           </div>
         ) : (
@@ -236,14 +239,15 @@ export function ChatBox({
         {otherUserTyping && (
           <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 italic animate-pulse">
             <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-ping" />
-            <span>{otherPartyName} is typing…</span>
+            <span>{t('chat.typing', { name: otherPartyName })}</span>
           </div>
         )}
 
         {/* Send Error Alert */}
         {sendError && (
-          <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs">
-            ⚠️ {sendError}
+          <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
+            <AlertTriangleIcon className="w-4 h-4 shrink-0 text-rose-500" />
+            <span>{sendError}</span>
           </div>
         )}
 
@@ -259,16 +263,16 @@ export function ChatBox({
           type="text"
           value={inputMessage}
           onChange={handleInputChange}
-          placeholder={`Message ${otherPartyName}…`}
+          placeholder={t('chat.inputPlaceholder', { name: otherPartyName })}
           className="flex-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 transition"
           maxLength={4000}
         />
         <button
           type="submit"
           disabled={!inputMessage.trim() || sending}
-          className="px-4 py-2.5 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 disabled:opacity-50 text-white rounded-xl font-bold text-xs sm:text-sm transition flex items-center gap-1.5 shadow-md shadow-sky-500/20 cursor-pointer disabled:cursor-not-allowed"
+          className="px-4 py-2.5 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 disabled:opacity-50 text-white rounded-xl font-bold text-xs sm:text-sm transition flex items-center gap-1.5 shadow-md shadow-sky-500/20 btn-press cursor-pointer disabled:cursor-not-allowed"
         >
-          {sending ? <span>…</span> : <span>Send</span>}
+          {sending ? <span>…</span> : <span>{t('chat.send')}</span>}
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
           </svg>

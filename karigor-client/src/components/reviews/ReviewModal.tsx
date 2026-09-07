@@ -1,8 +1,11 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { RatingStars } from './RatingStars';
+import { Modal } from '../ui/Modal';
 import { reviewApi } from '../../api/reviewApi';
 import type { ReviewDto } from '../../api/reviewApi';
 import { extractErrorMessage } from '../../lib/errorUtils';
+import { CloseIcon, StarIcon } from '../icons/Icons';
 
 interface ReviewModalProps {
   bookingId: number;
@@ -14,11 +17,11 @@ interface ReviewModalProps {
 }
 
 const ratingLabels: Record<number, string> = {
-  1: '1 - Poor Experience 😞',
-  2: '2 - Fair, needs improvement 😐',
-  3: '3 - Good Service 👍',
-  4: '4 - Very Good & Professional ⭐',
-  5: '5 - Outstanding & Highly Recommended! 🌟',
+  1: '1 - Poor Experience',
+  2: '2 - Fair, needs improvement',
+  3: '3 - Good Service',
+  4: '4 - Very Good & Professional',
+  5: '5 - Outstanding & Highly Recommended!',
 };
 
 export function ReviewModal({
@@ -29,6 +32,7 @@ export function ReviewModal({
   onClose,
   onReviewSubmitted,
 }: ReviewModalProps) {
+  const { t } = useTranslation();
   const [rating, setRating] = useState<number>(5);
   const [comment, setComment] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
@@ -63,28 +67,33 @@ export function ReviewModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-6">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      backdropClassName="bg-black/60 backdrop-blur-sm"
+    >
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-6 sm:p-8 max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl space-y-6 animate-modal-pop">
         
         {/* Modal Header */}
         <div className="flex items-start justify-between border-b border-gray-100 dark:border-gray-800 pb-4">
           <div>
             <span className="text-xs font-extrabold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
-              Verified Service Review
+              {t('reviews.badgeVerified', 'Verified Service Review')}
             </span>
             <h3 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white mt-1">
-              Rate Your Experience
+              {t('reviews.modalTitle', 'Rate Your Experience')}
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-              Service: <span className="font-semibold text-gray-700 dark:text-gray-300">{categoryName}</span> • Pro: <span className="font-semibold text-gray-700 dark:text-gray-300">{workerName}</span>
+              {t('reviews.serviceLabel', 'Service')}: <span className="font-semibold text-gray-700 dark:text-gray-300">{categoryName}</span> • {t('reviews.artisanLabel', 'Artisan')}: <span className="font-semibold text-gray-700 dark:text-gray-300">{workerName}</span>
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
+            aria-label={t('common.close', 'Close')}
             className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition"
           >
-            ✕
+            <CloseIcon className="w-5 h-5" />
           </button>
         </div>
 
@@ -97,9 +106,9 @@ export function ReviewModal({
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Interactive Stars Section */}
           <div className="text-center space-y-3 bg-gray-50 dark:bg-gray-800/50 p-6 rounded-2xl border border-gray-100 dark:border-gray-800">
-            <span className="text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider block">
-              Tap stars to rate
-            </span>
+            <div className="flex justify-center">
+              <StarIcon className="w-5 h-5 text-amber-500 fill-amber-400" />
+            </div>
             <div className="flex justify-center">
               <RatingStars
                 rating={rating}
@@ -117,7 +126,7 @@ export function ReviewModal({
           <div className="space-y-2">
             <div className="flex justify-between items-center">
               <label htmlFor="review-comment" className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                Write a feedback review (Optional)
+                {t('common.details', 'Feedback')}
               </label>
               <span className="text-xs text-gray-400">
                 {comment.length}/1000
@@ -129,7 +138,7 @@ export function ReviewModal({
               onChange={(e) => setComment(e.target.value)}
               maxLength={1000}
               rows={4}
-              placeholder="How was the worker's punctuality, technical skill, and behavior? Your review helps other customers hire with confidence."
+              placeholder={t('reviews.commentPlaceholder', 'Share feedback about punctuality, craftsmanship, and professionalism...')}
               className="w-full px-4 py-3 rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm transition"
             />
           </div>
@@ -139,28 +148,31 @@ export function ReviewModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 rounded-2xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-bold text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition active:scale-95"
+              className="px-5 py-2.5 rounded-2xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-bold text-sm hover:bg-gray-100 dark:hover:bg-gray-800 btn-press"
             >
-              Cancel
+              {t('common.cancel', 'Cancel')}
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-sm shadow-lg shadow-emerald-600/25 transition flex items-center gap-2 disabled:opacity-50"
+              className="px-6 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-lg shadow-emerald-600/25 flex items-center gap-2 disabled:opacity-50 btn-press"
             >
               {loading ? (
                 <>
                   <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Submitting...</span>
+                  <span>{t('reviews.submitting', 'Submitting...')}</span>
                 </>
               ) : (
-                <span>Submit Verified Review ⭐</span>
+                <span className="flex items-center gap-1.5">
+                  {t('reviews.submitButton', 'Submit Verified Review')}
+                  <StarIcon className="w-4 h-4 fill-amber-300 text-amber-300" />
+                </span>
               )}
             </button>
           </div>
         </form>
 
       </div>
-    </div>
+    </Modal>
   );
 }

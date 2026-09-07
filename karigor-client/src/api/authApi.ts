@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { refreshAuthToken } from './client';
 
 export interface AuthUser {
   userId: string;
@@ -49,8 +50,7 @@ export async function login(payload: LoginPayload): Promise<AuthUser> {
 
 /** Attempt to restore session using the httpOnly refresh token cookie */
 export async function refreshSession(): Promise<AuthUser> {
-  const { data } = await axios.post('/api/auth/refresh', {}, { withCredentials: true });
-  return data;
+  return refreshAuthToken();
 }
 
 /** Logout — revokes refresh token on server and clears cookie */

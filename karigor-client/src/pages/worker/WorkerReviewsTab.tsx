@@ -1,11 +1,14 @@
 import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { workerApi } from '../../api/workerApi';
 import { reviewApi } from '../../api/reviewApi';
 import { WorkerReviewsList } from '../../components/reviews/WorkerReviewsList';
 import { signalRService } from '../../services/signalrService';
+import { AlertTriangleIcon } from '../../components/icons/Icons';
 
 export function WorkerReviewsTab() {
+  const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
 
   const { data: profile, isLoading: isProfileLoading } = useQuery({
@@ -49,7 +52,7 @@ export function WorkerReviewsTab() {
   if (isProfileLoading || isReviewsLoading) {
     return (
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-10 text-center text-sm text-gray-500">
-        Loading reviews and customer feedback…
+        {t('common.loading')}
       </div>
     );
   }
@@ -57,9 +60,13 @@ export function WorkerReviewsTab() {
   if (isError || !reviewsSummary) {
     return (
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-10 text-center space-y-2">
-        <span className="text-3xl block">⚠️</span>
-        <h4 className="text-base font-bold text-gray-900 dark:text-white">Could not load reviews</h4>
-        <p className="text-xs text-gray-500">Please check your connection and try refreshing.</p>
+        <AlertTriangleIcon className="w-8 h-8 mx-auto text-amber-500" />
+        <h4 className="text-base font-bold text-gray-900 dark:text-white">
+          {i18n.language === 'bn' ? 'রিভিউ লোড করা যায়নি' : 'Could not load reviews'}
+        </h4>
+        <p className="text-xs text-gray-500">
+          {i18n.language === 'bn' ? 'অনুগ্রহ করে ইন্টারনেট সংযোগ চেক করে রিফ্রেশ করুন।' : 'Please check your connection and try refreshing.'}
+        </p>
       </div>
     );
   }
@@ -68,10 +75,10 @@ export function WorkerReviewsTab() {
     <div className="space-y-6">
       <div className="space-y-1">
         <h3 className="text-xl font-extrabold text-gray-900 dark:text-white">
-          Client Feedback & Performance Ratings
+          {t('worker.reviews.title')}
         </h3>
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          Reviews left by verified customers upon completing scheduled bookings. You can reply directly to any feedback.
+          {t('worker.reviews.subtitle')}
         </p>
       </div>
 

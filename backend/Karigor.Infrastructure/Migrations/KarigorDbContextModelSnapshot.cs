@@ -98,6 +98,9 @@ namespace Karigor.Infrastructure.Migrations
                     b.Property<decimal>("AgreedPrice")
                         .HasColumnType("decimal(18, 2)");
 
+                    b.Property<DateTime?>("CheckedInAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<int>("CustomerId")
                         .HasColumnType("int");
 
@@ -113,6 +116,16 @@ namespace Karigor.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)")
                         .HasDefaultValue("Scheduled");
+
+                    b.Property<int>("VerificationAttempts")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("VerificationCodeExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("VerificationCodeHash")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
 
                     b.Property<int>("WorkerId")
                         .HasColumnType("int");
@@ -422,6 +435,58 @@ namespace Karigor.Infrastructure.Migrations
                     b.HasIndex(new[] { "Status" }, "IX_ServiceRequests_Status");
 
                     b.ToTable("ServiceRequests");
+                });
+
+            modelBuilder.Entity("Karigor.Infrastructure.Models.SosAlert", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AdminNotes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("BookingId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ResolvedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ResolvedByAdminId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasDefaultValue("Open");
+
+                    b.Property<DateTime>("TriggeredAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("(sysutcdatetime())");
+
+                    b.Property<int>("WorkerId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BookingId");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("ResolvedByAdminId");
+
+                    b.HasIndex("WorkerId");
+
+                    b.ToTable("SosAlerts");
                 });
 
             modelBuilder.Entity("Karigor.Infrastructure.Models.WorkerAvailability", b =>
@@ -816,6 +881,40 @@ namespace Karigor.Infrastructure.Migrations
                     b.Navigation("Customer");
                 });
 
+            modelBuilder.Entity("Karigor.Infrastructure.Models.SosAlert", b =>
+                {
+                    b.HasOne("Karigor.Infrastructure.Models.Booking", "Booking")
+                        .WithMany("SosAlerts")
+                        .HasForeignKey("BookingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Karigor.Infrastructure.Models.CustomerProfile", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Karigor.Infrastructure.Models.ApplicationUser", "ResolvedByAdmin")
+                        .WithMany()
+                        .HasForeignKey("ResolvedByAdminId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Karigor.Infrastructure.Models.WorkerProfile", "Worker")
+                        .WithMany()
+                        .HasForeignKey("WorkerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Booking");
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("ResolvedByAdmin");
+
+                    b.Navigation("Worker");
+                });
+
             modelBuilder.Entity("Karigor.Infrastructure.Models.WorkerAvailability", b =>
                 {
                     b.HasOne("Karigor.Infrastructure.Models.WorkerProfile", "Worker")
@@ -935,6 +1034,8 @@ namespace Karigor.Infrastructure.Migrations
                     b.Navigation("Messages");
 
                     b.Navigation("Review");
+
+                    b.Navigation("SosAlerts");
                 });
 
             modelBuilder.Entity("Karigor.Infrastructure.Models.CustomerProfile", b =>

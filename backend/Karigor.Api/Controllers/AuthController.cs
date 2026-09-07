@@ -109,7 +109,7 @@ public class AuthController : ControllerBase
         {
             HttpOnly = true,
             Secure   = false,
-            SameSite = SameSiteMode.Strict,
+            SameSite = SameSiteMode.Lax,
             Path     = "/"
         });
 
@@ -125,7 +125,7 @@ public class AuthController : ControllerBase
         {
             HttpOnly = true,
             Secure   = false,        // false for local HTTP dev
-            SameSite = SameSiteMode.Strict,
+            SameSite = SameSiteMode.Lax,
             Expires  = DateTimeOffset.UtcNow.AddDays(RefreshTokenExpiryDays),
             Path     = "/"
         });

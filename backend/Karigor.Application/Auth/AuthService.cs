@@ -154,7 +154,33 @@ public class AuthService : IAuthService
             throw new UnauthorizedAccessException("Your account has been suspended by an administrator.");
 
         if (storedToken.RevokedAt is not null)
+        {
+            // Grace window for concurrent requests during token rotation:
+            // If the token was revoked within the last 60 seconds and has a replacement token,
+            // return a valid access token to prevent concurrent race conditions from dropping the session.
+            if (storedToken.RevokedAt.Value.AddSeconds(60) > DateTime.UtcNow && !string.IsNullOrEmpty(storedToken.ReplacedByToken))
+            {
+                var replacementToken = await _db.RefreshTokens
+                    .FirstOrDefaultAsync(t => t.TokenHash == storedToken.ReplacedByToken && t.RevokedAt == null);
+
+                if (replacementToken != null && replacementToken.ExpiresAt > DateTime.UtcNow)
+                {
+                    var activeRoles = await _userManager.GetRolesAsync(storedToken.User);
+                    var (graceToken, graceExpiry) = _tokenService.GenerateAccessToken(storedToken.User, activeRoles);
+                    var graceResult = new AuthResultDto
+                    {
+                        AccessToken       = graceToken,
+                        UserId            = storedToken.UserId,
+                        Email             = storedToken.User.Email!,
+                        Role              = activeRoles.FirstOrDefault() ?? string.Empty,
+                        AccessTokenExpiry = graceExpiry
+                    };
+                    return (graceResult, rawRefreshToken);
+                }
+            }
+
             throw new UnauthorizedAccessException("Refresh token has been revoked.");
+        }
 
         if (storedToken.ExpiresAt <= DateTime.UtcNow)
             throw new UnauthorizedAccessException("Refresh token has expired.");

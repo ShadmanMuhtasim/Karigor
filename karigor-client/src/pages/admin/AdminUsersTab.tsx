@@ -180,7 +180,7 @@ export const AdminUsersTab: React.FC = () => {
                 <tr>
                   <th className="py-3.5 px-4 sm:px-6">{t('admin.users.userColumn')}</th>
                   <th className="py-3.5 px-4">{t('admin.users.roleColumn')}</th>
-                  <th className="py-3.5 px-4">Profile</th>
+                  <th className="py-3.5 px-4">{t('admin.users.profileColumn', 'Profile')}</th>
                   <th className="py-3.5 px-4">{t('admin.users.statusColumn')}</th>
                   <th className="py-3.5 px-4 sm:px-6 text-right">{t('admin.users.actionsColumn')}</th>
                 </tr>
@@ -238,7 +238,7 @@ export const AdminUsersTab: React.FC = () => {
 
                     <td className="py-4 px-4 sm:px-6 text-right">
                       {u.role === 'Admin' ? (
-                        <span className="text-[11px] text-gray-400 font-medium italic">Protected Admin</span>
+                        <span className="text-[11px] text-gray-400 font-medium italic">{t('admin.users.protectedAdmin', 'Protected Admin')}</span>
                       ) : u.isSuspended ? (
                         <button
                           onClick={() => setSelectedUser({ user: u, targetSuspend: false })}

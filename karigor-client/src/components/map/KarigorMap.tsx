@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { useTranslation } from 'react-i18next';
 import type { NearbyWorkerDto, NearbyRequestDto } from '../../api/locationApi';
 import { useTheme } from '../../context/ThemeContext';
 import { TargetIcon, RefreshCwIcon, AlertTriangleIcon, CloseIcon, MapPinIcon } from '../icons/Icons';
@@ -71,6 +72,7 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
 
   const { theme } = useTheme();
   const isDarkMode = theme === 'dark';
+  const { t } = useTranslation();
 
   const [gpsError, setGpsError] = React.useState<string | null>(null);
   const [locLoading, setLocLoading] = React.useState<boolean>(false);
@@ -211,7 +213,7 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
             <!-- Floating Drag Me Badge -->
             <div class="absolute -top-7 whitespace-nowrap px-2.5 py-0.5 bg-rose-600 text-white text-[10px] font-bold rounded-full shadow-md border-2 border-white dark:border-gray-900 uppercase tracking-wide flex items-center gap-1">
               ${SVG_PIN_ICON}
-              <span>DRAG ME</span>
+              <span>${t('common.map.dragMe', 'DRAG ME')}</span>
             </div>
             <!-- Main Pin Badge -->
             <div class="relative w-10 h-10 bg-rose-600 rounded-full border-2 border-white dark:border-gray-900 shadow-xl flex items-center justify-center text-white text-base font-black group-hover:scale-105 transition-transform">
@@ -265,9 +267,9 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
 
       pickerMarker.bindPopup(`
         <div class="text-xs p-1">
-          <strong class="text-rose-600 font-bold block mb-1">Selected Location</strong>
+          <strong class="text-rose-600 font-bold block mb-1">${t('common.map.selectedLocation', 'Selected Location')}</strong>
           <span class="text-gray-600 dark:text-gray-300 text-[11px]">Lat: ${pickerLatLng[0].toFixed(5)}, Lng: ${pickerLatLng[1].toFixed(5)}</span>
-          <p class="text-gray-400 text-[10px] mt-1">Drag marker or click anywhere on the map to change.</p>
+          <p class="text-gray-400 text-[10px] mt-1">${t('common.map.dragMarkerHint', 'Drag marker or click anywhere on the map to change.')}</p>
         </div>
       `);
 
@@ -296,7 +298,7 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
       const userMarker = L.marker(userLatLng, { icon: userIcon })
         .bindPopup(`
           <div class="text-xs p-1">
-            <strong class="text-sky-600 dark:text-sky-400">Your Location</strong>
+            <strong class="text-sky-600 dark:text-sky-400">${t('common.map.yourLocation', 'Your Location')}</strong>
             <p class="text-gray-500 text-[10px] mt-0.5">Lat: ${userLocation.lat.toFixed(4)}, Lng: ${userLocation.lng.toFixed(4)}</p>
           </div>
         `);
@@ -337,8 +339,8 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
       const baseMarker = L.marker(workerLatLng, { icon: workerBaseIcon })
         .bindPopup(`
           <div class="text-xs p-1">
-            <strong class="text-emerald-600 font-bold">Your Base Location</strong>
-            <p class="text-gray-500 text-[10px] mt-0.5">Coverage: ${workerCoverageRadiusKm || 10} km radius</p>
+            <strong class="text-emerald-600 font-bold">${t('common.map.baseLocation', 'Your Base Location')}</strong>
+            <p class="text-gray-500 text-[10px] mt-0.5">${t('common.map.coverage', 'Coverage: {{radius}} km radius', { radius: workerCoverageRadiusKm || 10 })}</p>
           </div>
         `);
       markersLayer.addLayer(baseMarker);
@@ -374,7 +376,7 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
               </div>
               <div class="absolute -bottom-1 px-1.5 py-0.2 bg-gray-900 text-amber-400 text-[9px] font-black rounded-full shadow-md flex items-center gap-0.5">
                 ${SVG_STAR_ICON}
-                <span>${worker.averageRating > 0 ? worker.averageRating.toFixed(1) : 'New'}</span>
+                <span>${worker.averageRating > 0 ? worker.averageRating.toFixed(1) : t('common.map.newBadge', 'New')}</span>
               </div>
             </div>
           `,
@@ -388,16 +390,16 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
         popupContent.className = 'p-1.5 max-w-[200px] space-y-1.5';
         popupContent.innerHTML = `
           <div class="flex items-center gap-2">
-            <span class="font-bold text-xs text-gray-900 dark:text-white">${worker.email || 'Skilled Artisan'}</span>
-            <span class="text-[10px] text-amber-500 font-bold flex items-center gap-0.5">${SVG_STAR_ICON} <span>${worker.averageRating > 0 ? worker.averageRating.toFixed(1) : 'New'}</span></span>
+            <span class="font-bold text-xs text-gray-900 dark:text-white">${worker.email || t('common.map.skilledArtisan', 'Skilled Artisan')}</span>
+            <span class="text-[10px] text-amber-500 font-bold flex items-center gap-0.5">${SVG_STAR_ICON} <span>${worker.averageRating > 0 ? worker.averageRating.toFixed(1) : t('common.map.newBadge', 'New')}</span></span>
           </div>
-          <p class="text-[11px] text-gray-600 dark:text-gray-300 line-clamp-1">${skillsHtml || 'General Artisan'}</p>
+          <p class="text-[11px] text-gray-600 dark:text-gray-300 line-clamp-1">${skillsHtml || t('common.map.generalArtisan', 'General Artisan')}</p>
           <div class="flex items-center justify-between text-[11px] pt-1 border-t border-gray-200 dark:border-gray-700">
             <span class="font-bold text-emerald-600">৳ ${worker.hourlyRate}/hr</span>
             <span class="text-gray-400">${worker.distanceKm != null ? `${worker.distanceKm.toFixed(1)} km` : ''}</span>
           </div>
           <button id="view-worker-${worker.id}" class="w-full mt-1 px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold rounded-lg transition cursor-pointer text-center">
-            View Profile
+            ${t('common.map.viewProfile', 'View Profile')}
           </button>
         `;
 
@@ -447,7 +449,7 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
         popupContent.innerHTML = `
           <div class="flex items-center justify-between gap-2">
             <span class="font-bold text-xs text-amber-600 dark:text-amber-400 uppercase">${req.categoryName}</span>
-            <span class="text-[10px] text-gray-500 font-bold">${req.distanceKm} km away</span>
+            <span class="text-[10px] text-gray-500 font-bold">${req.distanceKm} ${t('common.map.kmAway', 'km away')}</span>
           </div>
           <p class="text-[11px] text-gray-700 dark:text-gray-300 font-medium line-clamp-2">${req.description}</p>
           <div class="text-[10px] text-gray-400 flex items-center">
@@ -455,7 +457,7 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
             <span>${req.address}</span>
           </div>
           <button id="quote-btn-${req.id}" class="w-full mt-1 px-2 py-1 bg-amber-500 hover:bg-amber-400 text-white text-[11px] font-bold rounded-lg transition cursor-pointer text-center">
-            Send Quotation
+            ${t('common.map.sendQuotation', 'Send Quotation')}
           </button>
         `;
 
@@ -497,7 +499,7 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
   const handleLocateMe = () => {
     setGpsError(null);
     if (!navigator.geolocation) {
-      setGpsError('GPS location is not supported by this browser.');
+      setGpsError(t('common.map.gpsNotSupported', 'GPS location is not supported by this browser.'));
       return;
     }
 
@@ -514,13 +516,13 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
         setLocLoading(false);
       },
       (err) => {
-        let errorMsg = 'Your location could not be determined.';
+        let errorMsg = t('common.map.gpsUndetermined', 'Your location could not be determined.');
         if (err.code === 1 /* PERMISSION_DENIED */) {
-          errorMsg = 'Location permission was denied. Try map click.';
+          errorMsg = t('common.map.gpsPermissionDenied', 'Location permission was denied. Try map click.');
         } else if (err.code === 2 /* POSITION_UNAVAILABLE */) {
-          errorMsg = 'Your location could not be determined.';
+          errorMsg = t('common.map.gpsUndetermined', 'Your location could not be determined.');
         } else if (err.code === 3 /* TIMEOUT */) {
-          errorMsg = 'Location detection timed out. Try map click.';
+          errorMsg = t('common.map.gpsTimeout', 'Location detection timed out. Try map click.');
         }
         setGpsError(errorMsg);
         setLocLoading(false);
@@ -547,7 +549,7 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
           type="button"
           onClick={handleLocateMe}
           disabled={locLoading}
-          title="Locate my position (GPS)"
+          title={t('common.map.locateMe', 'Locate my position (GPS)')}
           className="p-2.5 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition flex items-center justify-center cursor-pointer disabled:opacity-50"
         >
           <TargetIcon className={`w-5 h-5 ${locLoading ? 'animate-pulse' : ''}`} />
@@ -556,7 +558,7 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
         <button
           type="button"
           onClick={handleResetCenter}
-          title="Reset map view"
+          title={t('common.map.resetView', 'Reset map view')}
           className="p-2.5 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition flex items-center justify-center cursor-pointer"
         >
           <RefreshCwIcon className="w-5 h-5" />
@@ -580,7 +582,9 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
           <div className="flex items-center gap-2">
             <MapPinIcon className="w-4 h-4 text-rose-500 shrink-0" />
             <span className="font-semibold text-gray-700 dark:text-gray-200 text-[11px] sm:text-xs">
-              Click anywhere on the map or drag the <strong className="text-rose-600 dark:text-rose-400">pin</strong> to set your exact coordinates.
+              {t('common.map.pickerBannerStart', 'Click anywhere on the map or drag the')}{' '}
+              <strong className="text-rose-600 dark:text-rose-400">{t('common.map.pin', 'pin')}</strong>{' '}
+              {t('common.map.pickerBannerEnd', 'to set your exact coordinates.')}
             </span>
           </div>
           <div className="font-mono text-emerald-600 dark:text-emerald-400 font-bold bg-gray-100 dark:bg-gray-800 px-2.5 py-1 rounded-xl border border-gray-200 dark:border-gray-700 text-[11px] sm:text-xs shrink-0 self-end sm:self-auto">

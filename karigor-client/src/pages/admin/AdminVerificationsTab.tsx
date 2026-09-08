@@ -214,7 +214,7 @@ export const AdminVerificationsTab: React.FC = () => {
                         </span>
                       ))
                     ) : (
-                      <span className="text-xs text-gray-400">No skills assigned</span>
+                      <span className="text-xs text-gray-400">{t('admin.verifications.noSkills', 'No skills assigned')}</span>
                     )}
                   </div>
                   {worker.bio && (
@@ -230,7 +230,7 @@ export const AdminVerificationsTab: React.FC = () => {
                     {t('admin.verifications.documents')} ({worker.documents.length})
                   </span>
                   {worker.documents.length === 0 ? (
-                    <p className="text-xs text-gray-400 italic">No verification documents submitted yet.</p>
+                    <p className="text-xs text-gray-400 italic">{t('admin.verifications.noDocs', 'No verification documents submitted yet.')}</p>
                   ) : (
                     <div className="space-y-2">
                       {worker.documents.map((doc) => (
@@ -299,7 +299,7 @@ export const AdminVerificationsTab: React.FC = () => {
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-xl text-xs btn-press"
                     >
-                      <span>Open PDF in New Tab</span>
+                      <span>{t('admin.verifications.openPdf', 'Open PDF in New Tab')}</span>
                       <ArrowRightIcon className="w-3.5 h-3.5" />
                     </a>
                   </div>
@@ -318,7 +318,7 @@ export const AdminVerificationsTab: React.FC = () => {
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-xl text-xs btn-press"
                     >
-                      <span>Open Image in New Tab</span>
+                      <span>{t('admin.verifications.openImage', 'Open Image in New Tab')}</span>
                       <ArrowRightIcon className="w-3.5 h-3.5" />
                     </a>
                   </div>

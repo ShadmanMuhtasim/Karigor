@@ -391,8 +391,8 @@ export function CustomerBookingsTab() {
 
             <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-xs text-rose-900 dark:text-rose-200 space-y-1.5">
               <div className="font-bold flex items-center justify-between">
-                <span>Booking #{confirmSosBooking.id}</span>
-                <span className="px-2 py-0.5 rounded-md bg-rose-200 dark:bg-rose-900/80 text-[10px] font-black uppercase">Active Job</span>
+                <span>{t('bookingDetail.bookingId', { defaultValue: 'Booking #{{id}}', id: confirmSosBooking.id })}</span>
+                <span className="px-2 py-0.5 rounded-md bg-rose-200 dark:bg-rose-900/80 text-[10px] font-black uppercase">{t('customer.activeJob', 'Active Job')}</span>
               </div>
               <div className="text-gray-700 dark:text-gray-300">
                 <span className="font-semibold">{t('customer.bookings.artisan', 'Artisan')}:</span> {confirmSosBooking.workerName}

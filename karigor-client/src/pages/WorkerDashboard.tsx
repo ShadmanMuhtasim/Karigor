@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navbar } from '../components/Navbar';
+import { Footer } from '../components/Footer';
 import { WorkerOverviewTab } from './worker/WorkerOverviewTab';
 import { WorkerProfileTab } from './worker/WorkerProfileTab';
 import { WorkerSkillsTab } from './worker/WorkerSkillsTab';
@@ -82,6 +83,8 @@ export function WorkerDashboard() {
           {activeTab === 'documents' && <WorkerDocumentsTab />}
         </div>
       </main>
+
+      <Footer />
     </div>
   );
 }

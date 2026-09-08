@@ -267,10 +267,10 @@ export const AdminSosTab: React.FC = () => {
                       }}
                       className="text-xs font-bold px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white cursor-pointer focus:ring-2 focus:ring-rose-500"
                     >
-                      <option value="Open">Status: Open</option>
-                      <option value="Contacted">Status: Contacted</option>
-                      <option value="Escalated">Status: Escalated</option>
-                      <option value="Resolved">Status: Resolved</option>
+                      <option value="Open">{t('admin.sos.statusOpen', 'Status: Open')}</option>
+                      <option value="Contacted">{t('admin.sos.statusContacted', 'Status: Contacted')}</option>
+                      <option value="Escalated">{t('admin.sos.statusEscalated', 'Status: Escalated')}</option>
+                      <option value="Resolved">{t('admin.sos.statusResolved', 'Status: Resolved')}</option>
                     </select>
 
                     {isUnresolved && (
@@ -467,14 +467,14 @@ export const AdminSosTab: React.FC = () => {
 
             <div className="space-y-3 py-2">
               <div>
-                <span className="text-xs text-gray-400 block font-bold uppercase">Name</span>
+                <span className="text-xs text-gray-400 block font-bold uppercase">{t('admin.sos.contactName', 'Name')}</span>
                 <span className="text-sm font-black text-gray-900 dark:text-white">
                   {contactModal.name}
                 </span>
               </div>
 
               <div>
-                <span className="text-xs text-gray-400 block font-bold uppercase">Phone Number</span>
+                <span className="text-xs text-gray-400 block font-bold uppercase">{t('admin.sos.contactPhone', 'Phone Number')}</span>
                 {contactModal.phone ? (
                   <a
                     href={`tel:${contactModal.phone}`}
@@ -482,15 +482,15 @@ export const AdminSosTab: React.FC = () => {
                   >
                     <SmartphoneIcon className="w-4 h-4 text-sky-600 shrink-0" />
                     <span>{contactModal.phone}</span>
-                    <span className="text-[10px] ml-1 bg-sky-100 dark:bg-sky-950 px-2 py-0.5 rounded-md">Tap to Call</span>
+                    <span className="text-[10px] ml-1 bg-sky-100 dark:bg-sky-950 px-2 py-0.5 rounded-md">{t('admin.sos.tapToCall', 'Tap to Call')}</span>
                   </a>
                 ) : (
-                  <span className="text-xs text-gray-400">No phone provided</span>
+                  <span className="text-xs text-gray-400">{t('admin.sos.noPhone', 'No phone provided')}</span>
                 )}
               </div>
 
               <div>
-                <span className="text-xs text-gray-400 block font-bold uppercase">Email Address</span>
+                <span className="text-xs text-gray-400 block font-bold uppercase">{t('admin.sos.contactEmail', 'Email Address')}</span>
                 {contactModal.email ? (
                   <a
                     href={`mailto:${contactModal.email}`}
@@ -500,7 +500,7 @@ export const AdminSosTab: React.FC = () => {
                     <span className="truncate">{contactModal.email}</span>
                   </a>
                 ) : (
-                  <span className="text-xs text-gray-400">No email provided</span>
+                  <span className="text-xs text-gray-400">{t('admin.sos.noEmail', 'No email provided')}</span>
                 )}
               </div>
             </div>
@@ -509,7 +509,7 @@ export const AdminSosTab: React.FC = () => {
               onClick={() => setContactModal(null)}
               className="w-full py-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 font-bold text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-200 cursor-pointer"
             >
-              Close
+              {t('common.close', 'Close')}
             </button>
           </div>
         </Modal>
@@ -575,7 +575,7 @@ export const AdminSosTab: React.FC = () => {
                 ) : (
                   <>
                     <StopIcon className="w-4 h-4" />
-                    <span>Terminate Job</span>
+                    <span>{t('admin.sos.terminateJobBtn', 'Terminate Job')}</span>
                   </>
                 )}
               </button>

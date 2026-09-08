@@ -147,7 +147,7 @@ export function NotificationBell() {
               <span className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">
                 {t('notifications.title', 'Notifications')}
               </span>
-              <span className="text-[10px] text-gray-400 font-medium">Just now</span>
+              <span className="text-[10px] text-gray-400 font-medium">{t('common.justNow', 'Just now')}</span>
             </div>
             <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 leading-relaxed">
               {toastMessage}

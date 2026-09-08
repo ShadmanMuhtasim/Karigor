@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { Navbar } from '../components/Navbar';
+import { Footer } from '../components/Footer';
 import { AdminOverviewTab } from './admin/AdminOverviewTab';
 import { AdminVerificationsTab } from './admin/AdminVerificationsTab';
 import { AdminUsersTab } from './admin/AdminUsersTab';
@@ -96,7 +97,7 @@ export const AdminDashboard: React.FC = () => {
                   <span className="px-2 py-0.5 rounded bg-black/40 text-[10px] font-black uppercase tracking-wider">
                     CRITICAL SOS INCIDENT
                   </span>
-                  <span className="text-xs font-bold text-rose-200">Live Alert</span>
+                  <span className="text-xs font-bold text-rose-200">{t('admin.overview.liveAlert', 'Live Alert')}</span>
                 </div>
                 <p className="text-sm font-black mt-0.5">
                   Customer <span className="underline font-black">{emergencyAlert.customerName}</span> triggered an emergency SOS for Booking #{emergencyAlert.bookingId} ({emergencyAlert.serviceCategoryName})!
@@ -217,6 +218,8 @@ export const AdminDashboard: React.FC = () => {
           {activeTab === 'reviews' && <AdminReviewsTab />}
         </div>
       </main>
+
+      <Footer />
     </div>
   );
 };

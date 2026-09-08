@@ -169,13 +169,16 @@ export function WorkerBookingsTab() {
           <div>
             <h3 className="text-xl font-extrabold text-gray-900 dark:text-white flex items-center gap-2">
               <MapPinIcon className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-              <span>Nearby Job Opportunities</span>
+              <span>{t('worker.bookings.nearbyOpportunities', 'Nearby Job Opportunities')}</span>
               <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold">
-                Live Matching
+                {t('worker.bookings.liveMatching', 'Live Matching')}
               </span>
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-              Service requests matching your registered skills within your {workerProfile.data?.serviceRadiusKm || 10}km service area.
+              {t('worker.bookings.serviceAreaDesc', {
+                defaultValue: 'Service requests matching your registered skills within your {{radius}}km service area.',
+                radius: workerProfile.data?.serviceRadiusKm || 10
+              })}
             </p>
           </div>
 
@@ -191,7 +194,7 @@ export function WorkerBookingsTab() {
               }`}
             >
               <MapIcon className="w-3.5 h-3.5" />
-              <span>Map View</span>
+              <span>{t('worker.bookings.mapView', 'Map View')}</span>
             </button>
             <button
               type="button"
@@ -203,7 +206,7 @@ export function WorkerBookingsTab() {
               }`}
             >
               <ListIcon className="w-3.5 h-3.5" />
-              <span>List View</span>
+              <span>{t('worker.bookings.listView', 'List View')}</span>
             </button>
           </div>
         </div>
@@ -337,10 +340,10 @@ export function WorkerBookingsTab() {
         {jobsViewMode === 'list' && (
           <div>
             {openJobsList.isLoading ? (
-              <p className="text-gray-500 py-6 text-center text-sm">Loading opportunities...</p>
+              <p className="text-gray-500 py-6 text-center text-sm">{t('worker.bookings.loadingOpportunities', 'Loading opportunities...')}</p>
             ) : !openJobsList.data?.length ? (
               <div className="rounded-3xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-8 text-center text-sm text-gray-500">
-                No open requests currently match your skills.
+                {t('worker.bookings.noOpportunitiesYet', 'No open requests currently match your skills.')}
               </div>
             ) : (
               <div className="space-y-3">
@@ -429,22 +432,22 @@ export function WorkerBookingsTab() {
           <div>
             <h3 className="text-xl font-extrabold text-gray-900 dark:text-white flex items-center gap-2">
               <SendIcon className="w-5 h-5 text-sky-600 dark:text-sky-400" />
-              <span>My Submitted Quotations & Active Negotiations</span>
+              <span>{t('worker.bookings.negotiationsTitle', 'My Submitted Quotations & Active Negotiations')}</span>
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-              Review all price proposals you sent, customer counter-offers, and negotiation statuses.
+              {t('worker.bookings.negotiationsSubtitle', 'Review all price proposals you sent, customer counter-offers, and negotiation statuses.')}
             </p>
           </div>
           <span className="text-xs font-bold px-3 py-1 rounded-full bg-sky-50 dark:bg-sky-950 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
-            {workerQuotations.data?.length || 0} quotes
+            {t('worker.bookings.quotesCount', { defaultValue: '{{count}} quotes', count: workerQuotations.data?.length || 0 })}
           </span>
         </div>
 
         {workerQuotations.isLoading ? (
-          <p className="text-gray-500 py-6 text-center text-sm">Loading your quotations...</p>
+          <p className="text-gray-500 py-6 text-center text-sm">{t('worker.bookings.loadingQuotes', 'Loading your quotations...')}</p>
         ) : !workerQuotations.data?.length ? (
           <div className="rounded-3xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-8 text-center text-sm text-gray-500">
-            You haven't submitted any quotations yet. Check the opportunities above to place your bids!
+            {t('worker.bookings.noQuotesYet', "You haven't submitted any quotations yet. Check the opportunities above to place your bids!")}
           </div>
         ) : (
           <div className="space-y-3">
@@ -523,7 +526,7 @@ export function WorkerBookingsTab() {
                       to={`/requests/${q.serviceRequestId}`}
                       className="btn-press px-4 py-2 text-xs font-bold rounded-xl bg-sky-600 hover:bg-sky-500 text-white shadow-sm cursor-pointer"
                     >
-                      {isCounterFromCustomer ? 'Respond to Counter-Offer ↗' : 'View Negotiation Details ↗'}
+                      {isCounterFromCustomer ? t('worker.bookings.respondCounterOffer', 'Respond to Counter-Offer ↗') : t('worker.bookings.viewNegotiation', 'View Negotiation Details ↗')}
                     </Link>
                   </div>
                 </div>
@@ -535,12 +538,14 @@ export function WorkerBookingsTab() {
 
       {/* ── Section 3: Bookings History ─────────────────────────────────── */}
       <section className="space-y-4 pt-6 border-t border-gray-200 dark:border-gray-800">
-        <h3 className="text-xl font-extrabold text-gray-900 dark:text-white">My Active & Past Bookings</h3>
+        <h3 className="text-xl font-extrabold text-gray-900 dark:text-white">
+          {t('worker.bookings.bookingsHistoryTitle', 'My Active & Past Bookings')}
+        </h3>
         {bookings.isLoading ? (
-          <p className="text-gray-500 py-6 text-center text-sm">Loading bookings...</p>
+          <p className="text-gray-500 py-6 text-center text-sm">{t('worker.bookings.loadingBookings', 'Loading bookings...')}</p>
         ) : !bookings.data?.length ? (
           <div className="rounded-3xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-8 text-center text-sm text-gray-500">
-            Accepted jobs and bookings will appear here.
+            {t('worker.bookings.noBookingsYet', 'Accepted jobs and bookings will appear here.')}
           </div>
         ) : (
           <div className="space-y-3">
@@ -607,7 +612,7 @@ export function WorkerBookingsTab() {
                         "{b.review.comment}"
                       </p>
                     ) : (
-                      <p className="text-xs text-gray-400 italic">Rated without written feedback.</p>
+                      <p className="text-xs text-gray-400 italic">{t('worker.bookings.ratedWithoutFeedback', 'Rated without written feedback.')}</p>
                     )}
 
                     {b.review.workerResponse && (

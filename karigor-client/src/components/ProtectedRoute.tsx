@@ -1,4 +1,5 @@
 import { Navigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 
 interface ProtectedRouteProps {
@@ -13,12 +14,13 @@ interface ProtectedRouteProps {
  *  - Redirects to /unauthorized if authenticated but wrong role
  */
 export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
+  const { t } = useTranslation();
   const { user, isLoading } = useAuth();
 
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-950">
-        <div className="text-white text-lg animate-pulse">Restoring session…</div>
+        <div className="text-white text-lg animate-pulse">{t('common.restoringSession', 'Restoring session…')}</div>
       </div>
     );
   }

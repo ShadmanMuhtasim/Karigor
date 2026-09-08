@@ -341,7 +341,7 @@ export function Navbar() {
                   <div className="absolute right-0 top-full mt-2 w-64 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-2xl p-3 z-50 animate-in fade-in zoom-in-95 duration-150 space-y-2">
                     <div className="p-2.5 bg-gray-50 dark:bg-gray-800/60 rounded-xl space-y-1">
                       <div className="flex items-center justify-between gap-1">
-                        <span className="text-[10px] uppercase font-black tracking-wider text-gray-400">Account</span>
+                        <span className="text-[10px] uppercase font-black tracking-wider text-gray-400">{t('common.account', 'Account')}</span>
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${user.role === 'Admin' ? 'bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300' : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'}`}>
                           {user.role === 'Admin' ? t('nav.admin', 'Admin') : user.role === 'Worker' ? t('nav.worker', 'Artisan') : t('nav.customer', 'Customer')}
                         </span>

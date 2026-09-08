@@ -1,4 +1,5 @@
 import { Navbar } from '../components/Navbar';
+import { Footer } from '../components/Footer';
 import { CustomerSearchTab } from './customer/CustomerSearchTab';
 
 export function SearchWorkersPage() {
@@ -9,6 +10,8 @@ export function SearchWorkersPage() {
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8">
         <CustomerSearchTab />
       </main>
+
+      <Footer />
     </div>
   );
 }

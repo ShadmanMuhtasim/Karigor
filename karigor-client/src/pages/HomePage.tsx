@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Navbar } from '../components/Navbar';
+import { Footer } from '../components/Footer';
 import {
   ShieldCheckIcon,
   ZapIcon,
@@ -29,44 +30,44 @@ export function HomePage() {
 
   const workerStories = [
     {
-      title: 'Solidarity & Professional Pride',
-      subtitle: '5,000+ Registered Craftsmen Across Bangladesh',
+      title: t('home.workerStories.community.title', 'Solidarity & Professional Pride'),
+      subtitle: t('home.workerStories.community.subtitle', '5,000+ Registered Craftsmen Across Bangladesh'),
       image: workersInLineImg,
-      badge: 'Community',
+      badge: t('home.workerStories.community.badge', 'Community'),
       badgeColor: 'bg-emerald-500 text-white',
-      desc: 'Karigor brings thousands of independent tradesmen into a recognized, respected professional community with identity verification, safety standards, and collective dignity.',
+      desc: t('home.workerStories.community.desc', 'Karigor brings thousands of independent tradesmen into a recognized, respected professional community with identity verification, safety standards, and collective dignity.'),
     },
     {
-      title: 'Precision Plumbing & Sanitary Care',
-      subtitle: 'Modern Toolkits & Fair Diagnostic Rates',
+      title: t('home.workerStories.plumbing.title', 'Precision Plumbing & Sanitary Care'),
+      subtitle: t('home.workerStories.plumbing.subtitle', 'Modern Toolkits & Fair Diagnostic Rates'),
       image: plumberImg,
-      badge: 'Plumbing',
+      badge: t('home.workerStories.plumbing.badge', 'Plumbing'),
       badgeColor: 'bg-sky-500 text-white',
-      desc: 'Certified plumbers earn 100% of their agreed quotation without middlemen taking unfair cuts. Every service call respects the technical expertise of the artisan.',
+      desc: t('home.workerStories.plumbing.desc', 'Certified plumbers earn 100% of their agreed quotation without middlemen taking unfair cuts. Every service call respects the technical expertise of the artisan.'),
     },
     {
-      title: 'Master Interior Wall Finishing',
-      subtitle: 'Transforming Homes with Clean Artistic Craft',
+      title: t('home.workerStories.interiorPainting.title', 'Master Interior Wall Finishing'),
+      subtitle: t('home.workerStories.interiorPainting.subtitle', 'Transforming Homes with Clean Artistic Craft'),
       image: insidePainterImg,
-      badge: 'Interior Painting',
+      badge: t('home.workerStories.interiorPainting.badge', 'Interior Painting'),
       badgeColor: 'bg-amber-500 text-white',
-      desc: 'Skilled interior painters showcase their past portfolios, receive direct customer reviews, and build a lasting reputation with high-trust clients.',
+      desc: t('home.workerStories.interiorPainting.desc', 'Skilled interior painters showcase their past portfolios, receive direct customer reviews, and build a lasting reputation with high-trust clients.'),
     },
     {
-      title: 'High-Elevation Exterior Coating',
-      subtitle: 'Safety-First Scaffolding & Weatherproofing',
+      title: t('home.workerStories.exteriorCoating.title', 'High-Elevation Exterior Coating'),
+      subtitle: t('home.workerStories.exteriorCoating.subtitle', 'Safety-First Scaffolding & Weatherproofing'),
       image: outsidePainterImg,
-      badge: 'Exterior Coating',
+      badge: t('home.workerStories.exteriorCoating.badge', 'Exterior Coating'),
       badgeColor: 'bg-indigo-500 text-white',
-      desc: 'Heavy-duty exterior paint specialists are matched with commercial and residential building owners seeking verified, safety-compliant professionals.',
+      desc: t('home.workerStories.exteriorCoating.desc', 'Heavy-duty exterior paint specialists are matched with commercial and residential building owners seeking verified, safety-compliant professionals.'),
     },
     {
-      title: 'Certified Electrical Safety Diagnostics',
-      subtitle: 'Insulated Protection & Wiring Standards',
+      title: t('home.workerStories.electricians.title', 'Certified Electrical Safety Diagnostics'),
+      subtitle: t('home.workerStories.electricians.subtitle', 'Insulated Protection & Wiring Standards'),
       image: electricianImg,
-      badge: 'Electricians',
+      badge: t('home.workerStories.electricians.badge', 'Electricians'),
       badgeColor: 'bg-rose-500 text-white',
-      desc: 'Equipped with professional safety gloves and high-voltage circuit diagnostic tools, electricians resolve critical power hazards and keep homes safe 24/7.',
+      desc: t('home.workerStories.electricians.desc', 'Equipped with professional safety gloves and high-voltage circuit diagnostic tools, electricians resolve critical power hazards and keep homes safe 24/7.'),
     },
   ];
 
@@ -305,19 +306,7 @@ export function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="mt-auto border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 py-8 text-center text-xs text-gray-500 dark:text-gray-400 transition-colors">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-sm text-gray-900 dark:text-white">Karigor (কারিগর)</span>
-            <span>• {t('home.copyright', 'Dedicated to the dignity of skilled labor in Bangladesh.')}</span>
-          </div>
-          <div className="flex gap-6">
-            <Link to="/home" className="hover:text-gray-900 dark:hover:text-white transition">{t('nav.home', 'Home')}</Link>
-            <Link to="/categories" className="hover:text-gray-900 dark:hover:text-white transition">{t('nav.categories', 'Categories')}</Link>
-            <Link to="/login" className="hover:text-gray-900 dark:hover:text-white transition">{t('nav.signIn', 'Sign In')}</Link>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

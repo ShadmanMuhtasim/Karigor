@@ -1,8 +1,10 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { marketplaceApi, type QuotationDto } from '../api/marketplaceApi';
 import { Navbar } from '../components/Navbar';
+import { Footer } from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
 import { signalRService } from '../services/signalrService';
 import {
@@ -17,6 +19,7 @@ import {
 } from '../components/icons/Icons';
 
 export function RequestDetailPage() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const requestId = Number(id);
   const { user } = useAuth();
@@ -151,12 +154,13 @@ export function RequestDetailPage() {
         <Navbar />
         <div className="flex-1 flex items-center justify-center p-4 text-center">
           <div className="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 p-8 shadow-sm">
-            <p className="text-rose-500 mb-4 font-bold">Invalid request ID.</p>
+            <p className="text-rose-500 mb-4 font-bold">{t('requestDetail.invalidId', 'Invalid request ID.')}</p>
             <Link to="/dashboard" className="px-4 py-2 bg-sky-600 text-white rounded-xl text-xs font-bold">
-              Back to Dashboard
+              {t('requestDetail.backToDashboard', 'Back to Dashboard')}
             </Link>
           </div>
         </div>
+        <Footer />
       </div>
     );
   }
@@ -166,8 +170,9 @@ export function RequestDetailPage() {
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-white flex flex-col">
         <Navbar />
         <div className="flex-1 flex items-center justify-center p-4 text-center text-sm text-gray-500">
-          Loading service request details…
+          {t('common.loading', 'Loading service request details…')}
         </div>
+        <Footer />
       </div>
     );
   }
@@ -179,15 +184,18 @@ export function RequestDetailPage() {
         <div className="flex-1 flex items-center justify-center p-4 text-center">
           <div className="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 p-8 shadow-sm">
             <SearchIcon className="w-10 h-10 mx-auto mb-2 text-gray-400" />
-            <h3 className="font-bold text-sm text-gray-900 dark:text-white mb-1">Service Request Not Found</h3>
+            <h3 className="font-bold text-sm text-gray-900 dark:text-white mb-1">
+              {t('requestDetail.notFoundTitle', 'Service Request Not Found')}
+            </h3>
             <p className="text-xs text-gray-500 mb-4">
-              This request does not exist or you do not have permission to view it.
+              {t('requestDetail.notFoundDesc', 'This request does not exist or you do not have permission to view it.')}
             </p>
             <Link to="/dashboard" className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold transition">
-              Back to Dashboard
+              {t('requestDetail.backToDashboard', 'Back to Dashboard')}
             </Link>
           </div>
         </div>
+        <Footer />
       </div>
     );
   }
@@ -218,9 +226,11 @@ export function RequestDetailPage() {
             className="text-xs font-bold text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1.5"
           >
             <span>←</span>
-            <span>Back to Dashboard</span>
+            <span>{t('requestDetail.backToDashboard', 'Back to Dashboard')}</span>
           </Link>
-          <span className="text-xs text-gray-400 font-mono">Request #{request.id}</span>
+          <span className="text-xs text-gray-400 font-mono">
+            {t('requestDetail.requestId', { defaultValue: 'Request #{{id}}', id: request.id })}
+          </span>
         </div>
 
         {/* ── Card 1: Service Request Info ────────────────────────────── */}
@@ -228,10 +238,10 @@ export function RequestDetailPage() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <span className="text-xs font-bold text-sky-600 dark:text-sky-400 uppercase tracking-wider">
-                {request.categoryName}
+                {t(`categories.names.${request.categoryName}`, request.categoryName)}
               </span>
               <h1 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white mt-1">
-                {request.categoryName} Service Request
+                {t(`categories.names.${request.categoryName}`, request.categoryName)}
               </h1>
             </div>
 
@@ -246,18 +256,18 @@ export function RequestDetailPage() {
                   : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
               }`}
             >
-              {request.status}
+              {t(`bookingDetail.statuses.${request.status}`, request.status)}
             </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
             <div className="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-800/50">
-              <span className="text-xs text-gray-500 dark:text-gray-400 block mb-0.5">Customer</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400 block mb-0.5">{t('requestDetail.customer', 'Customer')}</span>
               <span className="font-bold text-sm text-gray-900 dark:text-white">{request.customerName}</span>
             </div>
 
             <div className="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-800/50">
-              <span className="text-xs text-gray-500 dark:text-gray-400 block mb-0.5">Scheduled Date</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400 block mb-0.5">{t('requestDetail.scheduledDate', 'Scheduled Date')}</span>
               <span className="font-semibold text-xs text-gray-900 dark:text-white">
                 {new Date(request.preferredDate).toLocaleString([], {
                   dateStyle: 'medium',
@@ -267,7 +277,7 @@ export function RequestDetailPage() {
             </div>
 
             <div className="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-800/50">
-              <span className="text-xs text-gray-500 dark:text-gray-400 block mb-0.5">Location</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400 block mb-0.5">{t('requestDetail.location', 'Location')}</span>
               <span className="font-medium text-xs text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
                 <MapPinIcon className="w-3.5 h-3.5 shrink-0 text-gray-500" />
                 <span>{request.address}</span>
@@ -278,7 +288,7 @@ export function RequestDetailPage() {
           {/* Description */}
           <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/50 space-y-1">
             <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider block">
-              Job Description
+              {t('requestDetail.description', 'Job Description')}
             </span>
             <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed">
               {request.description}
@@ -289,7 +299,7 @@ export function RequestDetailPage() {
           {photos.length > 0 && (
             <div className="space-y-2 pt-2">
               <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider block">
-                Attached Photos ({photos.length})
+                {t('requestDetail.photos', 'Attached Photos')} ({photos.length})
               </span>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {photos.map((url, idx) => (
@@ -320,8 +330,12 @@ export function RequestDetailPage() {
           <article className="rounded-2xl sm:rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 sm:p-6 md:p-8 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white">Submit Quotation</h2>
-                <p className="text-xs text-gray-500">Provide your price proposal for this customer request.</p>
+                <h2 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white">
+                  {t('requestDetail.submitQuotation', 'Submit Quotation')}
+                </h2>
+                <p className="text-xs text-gray-500">
+                  {t('requestDetail.submitQuotationDesc', 'Provide your price proposal for this customer request.')}
+                </p>
               </div>
               <button
                 type="button"
@@ -329,11 +343,11 @@ export function RequestDetailPage() {
                 className="btn-press px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5"
               >
                 {showQuoteForm ? (
-                  'Cancel'
+                  t('common.cancel', 'Cancel')
                 ) : (
                   <>
                     <PencilIcon className="w-3.5 h-3.5" />
-                    <span>Place Bid</span>
+                    <span>{t('requestDetail.placeBid', 'Place Bid')}</span>
                   </>
                 )}
               </button>
@@ -413,10 +427,10 @@ export function RequestDetailPage() {
           </div>
 
           {quotesLoading ? (
-            <p className="text-sm text-gray-500 text-center py-6">Loading quotations…</p>
+            <p className="text-sm text-gray-500 text-center py-6">{t('requestDetail.loadingQuotations', 'Loading quotations…')}</p>
           ) : workerThreads.length === 0 ? (
             <div className="p-8 text-center text-sm text-gray-500 rounded-2xl bg-gray-50 dark:bg-gray-800/40">
-              No quotations submitted yet for this request.
+              {t('requestDetail.noQuotationsYet', 'No quotations submitted yet for this request.')}
             </div>
           ) : (
             <div className="space-y-6">
@@ -494,7 +508,7 @@ export function RequestDetailPage() {
                                     {isCustomerOffer ? (
                                       <>
                                         <UserIcon className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
-                                        <span>Customer Counter-Offer</span>
+                                        <span>{t('requestDetail.customerCounterOffer', 'Customer Counter-Offer')}</span>
                                       </>
                                     ) : (
                                       <>
@@ -690,6 +704,8 @@ export function RequestDetailPage() {
           )}
         </article>
       </main>
+
+      <Footer />
     </div>
   );
 }

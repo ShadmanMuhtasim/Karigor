@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Navbar } from '../components/Navbar';
+import { Footer } from '../components/Footer';
 import { CustomerOverviewTab } from './customer/CustomerOverviewTab';
 import { CustomerRequestsTab } from './customer/CustomerRequestsTab';
 import { CustomerSearchTab } from './customer/CustomerSearchTab';
@@ -84,6 +85,8 @@ export function CustomerDashboard() {
           {activeTab === 'profile' && <CustomerProfileTab />}
         </div>
       </main>
+
+      <Footer />
     </div>
   );
 }

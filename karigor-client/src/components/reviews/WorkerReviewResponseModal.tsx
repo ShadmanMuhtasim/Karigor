@@ -95,7 +95,7 @@ export function WorkerReviewResponseModal({
               "{review.comment}"
             </p>
           ) : (
-            <p className="text-xs text-gray-400 italic">No written comment.</p>
+            <p className="text-xs text-gray-400 italic">{t('common.noWrittenComment', 'No written comment.')}</p>
           )}
         </div>
 

@@ -1,8 +1,10 @@
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { customerApi } from '../api/customerApi';
 import { reviewApi } from '../api/reviewApi';
 import { Navbar } from '../components/Navbar';
+import { Footer } from '../components/Footer';
 import { WorkerReviewsList } from '../components/reviews/WorkerReviewsList';
 import { RatingStars } from '../components/reviews/RatingStars';
 import { CheckCircleIcon, MapPinIcon, WrenchIcon } from '../components/icons/Icons';
@@ -10,6 +12,7 @@ import { CheckCircleIcon, MapPinIcon, WrenchIcon } from '../components/icons/Ico
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 export function WorkerProfilePage() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const workerId = Number(id);
 
@@ -31,12 +34,13 @@ export function WorkerProfilePage() {
         <Navbar />
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="text-center">
-            <p className="text-rose-500 mb-4">Invalid worker ID.</p>
+            <p className="text-rose-500 mb-4">{t('workerProfile.invalidId', 'Invalid worker ID.')}</p>
             <Link to="/customer/dashboard" className="text-sky-600 dark:text-sky-400 hover:underline">
-              Back to Dashboard
+              {t('bookingDetail.backToDashboard', 'Back to Dashboard')}
             </Link>
           </div>
         </div>
+        <Footer />
       </div>
     );
   }
@@ -46,8 +50,9 @@ export function WorkerProfilePage() {
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-white flex flex-col">
         <Navbar />
         <div className="flex-1 flex items-center justify-center p-4">
-          <div className="text-gray-500 dark:text-gray-400">Loading worker profile...</div>
+          <div className="text-gray-500 dark:text-gray-400">{t('workerProfile.loading', 'Loading worker profile...')}</div>
         </div>
+        <Footer />
       </div>
     );
   }
@@ -58,12 +63,13 @@ export function WorkerProfilePage() {
         <Navbar />
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="text-center">
-            <p className="text-rose-500 mb-4">Worker profile not found or failed to load.</p>
+            <p className="text-rose-500 mb-4">{t('workerProfile.notFound', 'Worker profile not found or failed to load.')}</p>
             <Link to="/customer/dashboard" className="text-sky-600 dark:text-sky-400 hover:underline">
-              Back to Dashboard
+              {t('bookingDetail.backToDashboard', 'Back to Dashboard')}
             </Link>
           </div>
         </div>
+        <Footer />
       </div>
     );
   }
@@ -82,15 +88,17 @@ export function WorkerProfilePage() {
               </div>
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">Worker #{worker.id}</h2>
+                  <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">
+                    {t('workerProfile.workerId', { defaultValue: 'Worker #{{id}}', id: worker.id })}
+                  </h2>
                   {worker.verificationStatus === 'Verified' ? (
                     <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold flex items-center gap-1">
                       <CheckCircleIcon className="w-3.5 h-3.5" />
-                      <span>Verified Pro</span>
+                      <span>{t('workerProfile.verifiedPro', 'Verified Pro')}</span>
                     </span>
                   ) : (
                     <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 font-bold">
-                      Verification Pending
+                      {t('workerProfile.verificationPending', 'Verification Pending')}
                     </span>
                   )}
                 </div>
@@ -101,12 +109,12 @@ export function WorkerProfilePage() {
             <div className="flex flex-row sm:flex-col items-baseline sm:items-end justify-between sm:justify-start w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-0 border-gray-100 dark:border-gray-800">
               <div className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400">
                 ৳{worker.hourlyRate}
-                <span className="text-xs text-gray-500 font-normal"> / hour</span>
+                <span className="text-xs text-gray-500 font-normal">{t('workerProfile.perHour', ' / hour')}</span>
               </div>
               <div className="flex items-center gap-1.5 mt-1">
                 <RatingStars rating={worker.averageRating} size="sm" showScore={true} />
                 <span className="text-xs text-gray-400">
-                  ({reviewsSummary?.totalReviews || 0} reviews)
+                  {t('workerProfile.reviewsCount', { defaultValue: '({{count}} reviews)', count: reviewsSummary?.totalReviews || 0 })}
                 </span>
               </div>
             </div>
@@ -114,33 +122,41 @@ export function WorkerProfilePage() {
 
           {/* Bio */}
           <div className="pt-2 border-t border-gray-100 dark:border-gray-800">
-            <h4 className="text-xs uppercase tracking-wider text-gray-400 dark:text-gray-500 font-bold mb-2">About Worker</h4>
+            <h4 className="text-xs uppercase tracking-wider text-gray-400 dark:text-gray-500 font-bold mb-2">
+              {t('workerProfile.aboutWorker', 'About Worker')}
+            </h4>
             <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
-              {worker.bio || 'This worker has not provided a biography yet.'}
+              {worker.bio || t('workerProfile.noBio', 'This worker has not provided a biography yet.')}
             </p>
           </div>
 
           {/* Quick Stats Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-2 border-t border-gray-100 dark:border-gray-800 text-sm">
             <div>
-              <span className="text-gray-500 dark:text-gray-400 text-xs block mb-0.5">Service Radius</span>
+              <span className="text-gray-500 dark:text-gray-400 text-xs block mb-0.5">
+                {t('workerProfile.serviceRadius', 'Service Radius')}
+              </span>
               <span className="text-gray-900 dark:text-gray-200 font-bold">{worker.serviceRadiusKm} km</span>
             </div>
             <div>
-              <span className="text-gray-500 dark:text-gray-400 text-xs block mb-0.5">Location</span>
+              <span className="text-gray-500 dark:text-gray-400 text-xs block mb-0.5">
+                {t('workerProfile.location', 'Location')}
+              </span>
               <span className="text-gray-900 dark:text-gray-200 font-bold flex items-center gap-1">
                 {worker.latitude && worker.longitude ? (
                   <>
                     <MapPinIcon className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                    <span>GPS Registered</span>
+                    <span>{t('workerProfile.gpsRegistered', 'GPS Registered')}</span>
                   </>
                 ) : (
-                  'Not Specified'
+                  t('workerProfile.notSpecified', 'Not Specified')
                 )}
               </span>
             </div>
             <div>
-              <span className="text-gray-500 dark:text-gray-400 text-xs block mb-0.5">Total Skills</span>
+              <span className="text-gray-500 dark:text-gray-400 text-xs block mb-0.5">
+                {t('workerProfile.totalSkills', 'Total Skills')}
+              </span>
               <span className="text-gray-900 dark:text-gray-200 font-bold">{worker.skills.length} Specialties</span>
             </div>
           </div>
@@ -148,9 +164,13 @@ export function WorkerProfilePage() {
 
         {/* Skills & Categories */}
         <div className="card-lift bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 space-y-4 shadow-xl">
-          <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">Skills & Services Offered</h3>
+          <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
+            {t('workerProfile.skillsOffered', 'Skills & Services Offered')}
+          </h3>
           {worker.skills.length === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400">No specific skills listed.</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {t('workerProfile.noSkills', 'No specific skills listed.')}
+            </p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
               {worker.skills.map((skill) => (
@@ -175,8 +195,12 @@ export function WorkerProfilePage() {
                     <WrenchIcon className="w-4 h-4" />
                   </span>
                   <div>
-                    <h5 className="text-sm font-bold text-gray-900 dark:text-white">{skill.categoryName}</h5>
-                    <span className="text-xs text-sky-600 dark:text-sky-400 font-medium">Certified Craft</span>
+                    <h5 className="text-sm font-bold text-gray-900 dark:text-white">
+                      {t(`categories.names.${skill.categoryName}`, skill.categoryName)}
+                    </h5>
+                    <span className="text-xs text-sky-600 dark:text-sky-400 font-medium">
+                      {t('workerProfile.certifiedCraft', 'Certified Craft')}
+                    </span>
                   </div>
                 </div>
               ))}
@@ -186,9 +210,13 @@ export function WorkerProfilePage() {
 
         {/* Availability Schedule */}
         <div className="card-lift bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 space-y-4 shadow-xl">
-          <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">Weekly Availability Schedule</h3>
+          <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
+            {t('workerProfile.weeklySchedule', 'Weekly Availability Schedule')}
+          </h3>
           {worker.availability.length === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400">No scheduled hours published.</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {t('workerProfile.noSchedule', 'No scheduled hours published.')}
+            </p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
               {worker.availability.map((slot) => (
@@ -197,7 +225,7 @@ export function WorkerProfilePage() {
                   className="bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700/60 rounded-2xl p-3.5 flex items-center justify-between"
                 >
                   <span className="text-sm font-bold text-indigo-700 dark:text-indigo-300">
-                    {DAYS[slot.dayOfWeek] ?? `Day ${slot.dayOfWeek}`}
+                    {t(`worker.schedule.days.${slot.dayOfWeek}`, DAYS[slot.dayOfWeek] ?? `Day ${slot.dayOfWeek}`)}
                   </span>
                   <span className="text-xs font-mono bg-white dark:bg-gray-900 px-3 py-1 rounded-lg text-emerald-600 dark:text-emerald-400 font-bold border border-gray-200 dark:border-gray-800">
                     {slot.startTime} – {slot.endTime}
@@ -212,7 +240,7 @@ export function WorkerProfilePage() {
         <section className="space-y-4">
           {isReviewsLoading ? (
             <div className="bg-white dark:bg-gray-900 rounded-2xl sm:rounded-3xl border border-gray-200 dark:border-gray-800 p-6 sm:p-8 text-center text-sm text-gray-500">
-              Loading reviews and ratings…
+              {t('common.loading', 'Loading reviews and ratings…')}
             </div>
           ) : reviewsSummary ? (
             <WorkerReviewsList summary={reviewsSummary} isWorkerOwner={false} />
@@ -225,10 +253,12 @@ export function WorkerProfilePage() {
             to="/customer/requests/new"
             className="btn-press w-full sm:w-auto text-center px-6 sm:px-8 py-3.5 sm:py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-2xl shadow-xl shadow-emerald-600/25 text-sm sm:text-base"
           >
-            Post Request to Hire Worker →
+            {t('categories.postRequestBtn', 'Post Request to Hire Worker')} →
           </Link>
         </div>
       </main>
+
+      <Footer />
     </div>
   );
 }

@@ -3,6 +3,8 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
 import { Navbar } from '../../components/Navbar';
+import { Footer } from '../../components/Footer';
+import { PasswordInput } from '../../components/PasswordInput';
 import { extractErrorMessage } from '../../lib/errorUtils';
 import { ZapIcon, ShieldCheckIcon, BanknoteIcon, SirenIcon, AlertTriangleIcon } from '../../components/icons/Icons';
 
@@ -59,18 +61,18 @@ export function LoginPage() {
           {/* Welcome Tag */}
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 text-xs font-semibold">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-            <span>Bangladesh's #1 Platform for Verified Skilled Artisans</span>
+            <span>{t('auth.verifiedArtisansBadge', "Bangladesh's #1 Platform for Verified Skilled Artisans")}</span>
           </div>
 
           <div className="space-y-4">
             <h1 className="text-4xl sm:text-5xl font-black tracking-tight leading-tight">
-              Hire Trusted Hands,{' '}
+              {t('auth.heroTitle', 'Hire Trusted Hands,')}{' '}
               <span className="bg-gradient-to-r from-sky-500 via-emerald-500 to-amber-500 bg-clip-text text-transparent">
-                Empower Real Craftsmen.
+                {t('auth.heroTitleHighlight', 'Empower Real Craftsmen.')}
               </span>
             </h1>
             <p className="text-base text-gray-600 dark:text-gray-300 leading-relaxed">
-              Karigor connects homeowners directly with background-verified plumbers, electricians, painters, and carpenters with fair rates and zero middleman deductions.
+              {t('auth.heroSubtitle', 'Karigor connects homeowners directly with background-verified plumbers, electricians, painters, and carpenters with fair rates and zero middleman deductions.')}
             </p>
           </div>
 
@@ -82,9 +84,11 @@ export function LoginPage() {
               <div className="w-10 h-10 rounded-xl bg-sky-500 text-white flex items-center justify-center mb-3 shadow-md shadow-sky-500/20">
                 <ZapIcon className="w-5 h-5 text-white" />
               </div>
-              <h3 className="text-sm font-bold text-sky-950 dark:text-sky-200">Instant Quotes</h3>
+              <h3 className="text-sm font-bold text-sky-950 dark:text-sky-200">
+                {t('auth.features.instantQuotes', 'Instant Quotes')}
+              </h3>
               <p className="text-xs text-sky-800/80 dark:text-sky-300/70 mt-1">
-                Post your job and get competitive quotes in minutes.
+                {t('auth.features.instantQuotesDesc', 'Post your job and get competitive quotes in minutes.')}
               </p>
             </div>
 
@@ -93,9 +97,11 @@ export function LoginPage() {
               <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center mb-3 shadow-md shadow-emerald-500/20">
                 <ShieldCheckIcon className="w-5 h-5 text-white" />
               </div>
-              <h3 className="text-sm font-bold text-emerald-950 dark:text-emerald-200">NID Verified Pros</h3>
+              <h3 className="text-sm font-bold text-emerald-950 dark:text-emerald-200">
+                {t('auth.features.nidVerified', 'NID Verified Pros')}
+              </h3>
               <p className="text-xs text-emerald-800/80 dark:text-emerald-300/70 mt-1">
-                Strict background checks and skill verification.
+                {t('auth.features.nidVerifiedDesc', 'Strict background checks and skill verification.')}
               </p>
             </div>
 
@@ -104,9 +110,11 @@ export function LoginPage() {
               <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center mb-3 shadow-md shadow-amber-500/20">
                 <BanknoteIcon className="w-5 h-5 text-white" />
               </div>
-              <h3 className="text-sm font-bold text-amber-950 dark:text-amber-200">Fair Wages</h3>
+              <h3 className="text-sm font-bold text-amber-950 dark:text-amber-200">
+                {t('auth.features.fairWages', 'Fair Wages')}
+              </h3>
               <p className="text-xs text-amber-800/80 dark:text-amber-300/70 mt-1">
-                Direct customer-worker pricing with no hidden charges.
+                {t('auth.features.fairWagesDesc', 'Direct customer-worker pricing with no hidden charges.')}
               </p>
             </div>
 
@@ -115,9 +123,11 @@ export function LoginPage() {
               <div className="w-10 h-10 rounded-xl bg-rose-500 text-white flex items-center justify-center mb-3 shadow-md shadow-rose-500/20">
                 <SirenIcon className="w-5 h-5 text-white" />
               </div>
-              <h3 className="text-sm font-bold text-rose-950 dark:text-rose-200">Emergency Support</h3>
+              <h3 className="text-sm font-bold text-rose-950 dark:text-rose-200">
+                {t('auth.features.emergencySupport', 'Emergency Support')}
+              </h3>
               <p className="text-xs text-rose-800/80 dark:text-rose-300/70 mt-1">
-                Fast response for urgent leaks, blackouts, & breakdowns.
+                {t('auth.features.emergencySupportDesc', 'Fast response for urgent leaks, blackouts, & breakdowns.')}
               </p>
             </div>
           </div>
@@ -189,9 +199,8 @@ export function LoginPage() {
                 >
                   {t('auth.passwordLabel', 'Password')}
                 </label>
-                <input
+                <PasswordInput
                   id="login-password"
-                  type="password"
                   required
                   autoComplete="current-password"
                   value={password}
@@ -265,6 +274,8 @@ export function LoginPage() {
           </div>
         </div>
       </main>
+
+      <Footer />
     </div>
   );
 }

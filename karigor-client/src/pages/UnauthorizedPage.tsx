@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Navbar } from '../components/Navbar';
+import { Footer } from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
 
 export function UnauthorizedPage() {
@@ -26,7 +27,7 @@ export function UnauthorizedPage() {
                 to="/dashboard"
                 className="w-full sm:w-auto bg-sky-500 hover:bg-sky-400 text-white font-bold px-6 py-3 rounded-2xl shadow-lg shadow-sky-500/25 transition text-center"
               >
-                Go to Dashboard
+                {t('nav.dashboard', 'Go to Dashboard')}
               </Link>
             )}
             <Link
@@ -42,6 +43,8 @@ export function UnauthorizedPage() {
           </div>
         </div>
       </main>
+
+      <Footer />
     </div>
   );
 }

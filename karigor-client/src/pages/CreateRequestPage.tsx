@@ -1,14 +1,17 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { customerApi } from '../api/customerApi';
 import { categoryApi } from '../api/categoryApi';
 import type { CreateServiceRequestDto } from '../api/customerApi';
 import { Navbar } from '../components/Navbar';
+import { Footer } from '../components/Footer';
 import { KarigorMap } from '../components/map/KarigorMap';
 import { MapPinIcon, AlertTriangleIcon, LightbulbIcon, ChevronDownIcon } from '../components/icons/Icons';
 
 export function CreateRequestPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -125,9 +128,11 @@ export function CreateRequestPage() {
 
       <main className="flex-1 max-w-3xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-10 animate-fade-in-up">
         <div className="mb-6 sm:mb-8">
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white mb-2">Create Service Request</h2>
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white mb-2">
+            {t('createRequest.title', 'Create Service Request')}
+          </h2>
           <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-            Provide details about the job and pinpoint your exact location to receive quotations from nearby workers.
+            {t('createRequest.subtitle', 'Provide details about the job and pinpoint your exact location to receive quotations from nearby workers.')}
           </p>
         </div>
 
@@ -142,7 +147,7 @@ export function CreateRequestPage() {
             {/* Category selection */}
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-2">
-                Service Category <span className="text-rose-500">*</span>
+                {t('createRequest.serviceCategory', 'Service Category')} <span className="text-rose-500">*</span>
               </label>
               <select
                 value={categoryId}
@@ -151,10 +156,10 @@ export function CreateRequestPage() {
                 disabled={catLoading}
                 className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm transition"
               >
-                <option value="">Select a Category</option>
+                <option value="">{t('createRequest.selectCategory', 'Select a Category')}</option>
                 {categories?.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.name}
+                    {t(`categories.names.${c.name}`, c.name)}
                   </option>
                 ))}
               </select>
@@ -163,7 +168,7 @@ export function CreateRequestPage() {
             {/* Job Description */}
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-2">
-                Job Description <span className="text-rose-500">*</span>
+                {t('createRequest.jobDescription', 'Job Description')} <span className="text-rose-500">*</span>
               </label>
               <textarea
                 value={description}
@@ -171,7 +176,7 @@ export function CreateRequestPage() {
                 rows={4}
                 required
                 maxLength={2000}
-                placeholder="Describe what needs to be fixed or installed, specific issues, materials needed, etc."
+                placeholder={t('createRequest.descriptionPlaceholder', 'Describe what needs to be fixed or installed, specific issues, materials needed, etc.')}
                 className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm transition"
               />
             </div>
@@ -180,7 +185,7 @@ export function CreateRequestPage() {
             <div className="space-y-3">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                  Service Address & Map Pin <span className="text-rose-500">*</span>
+                  {t('createRequest.serviceLocation', 'Service Address & Map Pin')} <span className="text-rose-500">*</span>
                 </label>
                 <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                   <button
@@ -190,11 +195,11 @@ export function CreateRequestPage() {
                     className="text-xs text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1.5 font-semibold transition cursor-pointer"
                   >
                     {locLoading ? (
-                      'Detecting GPS...'
+                      t('customer.search.locating', 'Locating...')
                     ) : (
                       <>
                         <MapPinIcon className="w-3.5 h-3.5" />
-                        <span>Auto-detect GPS</span>
+                        <span>{t('createRequest.autoDetectGps', 'Auto-detect GPS')}</span>
                       </>
                     )}
                   </button>
@@ -203,7 +208,7 @@ export function CreateRequestPage() {
                     onClick={() => setShowMapPicker(!showMapPicker)}
                     className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition cursor-pointer flex items-center gap-1"
                   >
-                    <span>{showMapPicker ? 'Hide Map' : 'Show Map'}</span>
+                    <span>{showMapPicker ? t('common.close', 'Close') : t('common.inspect', 'Inspect')}</span>
                     <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${showMapPicker ? 'rotate-180' : ''}`} />
                   </button>
                 </div>
@@ -236,7 +241,7 @@ export function CreateRequestPage() {
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1 text-[11px] text-gray-500">
                     <span className="flex items-center gap-1.5">
                       <LightbulbIcon className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                      <span>Click on map or drag pin to set exact service location</span>
+                      <span>{t('createRequest.mapInstruction', 'Click on map or drag pin to set exact service location')}</span>
                     </span>
                     {latitude && longitude && (
                       <span className="font-mono text-emerald-600 dark:text-emerald-400">
@@ -251,7 +256,7 @@ export function CreateRequestPage() {
             {/* Preferred Date */}
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-2">
-                Preferred Date & Time <span className="text-rose-500">*</span>
+                {t('createRequest.scheduledDate', 'Preferred Date & Time')} <span className="text-rose-500">*</span>
               </label>
               <input
                 type="datetime-local"
@@ -266,7 +271,7 @@ export function CreateRequestPage() {
             {/* Photo URLs (optional) */}
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-2">
-                Photo URL(s) <span className="text-gray-500 text-xs font-normal">(Optional)</span>
+                {t('createRequest.optionalPhotos', 'Photo URL(s)')} <span className="text-gray-500 text-xs font-normal">{t('createRequest.optional', '(Optional)')}</span>
               </label>
               <input
                 type="text"
@@ -275,7 +280,7 @@ export function CreateRequestPage() {
                 placeholder="https://example.com/item1.jpg, https://example.com/item2.jpg"
                 className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm transition"
               />
-              <p className="text-xs text-gray-500 mt-1">Provide links to photos showing the problem or workspace.</p>
+              <p className="text-xs text-gray-500 mt-1">{t('createRequest.photoHelp', 'Provide links to photos showing the problem or workspace.')}</p>
             </div>
 
             <div className="pt-4 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 sm:gap-4 border-t border-gray-100 dark:border-gray-800">
@@ -283,19 +288,21 @@ export function CreateRequestPage() {
                 to="/customer/dashboard"
                 className="btn-press px-5 py-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-semibold rounded-xl text-center"
               >
-                Cancel
+                {t('common.cancel', 'Cancel')}
               </Link>
               <button
                 type="submit"
                 disabled={mutation.isPending}
                 className="btn-press px-6 py-2.5 bg-sky-500 hover:bg-sky-400 text-white text-sm font-bold rounded-xl shadow-lg shadow-sky-500/25 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-center"
               >
-                {mutation.isPending ? 'Publishing Request...' : 'Publish Service Request'}
+                {mutation.isPending ? t('createRequest.submitting', 'Publishing Request...') : t('createRequest.submitButton', 'Publish Service Request')}
               </button>
             </div>
           </form>
         </div>
       </main>
+
+      <Footer />
     </div>
   );
 }

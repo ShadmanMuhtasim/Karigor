@@ -38,7 +38,34 @@
     "taka": "৳",
     "perHour": "/hr",
     "km": "km",
-    "logout": "Sign Out"
+    "logout": "Sign Out",
+    "account": "Account",
+    "justNow": "Just now",
+    "restoringSession": "Restoring session…",
+    "noWrittenComment": "No written comment.",
+    "map": {
+      "dragMe": "DRAG ME",
+      "selectedLocation": "Selected Location",
+      "dragMarkerHint": "Drag marker or click anywhere on the map to change.",
+      "yourLocation": "Your Location",
+      "baseLocation": "Your Base Location",
+      "locateMe": "Locate my position (GPS)",
+      "resetView": "Reset map view",
+      "pickerBannerStart": "Click anywhere on the map or drag the",
+      "pin": "pin",
+      "pickerBannerEnd": "to set your exact coordinates.",
+      "viewProfile": "View Profile",
+      "sendQuotation": "Send Quotation",
+      "newBadge": "New",
+      "kmAway": "km away",
+      "skilledArtisan": "Skilled Artisan",
+      "generalArtisan": "General Artisan",
+      "coverage": "Coverage: {{radius}} km radius",
+      "gpsNotSupported": "GPS location is not supported by this browser.",
+      "gpsPermissionDenied": "Location permission was denied. Try map click.",
+      "gpsUndetermined": "Your location could not be determined.",
+      "gpsTimeout": "Location detection timed out. Try map click."
+    }
   },
   "nav": {
     "home": "Home",
@@ -86,7 +113,39 @@
     "categoriesLink": "Browse Trades",
     "workerRegistrationLink": "Artisan Signup",
     "customerRegistrationLink": "Homeowner Signup",
-    "copyright": "All rights reserved. Dedicated to the dignity of skilled labor in Bangladesh."
+    "copyright": "All rights reserved. Dedicated to the dignity of skilled labor in Bangladesh.",
+    "workerStories": {
+      "community": {
+        "badge": "Community",
+        "title": "Solidarity & Professional Pride",
+        "subtitle": "5,000+ Registered Craftsmen Across Bangladesh",
+        "desc": "Karigor brings thousands of independent tradesmen into a recognized, respected professional community with identity verification, safety standards, and collective dignity."
+      },
+      "plumbing": {
+        "badge": "Plumbing",
+        "title": "Precision Plumbing & Sanitary Care",
+        "subtitle": "Modern Toolkits & Fair Diagnostic Rates",
+        "desc": "Certified plumbers earn 100% of their agreed quotation without middlemen taking unfair cuts. Every service call respects the technical expertise of the artisan."
+      },
+      "interiorPainting": {
+        "badge": "Interior Painting",
+        "title": "Master Interior Wall Finishing",
+        "subtitle": "Transforming Homes with Clean Artistic Craft",
+        "desc": "Skilled interior painters showcase their past portfolios, receive direct customer reviews, and build a lasting reputation with high-trust clients."
+      },
+      "exteriorCoating": {
+        "badge": "Exterior Coating",
+        "title": "High-Elevation Exterior Coating",
+        "subtitle": "Safety-First Scaffolding & Weatherproofing",
+        "desc": "Heavy-duty exterior paint specialists are matched with commercial and residential building owners seeking verified, safety-compliant professionals."
+      },
+      "electricians": {
+        "badge": "Electricians",
+        "title": "Certified Electrical Safety Diagnostics",
+        "subtitle": "Insulated Protection & Wiring Standards",
+        "desc": "Equipped with professional safety gloves and high-voltage circuit diagnostic tools, electricians resolve critical power hazards and keep homes safe 24/7."
+      }
+    }
   },
   "categories": {
     "title": "Explore Service Categories",
@@ -96,7 +155,29 @@
     "requests": "Requests",
     "exploreWorkers": "Find Artisans",
     "noCategoriesFound": "No categories found",
-    "noCategoriesMatch": "No service categories match your search criteria."
+    "noCategoriesMatch": "No service categories match your search criteria.",
+    "bookSpecialist": "Find and book verified, top-rated {{category}} specialists.",
+    "postRequestBtn": "Post Request",
+    "names": {
+      "Electrician": "Electrician",
+      "Plumber": "Plumber",
+      "Carpenter": "Carpenter",
+      "Mechanic": "Mechanic",
+      "AC Technician": "AC Technician",
+      "Painter": "Painter",
+      "Cleaner": "Cleaner",
+      "Welder": "Welder",
+      "Mason": "Mason",
+      "Driver": "Driver",
+      "Plumbing": "Plumbing",
+      "Electrical": "Electrical",
+      "Painting": "Painting",
+      "Carpentry": "Carpentry",
+      "Appliance Repair": "Appliance Repair",
+      "Cleaning": "Cleaning",
+      "HVAC / AC Repair": "HVAC / AC Repair",
+      "General Repair": "General Repair"
+    }
   },
   "auth": {
     "loginTitle": "Welcome Back",
@@ -141,7 +222,21 @@
     "joinCustomerTagline": "Join Karigor to book verified skilled craftsmen easily",
     "joinWorkerTagline": "Join Karigor to get direct service requests with fair pay",
     "createCustomerBtn": "Create Customer Account",
-    "createWorkerBtn": "Create Worker Account"
+    "createWorkerBtn": "Create Worker Account",
+    "verifiedArtisansBadge": "Bangladesh's #1 Platform for Verified Skilled Artisans",
+    "heroTitle": "Hire Trusted Hands,",
+    "heroTitleHighlight": "Empower Real Craftsmen.",
+    "heroSubtitle": "Karigor connects homeowners directly with background-verified plumbers, electricians, painters, and carpenters with fair rates and zero middleman deductions.",
+    "features": {
+      "instantQuotes": "Instant Quotes",
+      "instantQuotesDesc": "Post your job and get competitive quotes in minutes.",
+      "nidVerified": "NID Verified Pros",
+      "nidVerifiedDesc": "Strict background checks and skill verification.",
+      "fairWages": "Fair Wages",
+      "fairWagesDesc": "Direct customer-worker pricing with no hidden charges.",
+      "emergencySupport": "Emergency Support",
+      "emergencySupportDesc": "Fast response for urgent leaks, blackouts, & breakdowns."
+    }
   },
   "customer": {
     "portalTitle": "Customer Portal",
@@ -183,7 +278,8 @@
       "viewProfile": "View Profile",
       "hireWorker": "Request Service",
       "noWorkersFound": "No artisans found in this area",
-      "noWorkersDesc": "Try adjusting your distance slider, category, or search keywords."
+      "noWorkersDesc": "Try adjusting your distance slider, category, or search keywords.",
+      "gpsPrompt": "Turn on GPS or click the map target to sort by closest distance to you"
     },
     "requests": {
       "title": "My Service Requests",
@@ -222,8 +318,10 @@
       "email": "Email Address",
       "phone": "Phone Number",
       "address": "Default Address",
-      "saveButton": "Save Profile"
-    }
+      "saveButton": "Save Profile",
+      "avatarUrl": "Profile Image URL"
+    },
+    "activeJob": "Active Job"
   },
   "worker": {
     "portalTitle": "Artisan Workspace",
@@ -253,7 +351,23 @@
       "verifyAndStart": "Verify & Start Job",
       "markCompleted": "Mark Completed",
       "jobCompletedSuccess": "Service marked as completed!",
-      "jobCompletedDesc": "Waiting for customer review and payment confirmation."
+      "jobCompletedDesc": "Waiting for customer review and payment confirmation.",
+      "liveMatching": "Live Matching",
+      "mapView": "Map View",
+      "listView": "List View",
+      "loadingOpportunities": "Loading opportunities...",
+      "serviceAreaDesc": "Service requests matching your registered skills within your {{radius}}km service area.",
+      "negotiationsTitle": "My Submitted Quotations & Active Negotiations",
+      "negotiationsSubtitle": "Review all price proposals you sent, customer counter-offers, and negotiation statuses.",
+      "loadingQuotes": "Loading your quotations...",
+      "noQuotesYet": "You haven't submitted any quotations yet. Check the opportunities above to place your bids!",
+      "quotesCount": "{{count}} quotes",
+      "respondCounterOffer": "Respond to Counter-Offer ↗",
+      "viewNegotiation": "View Negotiation Details ↗",
+      "bookingsHistoryTitle": "My Active & Past Bookings",
+      "loadingBookings": "Loading bookings...",
+      "noBookingsYet": "Accepted jobs and bookings will appear here.",
+      "ratedWithoutFeedback": "Rated without written feedback."
     },
     "schedule": {
       "title": "Weekly Availability",
@@ -394,7 +508,8 @@
       "bookingMonitorTitle": "Booking Monitor",
       "bookingMonitorDesc": "View all ongoing & past services",
       "reviewModerationTitle": "Review Moderation",
-      "reviewModerationDesc": "Sanitize comments & manage feedback"
+      "reviewModerationDesc": "Sanitize comments & manage feedback",
+      "liveAlert": "Live Alert"
     },
     "users": {
       "title": "Platform User Management",
@@ -413,7 +528,9 @@
       "reasonLabel": "Reason / Administrator Note (Optional)",
       "reasonPlaceholder": "Provide justification for this account status update...",
       "confirmSuspend": "Confirm Suspension",
-      "confirmReactivate": "Confirm Reactivation"
+      "confirmReactivate": "Confirm Reactivation",
+      "profileColumn": "Profile",
+      "protectedAdmin": "Protected Admin"
     },
     "bookings": {
       "title": "Platform Booking Monitor",
@@ -445,7 +562,11 @@
       "modalTitle": "Artisan Credential Review",
       "noteLabel": "Administrator Note (Optional)",
       "confirmApprove": "Confirm Verification",
-      "confirmReject": "Confirm Rejection"
+      "confirmReject": "Confirm Rejection",
+      "noSkills": "No skills assigned",
+      "noDocs": "No verification documents submitted yet.",
+      "openPdf": "Open PDF in New Tab",
+      "openImage": "Open Image in New Tab"
     },
     "categories": {
       "title": "Platform Service Categories",
@@ -497,7 +618,18 @@
       "terminateModalTitle": "Terminate Booking",
       "terminateModalWarning": "This will immediately cancel the active booking, issue emergency cancellation notifications to customer and worker, and mark this SOS incident as Resolved.",
       "terminationReason": "Termination Justification / Audit Notes",
-      "viewIncident": "View SOS Incident"
+      "viewIncident": "View SOS Incident",
+      "statusOpen": "Status: Open",
+      "statusContacted": "Status: Contacted",
+      "statusEscalated": "Status: Escalated",
+      "statusResolved": "Status: Resolved",
+      "contactName": "Name",
+      "contactPhone": "Phone Number",
+      "tapToCall": "Tap to Call",
+      "noPhone": "No phone provided",
+      "contactEmail": "Email Address",
+      "noEmail": "No email provided",
+      "terminateJobBtn": "Terminate Job"
     }
   },
   "otp": {
@@ -547,5 +679,102 @@
     "title": "Access Denied",
     "description": "You don't have the necessary role permissions to view this resource.",
     "goHome": "Go Back Home"
+  },
+  "bookingDetail": {
+    "loading": "Loading booking details…",
+    "notFoundTitle": "Booking Not Found",
+    "notFoundDesc": "The requested booking could not be found or you do not have permission to view it.",
+    "backToDashboard": "Back to Dashboard",
+    "bookingId": "Booking #{{id}}",
+    "worker": "Worker",
+    "customer": "Customer",
+    "agreedTotal": "Agreed Total",
+    "scheduledDate": "Scheduled Date",
+    "serviceLocation": "Service Location",
+    "jobDescription": "Job Description",
+    "assignedWorker": "Assigned Worker",
+    "verifiedReview": "Verified Review",
+    "ratedWithoutFeedback": "Rated without written feedback.",
+    "workerReply": "Worker's Reply",
+    "replyToReview": "Reply to Customer Review",
+    "rateService": "Rate & Write a Review",
+    "statuses": {
+      "Completed": "Completed",
+      "InProgress": "In Progress",
+      "Cancelled": "Cancelled",
+      "Scheduled": "Scheduled"
+    }
+  },
+  "requestDetail": {
+    "invalidId": "Invalid request ID.",
+    "notFoundTitle": "Service Request Not Found",
+    "notFoundDesc": "This request does not exist or you do not have permission to view it.",
+    "backToDashboard": "Back to Dashboard",
+    "requestId": "Request #{{id}}",
+    "customer": "Customer",
+    "scheduledDate": "Scheduled Date",
+    "location": "Location",
+    "description": "Description",
+    "photos": "Attached Photos",
+    "submitQuotation": "Submit Quotation",
+    "submitQuotationDesc": "Provide your price proposal for this customer request.",
+    "placeBid": "Place Bid",
+    "loadingQuotations": "Loading quotations…",
+    "customerCounterOffer": "Customer Counter-Offer",
+    "quotationsReceived": "Quotations Received ({{count}})",
+    "noQuotationsYet": "No quotations received yet."
+  },
+  "workerProfile": {
+    "invalidId": "Invalid worker ID.",
+    "loading": "Loading worker profile...",
+    "notFound": "Worker profile not found or failed to load.",
+    "workerId": "Worker #{{id}}",
+    "verifiedPro": "Verified Pro",
+    "verificationPending": "Verification Pending",
+    "perHour": " / hour",
+    "reviewsCount": "({{count}} reviews)",
+    "aboutWorker": "About Worker",
+    "noBio": "This worker has not provided a biography yet.",
+    "serviceRadius": "Service Radius",
+    "location": "Location",
+    "gpsRegistered": "GPS Registered",
+    "notSpecified": "Not Specified",
+    "totalSkills": "Total Skills",
+    "skillsOffered": "Skills & Services Offered",
+    "noSkills": "No specific skills listed.",
+    "certifiedCraft": "Certified Craft",
+    "weeklySchedule": "Weekly Availability Schedule",
+    "noSchedule": "No scheduled hours published."
+  },
+  "createRequest": {
+    "title": "Create Service Request",
+    "subtitle": "Provide details about the job and pinpoint your exact location to receive quotations from nearby workers.",
+    "selectCategory": "Select a Category",
+    "serviceCategory": "Service Category",
+    "jobDescription": "Job Description",
+    "descriptionPlaceholder": "Describe what needs fixing, required materials, or specific issues...",
+    "scheduledDate": "Preferred Scheduled Date & Time",
+    "serviceLocation": "Service Location (Pin on Map)",
+    "autoDetectGps": "Auto-detect GPS",
+    "mapInstruction": "Click on map or drag pin to set exact service location",
+    "optionalPhotos": "Photo URL(s)",
+    "optional": "(Optional)",
+    "photoHelp": "Provide links to photos showing the problem or workspace.",
+    "submitButton": "Submit Service Request",
+    "submitting": "Submitting..."
+  },
+  "footer": {
+    "tagline": "Connecting trusted local service professionals across Bangladesh",
+    "allRightsReserved": "All rights reserved.",
+    "quickLinks": "Quick Links",
+    "categories": "Service Categories",
+    "contactSupport": "Contact & Support",
+    "supportEmail": "support@karigor.com",
+    "supportPhone": "+880 1700-000000",
+    "supportHours": "Sat – Thu: 9:00 AM – 8:00 PM",
+    "emergencyNote": "24/7 Emergency Assistance Available",
+    "location": "Dhaka, Bangladesh",
+    "privacyPolicy": "Privacy Policy",
+    "termsOfService": "Terms of Service"
   }
 }

@@ -54,7 +54,7 @@ export function Categories() {
               return (
                 <Card
                   key={cat.id}
-                  className={`card-lift bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 ${theme.cardBorderTop} ${theme.cardBorderHover} rounded-2xl shadow-sm overflow-hidden`}
+                  className={`card-lift ${theme.cardBg} border ${theme.cardBorder} ${theme.cardHover} rounded-2xl shadow-sm overflow-hidden`}
                 >
                   <CardHeader>
                     <CardTitle className="flex items-center gap-3 text-base">
@@ -83,16 +83,16 @@ export function Categories() {
                     </CardTitle>
                   </CardHeader>
                 <CardContent className="space-y-4">
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <p className="text-xs text-gray-600 dark:text-gray-400">
                     {t('categories.bookSpecialist', {
                       defaultValue: 'Find and book verified, top-rated {{category}} specialists.',
                       category: t(`categories.names.${cat.name}`, cat.name)
                     })}
                   </p>
-                  <div className="pt-2 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                  <div className={`pt-2 border-t ${theme.cardDivider} flex items-center justify-between`}>
                     <Link
                       to="/customer/requests/new"
-                      className="text-xs font-semibold text-sky-600 dark:text-sky-400 hover:underline"
+                      className={`text-xs font-semibold ${theme.link} hover:underline`}
                     >
                       {t('categories.postRequestBtn', 'Post Request')} →
                     </Link>

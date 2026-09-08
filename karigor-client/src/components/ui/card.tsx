@@ -1,8 +1,9 @@
 import React from 'react';
+import { cn } from '../../lib/utils';
 
 export function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-xl border border-gray-800 bg-gray-900 shadow-sm ${className}`}>
+    <div className={cn("rounded-xl border border-gray-800 bg-gray-900 shadow-sm", className)}>
       {children}
     </div>
   );

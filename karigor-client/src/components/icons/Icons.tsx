@@ -652,4 +652,41 @@ export function EyeOffIcon({ className = 'w-5 h-5' }: IconProps) {
   );
 }
 
+// ─── Dashboard Navigation ───────────────────────────────────────────────────
+
+export function LayoutGridIcon({ className = 'w-5 h-5' }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <rect width="7" height="7" x="3" y="3" rx="1" />
+      <rect width="7" height="7" x="14" y="3" rx="1" />
+      <rect width="7" height="7" x="14" y="14" rx="1" />
+      <rect width="7" height="7" x="3" y="14" rx="1" />
+    </svg>
+  );
+}
+
+export function CalendarCheckIcon({ className = 'w-5 h-5' }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+      <path d="m9 16 2 2 4-4" />
+    </svg>
+  );
+}
+
+export function UserSearchIcon({ className = 'w-5 h-5' }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <circle cx="10" cy="8" r="4" />
+      <path d="M2 20c0-3.3 2.7-6 6-6h4c1.1 0 2.2.3 3.1.9" />
+      <circle cx="18" cy="18" r="3" />
+      <path d="m20.5 20.5 1.5 1.5" />
+    </svg>
+  );
+}
+
+
 

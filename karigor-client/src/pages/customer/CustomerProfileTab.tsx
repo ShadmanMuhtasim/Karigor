@@ -68,27 +68,27 @@ export function CustomerProfileTab() {
   if (isError || !profile) return <div className="text-red-400 py-8">{t('common.error', 'Failed to load profile.')}</div>;
 
   return (
-    <Card className="card-lift bg-gray-900 border-gray-800 max-w-2xl">
+    <Card className="card-lift bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm rounded-2xl max-w-2xl">
       <CardHeader>
-        <CardTitle className="text-indigo-400">{t('customer.profile.title', 'Profile Settings')}</CardTitle>
+        <CardTitle className="text-xl font-extrabold text-gray-900 dark:text-white">{t('customer.profile.title', 'Profile Settings')}</CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Email (read-only) */}
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">{t('customer.profile.email', 'Email Address')}</label>
+            <label className="block text-sm font-semibold text-gray-500 dark:text-gray-400 mb-1.5">{t('customer.profile.email', 'Email Address')}</label>
             <input
               type="email"
               value={profile.email}
               disabled
-              className="w-full px-3 py-2 bg-gray-800/50 border border-gray-800 rounded-lg text-gray-400 cursor-not-allowed text-sm"
+              className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/80 rounded-xl text-gray-500 dark:text-gray-400 cursor-not-allowed text-sm"
             />
           </div>
 
           {/* Full Name */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
-              {t('customer.profile.name', 'Full Name')} <span className="text-rose-400">*</span>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1.5">
+              {t('customer.profile.name', 'Full Name')} <span className="text-rose-500">*</span>
             </label>
             <input
               type="text"
@@ -98,13 +98,13 @@ export function CustomerProfileTab() {
               required
               maxLength={100}
               placeholder="e.g. John Doe"
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 text-sm transition"
+              className="w-full px-3.5 py-2.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm transition shadow-sm"
             />
           </div>
 
           {/* Address */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">{t('customer.profile.address', 'Default Address')}</label>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1.5">{t('customer.profile.address', 'Default Address')}</label>
             <textarea
               name="address"
               value={formData.address || ''}
@@ -112,29 +112,29 @@ export function CustomerProfileTab() {
               rows={3}
               maxLength={200}
               placeholder="e.g. House 12, Road 4, Sector 7, Uttara, Dhaka"
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 text-sm transition"
+              className="w-full px-3.5 py-2.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm transition shadow-sm"
             />
           </div>
 
           {/* Profile Image URL */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">{t('customer.profile.avatarUrl', 'Profile Image URL')}</label>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1.5">{t('customer.profile.avatarUrl', 'Profile Image URL')}</label>
             <input
               type="url"
               name="profileImageUrl"
               value={formData.profileImageUrl || ''}
               onChange={handleChange}
               placeholder="https://example.com/avatar.jpg"
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 text-sm transition"
+              className="w-full px-3.5 py-2.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm transition shadow-sm"
             />
           </div>
 
           {saveMessage && (
             <div
-              className={`p-3 rounded-lg text-sm ${
+              className={`p-3.5 rounded-xl text-sm font-medium ${
                 saveMessage.type === 'success'
-                  ? 'bg-emerald-900/50 border border-emerald-700/50 text-emerald-300'
-                  : 'bg-rose-900/50 border border-rose-700/50 text-rose-300'
+                  ? 'bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300'
+                  : 'bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300'
               }`}
             >
               {saveMessage.text}
@@ -145,7 +145,7 @@ export function CustomerProfileTab() {
             <button
               type="submit"
               disabled={mutation.isPending}
-              className="btn-press px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-indigo-900/20 cursor-pointer"
+              className="btn-press px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-indigo-600/20 transition cursor-pointer"
             >
               {mutation.isPending ? t('common.loading', 'Saving Changes...') : t('customer.profile.saveButton', 'Save Profile')}
             </button>

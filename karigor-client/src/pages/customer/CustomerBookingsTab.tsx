@@ -8,6 +8,7 @@ import { ChatModal } from '../../components/chat/ChatModal';
 import { ReviewModal } from '../../components/reviews/ReviewModal';
 import { RatingStars } from '../../components/reviews/RatingStars';
 import { Modal } from '../../components/ui/Modal';
+import { StatusBadge } from '../../components/ui/StatusBadge';
 import { signalRService } from '../../services/signalrService';
 import type { BookingDto } from '../../api/marketplaceApi';
 import {
@@ -189,19 +190,7 @@ export function CustomerBookingsTab() {
               </p>
             </div>
 
-            <span
-              className={`rounded-full px-3 py-1 text-xs font-bold ${
-                b.status === 'Completed'
-                  ? 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
-                  : b.status === 'InProgress'
-                  ? 'bg-amber-50 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
-                  : b.status === 'Cancelled'
-                  ? 'bg-rose-50 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
-                  : 'bg-sky-50 dark:bg-sky-950/80 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800'
-              }`}
-            >
-              {getStatusLabel(b.status)}
-            </span>
+            <StatusBadge status={b.status} label={getStatusLabel(b.status)} size="md" />
           </div>
 
           {/* Review Banner for Completed Bookings */}

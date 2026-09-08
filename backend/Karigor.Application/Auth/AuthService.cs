@@ -31,35 +31,41 @@ public class AuthService : IAuthService
     public async Task<(AuthResultDto result, string rawRefreshToken)> RegisterCustomerAsync(RegisterCustomerDto dto)
     {
         if (await _userManager.FindByEmailAsync(dto.Email) is not null)
-            throw new InvalidOperationException("An account with that email already exists.");
+            throw new AuthValidationException("An account with that email already exists.");
 
-        await using var tx = await _db.Database.BeginTransactionAsync();
-        try
+        var strategy = _db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            var user = new ApplicationUser { UserName = dto.Email, Email = dto.Email };
-            var createResult = await _userManager.CreateAsync(user, dto.Password);
-            if (!createResult.Succeeded)
-                throw new InvalidOperationException(string.Join("; ", createResult.Errors.Select(e => e.Description)));
-
-            await _userManager.AddToRoleAsync(user, "Customer");
-
-            _db.CustomerProfiles.Add(new CustomerProfile
+            await using var tx = await _db.Database.BeginTransactionAsync();
+            try
             {
-                UserId          = user.Id,
-                FullName        = dto.FullName,
-                Address         = dto.Address,
-                ProfileImageUrl = null
-            });
-            await _db.SaveChangesAsync();
-            await tx.CommitAsync();
+                var user = new ApplicationUser { UserName = dto.Email, Email = dto.Email };
+                var createResult = await _userManager.CreateAsync(user, dto.Password);
+                if (!createResult.Succeeded)
+                    throw new AuthValidationException(string.Join("; ", createResult.Errors.Select(e => e.Description)));
 
-            return await BuildAuthResultAsync(user);
-        }
-        catch
-        {
-            await tx.RollbackAsync();
-            throw;
-        }
+                await _userManager.AddToRoleAsync(user, "Customer");
+
+                _db.CustomerProfiles.Add(new CustomerProfile
+                {
+                    UserId          = user.Id,
+                    FullName        = dto.FullName,
+                    Address         = dto.Address,
+                    ProfileImageUrl = null
+                });
+                await _db.SaveChangesAsync();
+
+                var authResult = await BuildAuthResultAsync(user);
+                await tx.CommitAsync();
+
+                return authResult;
+            }
+            catch
+            {
+                await tx.RollbackAsync();
+                throw;
+            }
+        });
     }
 
     // -------------------------------------------------------------------------
@@ -68,10 +74,10 @@ public class AuthService : IAuthService
     public async Task<(AuthResultDto result, string rawRefreshToken)> RegisterWorkerAsync(RegisterWorkerDto dto)
     {
         if (await _userManager.FindByEmailAsync(dto.Email) is not null)
-            throw new InvalidOperationException("An account with that email already exists.");
+            throw new AuthValidationException("An account with that email already exists.");
 
         if (dto.CategoryIds == null || dto.CategoryIds.Count == 0)
-            throw new InvalidOperationException("At least one category is required for worker registration.");
+            throw new AuthValidationException("At least one category is required for worker registration.");
 
         var validCategoryIds = await _db.ServiceCategories
             .Where(c => dto.CategoryIds.Contains(c.Id))
@@ -80,43 +86,49 @@ public class AuthService : IAuthService
 
         var invalidIds = dto.CategoryIds.Except(validCategoryIds).ToList();
         if (invalidIds.Count > 0)
-            throw new InvalidOperationException($"Invalid category IDs: {string.Join(", ", invalidIds)}");
+            throw new AuthValidationException($"Invalid category IDs: {string.Join(", ", invalidIds)}");
 
-        await using var tx = await _db.Database.BeginTransactionAsync();
-        try
+        var strategy = _db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            var user = new ApplicationUser { UserName = dto.Email, Email = dto.Email };
-            var createResult = await _userManager.CreateAsync(user, dto.Password);
-            if (!createResult.Succeeded)
-                throw new InvalidOperationException(string.Join("; ", createResult.Errors.Select(e => e.Description)));
-
-            await _userManager.AddToRoleAsync(user, "Worker");
-
-            var categories = await _db.ServiceCategories
-                .Where(c => validCategoryIds.Contains(c.Id))
-                .ToListAsync();
-
-            var workerProfile = new WorkerProfile
+            await using var tx = await _db.Database.BeginTransactionAsync();
+            try
             {
-                UserId             = user.Id,
-                Bio                = dto.Bio,
-                HourlyRate         = dto.HourlyRate,
-                ServiceRadiusKm    = 10.0,
-                VerificationStatus = "Pending",
-                AverageRating      = 0.0,
-                Categories         = categories
-            };
-            _db.WorkerProfiles.Add(workerProfile);
-            await _db.SaveChangesAsync();
-            await tx.CommitAsync();
+                var user = new ApplicationUser { UserName = dto.Email, Email = dto.Email };
+                var createResult = await _userManager.CreateAsync(user, dto.Password);
+                if (!createResult.Succeeded)
+                    throw new AuthValidationException(string.Join("; ", createResult.Errors.Select(e => e.Description)));
 
-            return await BuildAuthResultAsync(user);
-        }
-        catch
-        {
-            await tx.RollbackAsync();
-            throw;
-        }
+                await _userManager.AddToRoleAsync(user, "Worker");
+
+                var categories = await _db.ServiceCategories
+                    .Where(c => validCategoryIds.Contains(c.Id))
+                    .ToListAsync();
+
+                var workerProfile = new WorkerProfile
+                {
+                    UserId             = user.Id,
+                    Bio                = dto.Bio,
+                    HourlyRate         = dto.HourlyRate,
+                    ServiceRadiusKm    = 10.0,
+                    VerificationStatus = "Pending",
+                    AverageRating      = 0.0,
+                    Categories         = categories
+                };
+                _db.WorkerProfiles.Add(workerProfile);
+                await _db.SaveChangesAsync();
+
+                var authResult = await BuildAuthResultAsync(user);
+                await tx.CommitAsync();
+
+                return authResult;
+            }
+            catch
+            {
+                await tx.RollbackAsync();
+                throw;
+            }
+        });
     }
 
     // -------------------------------------------------------------------------

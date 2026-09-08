@@ -351,22 +351,44 @@ export function Navbar() {
                       </div>
                     </div>
 
-                    <div className="space-y-1">
+                    <div className="space-y-1 py-1">
                       <Link
-                        to="/dashboard"
+                        to="/home"
                         onClick={() => setUserMenuOpen(false)}
-                        className="flex items-center gap-2 px-3 py-2 text-xs font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition"
+                        className={`flex items-center gap-2 px-3 py-2 text-xs font-bold rounded-xl transition ${
+                          location.pathname === '/home' || location.pathname === '/'
+                            ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400'
+                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                        }`}
                       >
-                        <BarChartIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                        <span>{t('nav.dashboard', 'Dashboard')}</span>
+                        <HomeIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                        <span>{t('nav.home', 'Home')}</span>
                       </Link>
+
                       <Link
                         to="/categories"
                         onClick={() => setUserMenuOpen(false)}
-                        className="flex items-center gap-2 px-3 py-2 text-xs font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition"
+                        className={`flex items-center gap-2 px-3 py-2 text-xs font-bold rounded-xl transition ${
+                          location.pathname === '/categories'
+                            ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400'
+                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                        }`}
                       >
                         <FolderIcon className="w-4 h-4 text-sky-600 dark:text-sky-400" />
                         <span>{t('nav.categories', 'Categories')}</span>
+                      </Link>
+
+                      <Link
+                        to="/dashboard"
+                        onClick={() => setUserMenuOpen(false)}
+                        className={`flex items-center gap-2 px-3 py-2 text-xs font-bold rounded-xl transition ${
+                          location.pathname.startsWith('/dashboard') || location.pathname.startsWith('/customer') || location.pathname.startsWith('/admin')
+                            ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400'
+                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                        }`}
+                      >
+                        <BarChartIcon className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                        <span>{t('nav.dashboard', 'Dashboard')}</span>
                       </Link>
                     </div>
 
@@ -398,24 +420,26 @@ export function Navbar() {
             </div>
           ) : null}
 
-          {/* Mobile Hamburger Menu Toggle Button (Visible < 960px) */}
-          <button
-            type="button"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            aria-label={mobileMenuOpen ? 'Close Navigation Menu' : 'Open Navigation Menu'}
-            className="min-[960px]:hidden w-7 h-7 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-700 flex items-center justify-center transition cursor-pointer shrink-0"
-          >
-            {mobileMenuOpen ? (
-              <CloseIcon className="w-4 h-4 sm:w-5 sm:h-5 text-current" />
-            ) : (
-              <MenuIcon className="w-4 h-4 sm:w-5 sm:h-5 text-current" />
-            )}
-          </button>
+          {/* Mobile Hamburger Menu Toggle Button (Visible < 960px, unauthenticated guests only) */}
+          {!user && (
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label={mobileMenuOpen ? 'Close Navigation Menu' : 'Open Navigation Menu'}
+              className="min-[960px]:hidden w-7 h-7 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-700 flex items-center justify-center transition cursor-pointer shrink-0"
+            >
+              {mobileMenuOpen ? (
+                <CloseIcon className="w-4 h-4 sm:w-5 sm:h-5 text-current" />
+              ) : (
+                <MenuIcon className="w-4 h-4 sm:w-5 sm:h-5 text-current" />
+              )}
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Mobile Collapsible Navigation Menu Drawer (Visible < 960px) */}
-      {mobileMenuOpen && (
+      {/* Mobile Collapsible Navigation Menu Drawer (Visible < 960px, unauthenticated guests only) */}
+      {!user && mobileMenuOpen && (
         <div className="min-[960px]:hidden border-t border-gray-200 dark:border-gray-800 bg-white/98 dark:bg-gray-950/98 backdrop-blur-xl px-4 py-4 space-y-3 animate-in slide-in-from-top-2 duration-150 shadow-xl">
           <nav className="flex flex-col space-y-1">
             <Link
@@ -443,57 +467,17 @@ export function Navbar() {
               <FolderIcon className="w-4 h-4 text-sky-600 dark:text-sky-400" />
               <span>{t('nav.categories', 'Categories')}</span>
             </Link>
-
-            {user && (
-              <Link
-                to="/dashboard"
-                onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-bold transition ${
-                  location.pathname.startsWith('/dashboard') || location.pathname.startsWith('/customer') || location.pathname.startsWith('/admin')
-                    ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-                }`}
-              >
-                <BarChartIcon className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                <span>{t('nav.dashboard', 'Dashboard')}</span>
-              </Link>
-            )}
           </nav>
 
-          {/* Mobile User Information and Actions */}
-          {user ? (
-            <div className="pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
-              <div className="flex flex-col min-w-0 pr-2">
-                <span className="text-xs font-bold text-gray-900 dark:text-white truncate max-w-[200px]">
-                  {user.email}
-                </span>
-                <span className={`text-[10px] font-semibold ${user.role === 'Admin' ? 'text-purple-600 dark:text-purple-400 font-bold' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                  {user.role === 'Admin' ? t('nav.admin', 'Admin') : user.role === 'Worker' ? t('nav.worker', 'Artisan') : t('nav.customer', 'Customer')}
-                </span>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  logoutUser();
-                }}
-                className="px-3.5 py-1.5 text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl border border-red-200 dark:border-red-900/40 transition cursor-pointer shrink-0"
-              >
-                {t('nav.signOut', 'Sign out')}
-              </button>
-            </div>
-          ) : (
-            <div className="pt-2 border-t border-gray-100 dark:border-gray-800 flex items-center gap-2">
-              <Link
-                to="/login"
-                onClick={() => setMobileMenuOpen(false)}
-                className="w-full text-center py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow-md transition"
-              >
-                {t('nav.signIn', 'Sign In')}
-              </Link>
-            </div>
-          )}
+          <div className="pt-2 border-t border-gray-100 dark:border-gray-800 flex items-center gap-2">
+            <Link
+              to="/login"
+              onClick={() => setMobileMenuOpen(false)}
+              className="w-full text-center py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow-md transition"
+            >
+              {t('nav.signIn', 'Sign In')}
+            </Link>
+          </div>
         </div>
       )}
     </header>

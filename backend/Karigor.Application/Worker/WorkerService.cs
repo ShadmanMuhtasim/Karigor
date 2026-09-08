@@ -218,25 +218,31 @@ public class WorkerService : IWorkerService
         }
 
         // Atomic replace: delete existing, insert new — all in one transaction
-        await using var tx = await _db.Database.BeginTransactionAsync();
-
-        var existing = await _db.WorkerAvailabilities
-            .Where(a => a.WorkerId == profile.Id)
-            .ToListAsync();
-
-        _db.WorkerAvailabilities.RemoveRange(existing);
-
-        var newSlots = dto.Slots.Select(s => new WorkerAvailability
+        var strategy = _db.Database.CreateExecutionStrategy();
+        var newSlots = await strategy.ExecuteAsync(async () =>
         {
-            WorkerId  = profile.Id,
-            DayOfWeek = s.DayOfWeek,
-            StartTime = TimeOnly.Parse(s.StartTime),
-            EndTime   = TimeOnly.Parse(s.EndTime)
-        }).ToList();
+            await using var tx = await _db.Database.BeginTransactionAsync();
 
-        await _db.WorkerAvailabilities.AddRangeAsync(newSlots);
-        await _db.SaveChangesAsync();
-        await tx.CommitAsync();
+            var existing = await _db.WorkerAvailabilities
+                .Where(a => a.WorkerId == profile.Id)
+                .ToListAsync();
+
+            _db.WorkerAvailabilities.RemoveRange(existing);
+
+            var slots = dto.Slots.Select(s => new WorkerAvailability
+            {
+                WorkerId  = profile.Id,
+                DayOfWeek = s.DayOfWeek,
+                StartTime = TimeOnly.Parse(s.StartTime),
+                EndTime   = TimeOnly.Parse(s.EndTime)
+            }).ToList();
+
+            await _db.WorkerAvailabilities.AddRangeAsync(slots);
+            await _db.SaveChangesAsync();
+            await tx.CommitAsync();
+
+            return slots;
+        });
 
         return newSlots.OrderBy(a => a.DayOfWeek).ThenBy(a => a.StartTime)
                        .Select(MapSlotToDto).ToList();

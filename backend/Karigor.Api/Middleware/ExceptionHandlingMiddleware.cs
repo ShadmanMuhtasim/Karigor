@@ -38,10 +38,12 @@ public sealed class ExceptionHandlingMiddleware
             context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
             context.Response.ContentType = "application/json";
 
+            var safeMessage = "An unexpected error occurred. Please try again later.";
             var payload = new
             {
                 status  = 500,
-                message = _env.IsDevelopment() ? ex.Message : "An unexpected error occurred.",
+                error   = safeMessage,
+                message = safeMessage,
                 traceId = context.TraceIdentifier
             };
 

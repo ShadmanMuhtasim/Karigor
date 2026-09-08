@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '../context/AuthContext';
+import { customerApi } from '../api/customerApi';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { CustomerOverviewTab } from './customer/CustomerOverviewTab';
@@ -24,9 +27,22 @@ type CustomerTabId = 'overview' | 'requests' | 'bookings' | 'messages' | 'search
 
 export function CustomerDashboard() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = (searchParams.get('tab') as CustomerTabId) ?? 'overview';
   const [activeTab, setActiveTab] = useState<CustomerTabId>(initialTab);
+
+  const { data: profile, isLoading } = useQuery({
+    queryKey: ['customerProfile'],
+    queryFn: customerApi.getProfile,
+  });
+
+  const displayName = profile?.fullName?.trim() || (user?.email ? user.email.split('@')[0] : '');
+  const greeting = isLoading && !profile
+    ? t('common.welcomeBack', 'Welcome back')
+    : displayName
+      ? `${t('common.welcomeBack', 'Welcome back')}, ${displayName}`
+      : t('common.welcomeBack', 'Welcome back');
 
   // Keep URL in sync when tab changes programmatically
   const handleTabChange = (tab: CustomerTabId) => {
@@ -51,7 +67,7 @@ export function CustomerDashboard() {
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="mb-6 sm:mb-8 text-center sm:text-left">
           <div className="flex items-center justify-center sm:justify-start gap-3 mb-1.5 sm:mb-2">
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white">{t('customer.portalTitle', 'Customer Portal')}</h2>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white">{greeting}</h2>
             <span className="text-xs bg-indigo-100 dark:bg-indigo-950/80 border border-indigo-300 dark:border-indigo-700/50 text-indigo-700 dark:text-indigo-300 px-2.5 py-0.5 sm:py-1 rounded-full font-bold">
               {t('nav.customer', 'Customer')}
             </span>

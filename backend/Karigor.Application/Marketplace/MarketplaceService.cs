@@ -406,29 +406,35 @@ public class MarketplaceService(
                 throw new UnauthorizedAccessException("Only the worker can accept this counter-offer.");
         }
 
-        await using var transaction = await db.Database.BeginTransactionAsync();
-        quote.Status = "Accepted";
-        quote.ServiceRequest.Status = "InProgress";
-
-        var otherQuotes = await db.Quotations
-            .Where(x => x.ServiceRequestId == quote.ServiceRequestId && x.Id != quote.Id && x.Status == "Pending")
-            .ToListAsync();
-
-        foreach (var other in otherQuotes) other.Status = "Rejected";
-
-        var booking = new Booking
+        var strategy = db.Database.CreateExecutionStrategy();
+        var booking = await strategy.ExecuteAsync(async () =>
         {
-            ServiceRequestId = quote.ServiceRequestId,
-            WorkerId         = quote.WorkerId,
-            CustomerId       = quote.ServiceRequest.CustomerId,
-            AgreedPrice      = quote.ProposedPrice,
-            ScheduledDate    = quote.ServiceRequest.PreferredDate,
-            Status           = "Scheduled"
-        };
+            await using var transaction = await db.Database.BeginTransactionAsync();
+            quote.Status = "Accepted";
+            quote.ServiceRequest.Status = "InProgress";
 
-        db.Bookings.Add(booking);
-        await db.SaveChangesAsync();
-        await transaction.CommitAsync();
+            var otherQuotes = await db.Quotations
+                .Where(x => x.ServiceRequestId == quote.ServiceRequestId && x.Id != quote.Id && x.Status == "Pending")
+                .ToListAsync();
+
+            foreach (var other in otherQuotes) other.Status = "Rejected";
+
+            var b = new Booking
+            {
+                ServiceRequestId = quote.ServiceRequestId,
+                WorkerId         = quote.WorkerId,
+                CustomerId       = quote.ServiceRequest.CustomerId,
+                AgreedPrice      = quote.ProposedPrice,
+                ScheduledDate    = quote.ServiceRequest.PreferredDate,
+                Status           = "Scheduled"
+            };
+
+            db.Bookings.Add(b);
+            await db.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            return b;
+        });
 
         // Notify other party
         var customerName = quote.ServiceRequest.Customer?.FullName ?? "Customer";

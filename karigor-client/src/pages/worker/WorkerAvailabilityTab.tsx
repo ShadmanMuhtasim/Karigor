@@ -99,25 +99,25 @@ export function WorkerAvailabilityTab() {
   if (isLoading) return <div className="text-gray-400">{t('common.loading')}</div>;
 
   return (
-    <Card className="card-lift bg-gray-900 border-gray-800">
+    <Card className="card-lift bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm rounded-2xl">
       <CardHeader>
-        <CardTitle className="text-emerald-400">{t('worker.schedule.title')}</CardTitle>
+        <CardTitle className="text-lg font-extrabold text-gray-900 dark:text-white">{t('worker.schedule.title')}</CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           
           <div className="space-y-3">
             {schedule.map((day) => (
-              <div key={day.dayOfWeek} className="table-row-hover flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-gray-800/50 p-3 rounded-xl border border-gray-800">
+              <div key={day.dayOfWeek} className="table-row-hover flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-gray-50 dark:bg-gray-800/50 p-3.5 rounded-xl border border-gray-200 dark:border-gray-800 transition">
                 <div className="flex items-center gap-2.5 min-w-[130px]">
                   <input
                     type="checkbox"
                     id={`day-${day.dayOfWeek}`}
                     checked={day.enabled}
                     onChange={() => handleToggle(day.dayOfWeek)}
-                    className="w-4 h-4 rounded border-gray-600 text-emerald-500 focus:ring-emerald-500 bg-gray-700 cursor-pointer"
+                    className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-emerald-600 focus:ring-emerald-500 bg-white dark:bg-gray-700 cursor-pointer"
                   />
-                  <label htmlFor={`day-${day.dayOfWeek}`} className={`text-sm font-semibold cursor-pointer ${day.enabled ? 'text-gray-100' : 'text-gray-500'}`}>
+                  <label htmlFor={`day-${day.dayOfWeek}`} className={`text-sm font-bold cursor-pointer ${day.enabled ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'}`}>
                     {t(`worker.schedule.days.${day.dayOfWeek}`)}
                   </label>
                 </div>
@@ -128,7 +128,7 @@ export function WorkerAvailabilityTab() {
                     value={day.startTime}
                     onChange={(e) => handleTimeChange(day.dayOfWeek, 'startTime', e.target.value)}
                     disabled={!day.enabled}
-                    className="px-2.5 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-xs sm:text-sm text-white disabled:opacity-40 disabled:cursor-not-allowed focus:border-emerald-500 focus:outline-none font-mono"
+                    className="px-2.5 py-1.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-xs sm:text-sm text-gray-900 dark:text-white disabled:opacity-40 disabled:cursor-not-allowed focus:border-emerald-500 focus:outline-none font-mono transition"
                     required={day.enabled}
                   />
                   <span className="text-gray-500 text-xs sm:text-sm font-medium px-1">{t('worker.schedule.to')}</span>
@@ -137,7 +137,7 @@ export function WorkerAvailabilityTab() {
                     value={day.endTime}
                     onChange={(e) => handleTimeChange(day.dayOfWeek, 'endTime', e.target.value)}
                     disabled={!day.enabled}
-                    className="px-2.5 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-xs sm:text-sm text-white disabled:opacity-40 disabled:cursor-not-allowed focus:border-emerald-500 focus:outline-none font-mono"
+                    className="px-2.5 py-1.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-xs sm:text-sm text-gray-900 dark:text-white disabled:opacity-40 disabled:cursor-not-allowed focus:border-emerald-500 focus:outline-none font-mono transition"
                     required={day.enabled}
                   />
                 </div>
@@ -146,7 +146,7 @@ export function WorkerAvailabilityTab() {
           </div>
 
           {saveMessage && (
-            <div className={`p-3 rounded-md text-sm ${saveMessage.type === 'success' ? 'bg-emerald-900/50 text-emerald-300' : 'bg-red-900/50 text-red-300'}`}>
+            <div className={`p-3 rounded-xl text-sm font-medium border ${saveMessage.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300' : 'bg-rose-50 dark:bg-rose-950/60 border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300'}`}>
               {saveMessage.text}
             </div>
           )}
@@ -155,7 +155,7 @@ export function WorkerAvailabilityTab() {
             <button
               type="submit"
               disabled={mutation.isPending}
-              className="btn-press px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-md font-medium disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              className="btn-press px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-sm shadow-sm"
             >
               {mutation.isPending ? t('worker.schedule.saving') : t('worker.schedule.saveSchedule')}
             </button>

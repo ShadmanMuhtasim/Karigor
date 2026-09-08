@@ -33,10 +33,14 @@ type AdminTab = 'overview' | 'sos' | 'verifications' | 'users' | 'categories' | 
 
 export const AdminDashboard: React.FC = () => {
   const { t } = useTranslation();
-  const { user, logoutUser } = useAuth();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<AdminTab>('overview');
   const [emergencyAlert, setEmergencyAlert] = useState<SosAlertDto | null>(null);
+
+  const adminEmail = user?.email || '';
+  const adminDisplayName = adminEmail.includes('@') ? adminEmail.split('@')[0] : adminEmail || 'Admin';
+  const greeting = `${t('common.welcomeBack', 'Welcome back')}, ${adminDisplayName}`;
 
   // Live count of open/unresolved SOS alerts
   const { data: openAlerts } = useQuery({
@@ -137,33 +141,29 @@ export const AdminDashboard: React.FC = () => {
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
         {/* Session / Header Card */}
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-5 sm:p-8 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-5 sm:p-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3 sm:gap-4">
             <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl sm:rounded-3xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-sky-500 text-white font-black text-xl sm:text-2xl flex items-center justify-center shadow-lg shadow-purple-500/20 shrink-0">
               <ZapIcon className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-gray-900 dark:text-white tracking-tight">
-                  {t('admin.portalTitle', 'Platform Administration')}
+                  {greeting}
                 </h1>
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-black bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 uppercase tracking-wider shrink-0">
                   {t('nav.admin', 'Admin')}
                 </span>
               </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate max-w-xs sm:max-w-md">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">
                 Logged in as <span className="font-semibold text-gray-900 dark:text-white">{user?.email}</span> • Platform Governor
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 w-full md:w-auto">
-            <button
-              onClick={() => logoutUser()}
-              className="px-4 py-2 sm:py-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-gray-700 dark:text-gray-300 hover:text-rose-600 dark:hover:text-rose-400 font-bold rounded-xl sm:rounded-2xl text-xs transition cursor-pointer"
-            >
-              {t('nav.signOut', 'Sign Out')}
-            </button>
+          <div className="hidden sm:flex items-center gap-2 bg-purple-50 dark:bg-purple-950/40 border border-purple-200/80 dark:border-purple-800/60 rounded-2xl px-3.5 py-2 shrink-0 text-xs text-purple-700 dark:text-purple-300 shadow-sm font-medium">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="font-semibold">Platform Governor</span>
           </div>
         </div>
 

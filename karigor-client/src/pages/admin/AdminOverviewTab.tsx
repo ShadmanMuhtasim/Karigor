@@ -15,7 +15,7 @@ import {
   StarIcon,
   FolderIcon,
   CloseIcon,
-  ArrowRightIcon,
+  AlertTriangleIcon,
 } from '../../components/icons/Icons';
 
 interface AdminOverviewTabProps {
@@ -49,26 +49,19 @@ export const AdminOverviewTab: React.FC<AdminOverviewTabProps> = ({ onSelectTab 
 
   return (
     <div className="space-y-8">
-      {/* Welcome & System Summary Banner */}
-      <div className="p-6 sm:p-8 bg-gradient-to-r from-emerald-600 via-teal-600 to-sky-700 rounded-3xl text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-        <div className="space-y-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-bold uppercase tracking-wider">
-            <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse" />
-            <span>{t('admin.overview.statusLive')}</span>
-          </div>
-          <h2 className="text-2xl sm:text-3xl font-black">{t('admin.overview.commandCenter')}</h2>
-          <p className="text-emerald-100 text-sm max-w-xl">
-            {t('admin.overview.commandCenterDesc')}
-          </p>
-        </div>
+      {/* Welcome & Command Center Banner */}
+      <div className="py-4 px-6 sm:py-4.5 sm:px-8 bg-gradient-to-r from-emerald-600 via-teal-600 to-sky-700 rounded-2xl sm:rounded-3xl text-white shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <h2 className="text-xl sm:text-2xl font-black tracking-tight">{t('admin.overview.commandCenter')}</h2>
 
         {stats.pendingVerifications > 0 && (
           <button
             onClick={() => onSelectTab('verifications')}
-            className="btn-press px-5 py-3 bg-amber-400 hover:bg-amber-300 text-gray-900 font-extrabold rounded-2xl shadow-lg shadow-amber-500/20 text-sm flex items-center gap-2 cursor-pointer"
+            className="btn-press px-4 py-2 sm:px-5 sm:py-2.5 bg-amber-400 hover:bg-amber-300 text-gray-900 font-extrabold rounded-xl sm:rounded-2xl shadow-md shadow-amber-500/20 text-xs sm:text-sm shrink-0 flex items-center gap-1.5 sm:gap-2 cursor-pointer"
           >
-            <span>{stats.pendingVerifications === 1 ? t('admin.overview.pendingBadge', { count: stats.pendingVerifications }) : t('admin.overview.pendingBadgePlural', { count: stats.pendingVerifications })}</span>
-            <ArrowRightIcon className="w-4 h-4" />
+            <AlertTriangleIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 text-gray-900" />
+            <span>
+              {stats.pendingVerifications === 1 ? t('admin.overview.pendingBadge', { count: stats.pendingVerifications }) : t('admin.overview.pendingBadgePlural', { count: stats.pendingVerifications })}
+            </span>
           </button>
         )}
       </div>

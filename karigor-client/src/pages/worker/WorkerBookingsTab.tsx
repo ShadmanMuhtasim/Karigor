@@ -26,6 +26,7 @@ import {
   KeyIcon,
   CheckIcon,
 } from '../../components/icons/Icons';
+import { StatusBadge } from '../../components/ui/StatusBadge';
 
 export function WorkerBookingsTab() {
   const { t } = useTranslation();
@@ -240,7 +241,7 @@ export function WorkerBookingsTab() {
             </div>
 
             {/* Selected Request Details Sidebar / Send Quote Card */}
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-5 shadow-sm space-y-4">
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm space-y-4">
               {selectedReq ? (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
@@ -342,7 +343,7 @@ export function WorkerBookingsTab() {
             {openJobsList.isLoading ? (
               <p className="text-gray-500 py-6 text-center text-sm">{t('worker.bookings.loadingOpportunities', 'Loading opportunities...')}</p>
             ) : !openJobsList.data?.length ? (
-              <div className="rounded-3xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-8 text-center text-sm text-gray-500">
+              <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-8 text-center text-sm text-gray-500">
                 {t('worker.bookings.noOpportunitiesYet', 'No open requests currently match your skills.')}
               </div>
             ) : (
@@ -350,7 +351,7 @@ export function WorkerBookingsTab() {
                 {openJobsList.data.map((job) => (
                   <div
                     key={job.id}
-                    className="card-lift rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm space-y-3"
+                    className="card-lift rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm space-y-3"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
@@ -446,20 +447,18 @@ export function WorkerBookingsTab() {
         {workerQuotations.isLoading ? (
           <p className="text-gray-500 py-6 text-center text-sm">{t('worker.bookings.loadingQuotes', 'Loading your quotations...')}</p>
         ) : !workerQuotations.data?.length ? (
-          <div className="rounded-3xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-8 text-center text-sm text-gray-500">
+          <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-8 text-center text-sm text-gray-500">
             {t('worker.bookings.noQuotesYet', "You haven't submitted any quotations yet. Check the opportunities above to place your bids!")}
           </div>
         ) : (
           <div className="space-y-3">
             {workerQuotations.data.map((q) => {
               const isCounterFromCustomer = q.latestStatus === 'Pending' && q.latestProposedBy === 'Customer';
-              const isAccepted = q.latestStatus === 'Accepted';
-              const isRejected = q.latestStatus === 'Rejected';
 
               return (
                 <div
                   key={q.quotationId}
-                  className="card-lift rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm space-y-3"
+                  className="card-lift rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm space-y-3"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="space-y-1">
@@ -488,20 +487,11 @@ export function WorkerBookingsTab() {
                       )}
                     </div>
 
-                    <div className="text-right">
-                      <span
-                        className={`h-fit rounded-full px-3 py-1 text-xs font-bold ${
-                          isAccepted
-                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                            : isRejected
-                            ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
-                            : isCounterFromCustomer
-                            ? 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300'
-                            : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                        }`}
-                      >
-                        {isCounterFromCustomer ? 'Customer Counter-Offered' : q.latestStatus}
-                      </span>
+                    <div className="text-right flex flex-col items-end">
+                      <StatusBadge
+                        status={isCounterFromCustomer ? 'Customer Counter-Offered' : q.latestStatus}
+                        label={isCounterFromCustomer ? 'Customer Counter-Offered' : q.latestStatus}
+                      />
 
                       <div className="mt-1">
                         <span className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400">
@@ -544,7 +534,7 @@ export function WorkerBookingsTab() {
         {bookings.isLoading ? (
           <p className="text-gray-500 py-6 text-center text-sm">{t('worker.bookings.loadingBookings', 'Loading bookings...')}</p>
         ) : !bookings.data?.length ? (
-          <div className="rounded-3xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-8 text-center text-sm text-gray-500">
+          <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-8 text-center text-sm text-gray-500">
             {t('worker.bookings.noBookingsYet', 'Accepted jobs and bookings will appear here.')}
           </div>
         ) : (
@@ -552,7 +542,7 @@ export function WorkerBookingsTab() {
             {bookings.data.map((b) => (
               <div
                 key={b.id}
-                className="card-lift rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm"
+                className="card-lift rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm"
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
@@ -574,17 +564,7 @@ export function WorkerBookingsTab() {
                       <span>Scheduled: {new Date(b.scheduledDate).toLocaleString()}</span>
                     </p>
                   </div>
-                  <span
-                    className={`h-fit rounded-full px-3 py-1 text-xs font-bold ${
-                      b.status === 'Completed'
-                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                        : b.status === 'InProgress'
-                        ? 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300'
-                        : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                    }`}
-                  >
-                    {b.status}
-                  </span>
+                  <StatusBadge status={b.status} />
                 </div>
 
                 {/* Review Feedback on Completed Booking */}

@@ -23,23 +23,25 @@ export function getStatusTheme(status: string) {
         dot: 'bg-amber-500 dark:bg-amber-400',
       };
 
-    // 2. Blue: InProgress / Active / Scheduled / Confirmed
+    // 2. Blue: InProgress / Active / Scheduled / Confirmed / Countered
     case 'inprogress':
     case 'active':
     case 'scheduled':
     case 'confirmed':
     case 'contacted':
-    case 'accepted':
+    case 'customercounteroffered':
+    case 'countered':
       return {
         badge: 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800/60',
         dot: 'bg-blue-500 dark:bg-blue-400',
       };
 
-    // 3. Emerald: Completed / Resolved / Approved / Verified
+    // 3. Emerald: Completed / Resolved / Approved / Verified / Accepted
     case 'completed':
     case 'resolved':
     case 'approved':
     case 'verified':
+    case 'accepted':
     case 'finished':
       return {
         badge: 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/60',

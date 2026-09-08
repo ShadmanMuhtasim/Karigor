@@ -5,6 +5,7 @@ import { workerApi } from '../../api/workerApi';
 import type { UpdateWorkerProfileDto } from '../../api/workerApi';
 import { KarigorMap } from '../../components/map/KarigorMap';
 import { MapPinIcon, AlertTriangleIcon, CheckCircleIcon } from '../../components/icons/Icons';
+import { StatusBadge } from '../../components/ui/StatusBadge';
 
 export function WorkerProfileTab() {
   const { t } = useTranslation();
@@ -121,7 +122,7 @@ export function WorkerProfileTab() {
 
   return (
     <div className="space-y-6">
-      <div className="card-lift bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 shadow-xl">
+      <div className="card-lift bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 sm:p-6 md:p-8 shadow-sm">
         <div className="mb-6 pb-4 border-b border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h3 className="text-lg sm:text-xl font-extrabold text-gray-900 dark:text-white">{t('worker.profileTab.title')}</h3>
@@ -129,9 +130,7 @@ export function WorkerProfileTab() {
               {t('worker.profileTab.subtitle')}
             </p>
           </div>
-          <span className="text-xs px-3 py-1 bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold rounded-full self-start sm:self-auto">
-            {profile.verificationStatus}
-          </span>
+          <StatusBadge status={profile.verificationStatus} />
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">

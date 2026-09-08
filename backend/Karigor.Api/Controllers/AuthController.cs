@@ -10,12 +10,14 @@ namespace Karigor.Api.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly ILogger<AuthController> _logger;
     private const string RefreshTokenCookieName = "karigor_rt";
     private const int RefreshTokenExpiryDays = 7;
 
-    public AuthController(IAuthService authService)
+    public AuthController(IAuthService authService, ILogger<AuthController> logger)
     {
         _authService = authService;
+        _logger = logger;
     }
 
     // POST /api/auth/register/customer
@@ -31,9 +33,14 @@ public class AuthController : ControllerBase
             SetRefreshCookie(rawRefreshToken);
             return Ok(result);
         }
-        catch (InvalidOperationException ex)
+        catch (AuthValidationException ex)
         {
             return Conflict(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error during customer registration for {Email}", dto.Email);
+            return StatusCode(500, new { error = "Something went wrong while creating your account. Please try again in a moment." });
         }
     }
 
@@ -50,9 +57,14 @@ public class AuthController : ControllerBase
             SetRefreshCookie(rawRefreshToken);
             return Ok(result);
         }
-        catch (InvalidOperationException ex)
+        catch (AuthValidationException ex)
         {
             return Conflict(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error during worker registration for {Email}", dto.Email);
+            return StatusCode(500, new { error = "Something went wrong while creating your account. Please try again in a moment." });
         }
     }
 

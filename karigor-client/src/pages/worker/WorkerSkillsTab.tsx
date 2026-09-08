@@ -64,20 +64,20 @@ export function WorkerSkillsTab() {
   const activeCategoryIds = new Set(skills?.map(s => s.categoryId));
 
   return (
-    <Card className="card-lift bg-gray-900 border-gray-800">
+    <Card className="card-lift bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm rounded-2xl">
       <CardHeader>
-        <CardTitle className="text-emerald-400">{t('worker.skills.title')}</CardTitle>
+        <CardTitle className="text-lg font-extrabold text-gray-900 dark:text-white">{t('worker.skills.title')}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
         
         {/* Add Skill Form */}
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-end">
           <div className="flex-1 w-full">
-            <label className="block text-xs sm:text-sm font-medium text-gray-400 mb-1.5">{t('worker.skills.addNewSkill')}</label>
+            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1.5">{t('worker.skills.addNewSkill')}</label>
             <select
               value={selectedCategoryId}
               onChange={(e) => setSelectedCategoryId(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-emerald-500 text-sm transition"
+              className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm transition"
             >
               <option value="">{t('worker.skills.selectCategory')}</option>
               {categories?.map(cat => (
@@ -101,14 +101,14 @@ export function WorkerSkillsTab() {
         </div>
 
         {actionMessage && (
-          <div className={`p-3 rounded-md text-sm ${actionMessage.type === 'success' ? 'bg-emerald-900/50 text-emerald-300' : 'bg-red-900/50 text-red-300'}`}>
+          <div className={`p-3 rounded-xl text-sm font-medium border ${actionMessage.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300' : 'bg-rose-50 dark:bg-rose-950/60 border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300'}`}>
             {actionMessage.text}
           </div>
         )}
 
         {/* Current Skills List */}
-        <div className="pt-4 border-t border-gray-800">
-          <h4 className="text-sm font-medium text-gray-400 mb-3">{t('worker.skills.yourActiveSkills')}</h4>
+        <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-3">{t('worker.skills.yourActiveSkills')}</h4>
           
           {!skills || skills.length === 0 ? (
             <p className="text-gray-500 italic text-sm">{t('worker.skills.noSkillsYet')}</p>
@@ -117,13 +117,13 @@ export function WorkerSkillsTab() {
               {skills.map(skill => (
                 <div 
                   key={skill.categoryId} 
-                  className="flex items-center gap-2 bg-gray-800 border border-gray-700 rounded-full px-3 py-1"
+                  className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full px-3 py-1"
                 >
-                  <span className="text-sm text-gray-200">{skill.categoryName}</span>
+                  <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">{skill.categoryName}</span>
                   <button
                     onClick={() => handleRemoveSkill(skill.categoryId)}
                     disabled={deleteMutation.isPending}
-                    className="text-gray-500 hover:text-red-400 transition"
+                    className="text-gray-400 hover:text-rose-500 transition cursor-pointer"
                     title={t('worker.skills.removeSkill')}
                   >
                     &times;

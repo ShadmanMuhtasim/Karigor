@@ -32,7 +32,12 @@ export function RegisterCustomerPage() {
       });
       navigate('/dashboard/customer', { replace: true });
     } catch (err: unknown) {
-      setError(extractErrorMessage(err));
+      setError(
+        extractErrorMessage(
+          err,
+          'Something went wrong while creating your account. Please try again in a moment.'
+        )
+      );
     } finally {
       setLoading(false);
     }

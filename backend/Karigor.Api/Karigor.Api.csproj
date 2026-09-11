@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -21,6 +21,18 @@
   <ItemGroup>
     <ProjectReference Include="..\Karigor.Application\Karigor.Application.csproj" />
     <ProjectReference Include="..\Karigor.Infrastructure\Karigor.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- WebDeploy preservation: ensure deployments do not delete or overwrite persistent user uploads -->
+    <MsDeploySkipRules Include="SkipUploads">
+      <ObjectName>dirPath</ObjectName>
+      <AbsolutePath>.*\\wwwroot\\uploads.*</AbsolutePath>
+    </MsDeploySkipRules>
+    <MsDeploySkipRules Include="SkipUploadFiles">
+      <ObjectName>filePath</ObjectName>
+      <AbsolutePath>.*\\wwwroot\\uploads\\.*</AbsolutePath>
+    </MsDeploySkipRules>
   </ItemGroup>
 
 </Project>

@@ -20,7 +20,8 @@ export function getAccessToken() {
 }
 
 export function getFileUrl(relativeUrl: string): string {
-  const apiOrigin = import.meta.env.VITE_API_URL || 'http://localhost:5253';
+  const defaultOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5253';
+  const apiOrigin = import.meta.env.VITE_API_URL || defaultOrigin;
   const origin = apiOrigin.endsWith('/') ? apiOrigin.slice(0, -1) : apiOrigin;
   const path = relativeUrl.startsWith('/') ? relativeUrl : `/${relativeUrl}`;
   return `${origin}${path}`;

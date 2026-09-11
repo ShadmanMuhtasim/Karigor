@@ -1,0 +1,157 @@
+name: Deploy to MonsterASP.NET
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: monsterasp-deploy
+  cancel-in-progress: false
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  NODE_VERSION: '20.x'
+
+jobs:
+  build-and-deploy:
+    name: Build, Publish & Deploy
+    runs-on: windows-latest
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'karigor-client/package-lock.json'
+
+      # -----------------------------------------------------------------------
+      # Backend Verification & Build
+      # -----------------------------------------------------------------------
+      - name: 📦 Restore backend dependencies
+        run: dotnet restore Karigor.slnx
+
+      - name: 🏗️ Build backend (Release)
+        run: dotnet build Karigor.slnx --no-restore --configuration Release
+
+      - name: 🧪 Run backend tests
+        run: dotnet test Karigor.slnx --no-build --configuration Release --verbosity normal
+
+      # -----------------------------------------------------------------------
+      # Frontend Verification & Build
+      # -----------------------------------------------------------------------
+      - name: 📦 Install frontend dependencies
+        run: |
+          cd karigor-client
+          npm ci
+
+      - name: 📊 TypeScript check
+        run: |
+          cd karigor-client
+          npx tsc --noEmit
+
+      - name: 🏗️ Build frontend (Production)
+        run: |
+          cd karigor-client
+          npm run build
+
+      # -----------------------------------------------------------------------
+      # Assemble Unified Single-Origin Deployment
+      # -----------------------------------------------------------------------
+      - name: 📁 Copy React SPA into ASP.NET Core wwwroot
+        shell: pwsh
+        run: |
+          $webRoot = "backend/Karigor.Api/wwwroot"
+          if (-not (Test-Path $webRoot)) {
+            New-Item -ItemType Directory -Force -Path $webRoot | Out-Null
+          }
+          Write-Host "Copying karigor-client/dist into $webRoot..."
+          Copy-Item -Path karigor-client/dist/* -Destination "$webRoot/" -Recurse -Force
+          Get-ChildItem -Path $webRoot | Select-Object Name, Length
+
+      - name: 🚀 Publish ASP.NET Core Application
+        run: dotnet publish backend/Karigor.Api/Karigor.Api.csproj -c Release -o ./publish /p:UseAppHost=false
+
+      - name: 🔍 Verify Publish Artifacts
+        shell: pwsh
+        run: |
+          $requiredFiles = @(
+            "./publish/Karigor.Api.dll",
+            "./publish/web.config",
+            "./publish/wwwroot/index.html"
+          )
+          foreach ($file in $requiredFiles) {
+            if (-not (Test-Path $file)) {
+              throw "Critical publish artifact missing: $file"
+            }
+            Write-Host "Verified artifact: $file"
+          }
+
+      # -----------------------------------------------------------------------
+      # Deploy via WebDeploy
+      # -----------------------------------------------------------------------
+      - name: 🌐 Deploy to MonsterASP.NET via WebDeploy
+        uses: rasmusbuchholdt/simply-web-deploy@2.1.0
+        with:
+          website-name: ${{ secrets.WEBSITE_NAME }}
+          server-computer-name: ${{ secrets.SERVER_COMPUTER_NAME }}
+          server-username: ${{ secrets.SERVER_USERNAME }}
+          server-password: ${{ secrets.SERVER_PASSWORD }}
+          source-path: './publish'
+
+      # -----------------------------------------------------------------------
+      # Post-Deployment Health Check
+      # -----------------------------------------------------------------------
+      - name: 🩺 Verify Deployment Health
+        if: success()
+        shell: pwsh
+        run: |
+          $siteName = "${{ secrets.WEBSITE_NAME }}"
+          $customUrl = "${{ secrets.PRODUCTION_URL }}"
+          $baseUrl = if (-not [string]::IsNullOrWhiteSpace($customUrl)) {
+            $customUrl.TrimEnd('/')
+          } else {
+            "https://$siteName.monsterasp.net"
+          }
+
+          Write-Host "Verifying deployment endpoint at: $baseUrl"
+          $endpoints = @("/", "/swagger/v1/swagger.json", "/api/categories")
+          $maxAttempts = 10
+          $delaySeconds = 12
+
+          Write-Host "Waiting 15 seconds for initial IIS application warmup..."
+          Start-Sleep -Seconds 15
+
+          foreach ($endpoint in $endpoints) {
+            $url = "$baseUrl$endpoint"
+            $success = $false
+            for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+              Write-Host "Pinging $url (Attempt $attempt of $maxAttempts)..."
+              try {
+                $response = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 15 -SkipCertificateCheck
+                if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 400) {
+                  Write-Host "✅ Reached $url with HTTP $($response.StatusCode)"
+                  $success = $true
+                  break
+                } else {
+                  Write-Host "⚠️ Received HTTP $($response.StatusCode), waiting for warmup..."
+                }
+              } catch {
+                Write-Host "⚠️ Attempt $attempt failed: $($_.Exception.Message)"
+              }
+              Start-Sleep -Seconds $delaySeconds
+            }
+
+            if (-not $success) {
+              Write-Host "⚠️ Warning: Endpoint $url was not healthy within warmup period. Verify database connection string and environment variables in MonsterASP."
+            }
+          }

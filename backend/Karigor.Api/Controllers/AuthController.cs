@@ -11,13 +11,15 @@ public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
     private readonly ILogger<AuthController> _logger;
+    private readonly IWebHostEnvironment _env;
     private const string RefreshTokenCookieName = "karigor_rt";
     private const int RefreshTokenExpiryDays = 7;
 
-    public AuthController(IAuthService authService, ILogger<AuthController> logger)
+    public AuthController(IAuthService authService, ILogger<AuthController> logger, IWebHostEnvironment env)
     {
         _authService = authService;
         _logger = logger;
+        _env = env;
     }
 
     // POST /api/auth/register/customer
@@ -117,10 +119,11 @@ public class AuthController : ControllerBase
             await _authService.LogoutAsync(rawToken);
 
         // Clear the httpOnly refresh token cookie
+        var isSecure = Request.IsHttps || !_env.IsDevelopment();
         Response.Cookies.Delete(RefreshTokenCookieName, new CookieOptions
         {
             HttpOnly = true,
-            Secure   = false,
+            Secure   = isSecure,
             SameSite = SameSiteMode.Lax,
             Path     = "/"
         });
@@ -133,10 +136,11 @@ public class AuthController : ControllerBase
     // -------------------------------------------------------------------------
     private void SetRefreshCookie(string rawToken)
     {
+        var isSecure = Request.IsHttps || !_env.IsDevelopment();
         Response.Cookies.Append(RefreshTokenCookieName, rawToken, new CookieOptions
         {
             HttpOnly = true,
-            Secure   = false,        // false for local HTTP dev
+            Secure   = isSecure,
             SameSite = SameSiteMode.Lax,
             Expires  = DateTimeOffset.UtcNow.AddDays(RefreshTokenExpiryDays),
             Path     = "/"

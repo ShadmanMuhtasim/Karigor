@@ -28,6 +28,12 @@ export default defineConfig({
         ws: true,
         secure: false,
       },
+      // Forward /uploads/* to the .NET backend for previewing uploaded documents in dev
+      '/uploads': {
+        target: 'http://localhost:5253',
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
 })

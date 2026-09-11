@@ -127,11 +127,20 @@ try
 
     builder.Services.AddAuthorization();
 
-    // DI: IUploadPathProvider using host web root
+    // DI: IUploadPathProvider using host web root with directory initialization
+    var webRoot = builder.Environment.WebRootPath ?? Path.Combine(builder.Environment.ContentRootPath, "wwwroot");
+    var configuredUploadPath = builder.Configuration["Storage:UploadPath"];
+    var uploadRoot = !string.IsNullOrWhiteSpace(configuredUploadPath)
+        ? configuredUploadPath
+        : Path.Combine(webRoot, "uploads", "worker-documents");
+
+    if (!Directory.Exists(uploadRoot))
+    {
+        Directory.CreateDirectory(uploadRoot);
+    }
+
     builder.Services.AddScoped<IUploadPathProvider>(sp =>
-        new HostWebRootUploadPathProvider(
-            builder.Environment.WebRootPath ?? Path.Combine(builder.Environment.ContentRootPath, "wwwroot")
-        ));
+        new HostWebRootUploadPathProvider(webRoot));
 
     // Configuration overrides for Application layer
     // Removed hard-coded path override; path will be provided via DI
@@ -155,15 +164,29 @@ try
     builder.Services.AddScoped<Karigor.Application.Sos.ISosService, Karigor.Application.Sos.SosService>();
 
     // -------------------------------------------------------------------------
-    // CORS — allow Vite dev server with credentials (for httpOnly cookie)
+    // CORS — configure allowed origins dynamically (with localhost fallback)
     // -------------------------------------------------------------------------
-    const string CorsPolicyName = "ViteDev";
+    const string CorsPolicyName = "DefaultCorsPolicy";
+    var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+        ?? new[] { "http://localhost:5173" };
+
     builder.Services.AddCors(options =>
         options.AddPolicy(CorsPolicyName, policy =>
-            policy.WithOrigins("http://localhost:5173")
-                  .AllowAnyHeader()
-                  .AllowAnyMethod()
-                  .AllowCredentials()));
+        {
+            if (allowedOrigins.Length > 0 && !allowedOrigins.Contains("*"))
+            {
+                policy.WithOrigins(allowedOrigins)
+                      .AllowAnyHeader()
+                      .AllowAnyMethod()
+                      .AllowCredentials();
+            }
+            else
+            {
+                policy.AllowAnyOrigin()
+                      .AllowAnyHeader()
+                      .AllowAnyMethod();
+            }
+        }));
 
     // -------------------------------------------------------------------------
     // Controllers + Swagger (with JWT Bearer security scheme)
@@ -267,23 +290,23 @@ try
 
     app.UseSerilogRequestLogging();
 
-    if (app.Environment.IsDevelopment())
+    // Swagger enabled for all environments (academic project requirement)
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
     {
-        app.UseSwagger();
-        app.UseSwaggerUI(c =>
-        {
-            c.SwaggerEndpoint("/swagger/v1/swagger.json", "Karigor API v1");
-            c.RoutePrefix = "swagger";
-        });
-    }
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Karigor API v1");
+        c.RoutePrefix = "swagger";
+    });
 
     app.UseHttpsRedirection();
-    app.UseStaticFiles();   // serves wwwroot/uploads/worker-documents/*
+    app.UseDefaultFiles();  // serves index.html by default
+    app.UseStaticFiles();   // serves wwwroot/assets, wwwroot/uploads, etc.
     app.UseCors(CorsPolicyName);
     app.UseAuthentication();
     app.UseAuthorization();
     app.MapControllers();
     app.MapHub<Karigor.Api.Hubs.KarigorHub>("/hubs/chat");
+    app.MapFallbackToFile("index.html");  // SPA client-side fallback
 
     app.Run();
 }

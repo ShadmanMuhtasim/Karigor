@@ -68,3 +68,11 @@ Thumbs.db
 # --------------------------------------------------
 backend/Karigor.Api/wwwroot/uploads/worker-documents/*
 !backend/Karigor.Api/wwwroot/uploads/worker-documents/.gitkeep
+
+# --------------------------------------------------
+# Frontend Build Output in wwwroot (assembled in CI)
+# --------------------------------------------------
+backend/Karigor.Api/wwwroot/assets/
+backend/Karigor.Api/wwwroot/index.html
+backend/Karigor.Api/wwwroot/favicon.svg
+backend/Karigor.Api/wwwroot/icons.svg

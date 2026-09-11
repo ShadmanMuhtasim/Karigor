@@ -96,6 +96,34 @@ jobs:
             Write-Host "Verified artifact: $file"
           }
 
+          $assetsDir = "./publish/wwwroot/assets"
+          if (-not (Test-Path $assetsDir)) {
+            throw "Critical publish artifact missing: $assetsDir"
+          }
+          $jsFiles = Get-ChildItem -Path $assetsDir -Filter "index-*.js"
+          $cssFiles = Get-ChildItem -Path $assetsDir -Filter "*.css"
+          if ($jsFiles.Count -eq 0) {
+            throw "No index-*.js found in $assetsDir"
+          }
+          if ($cssFiles.Count -eq 0) {
+            throw "No CSS files found in $assetsDir"
+          }
+          Write-Host "Verified JS bundle: $($jsFiles[0].Name)"
+          Write-Host "Verified CSS bundle: $($cssFiles[0].Name)"
+
+          $indexContent = Get-Content -Path "./publish/wwwroot/index.html" -Raw
+          if (-not $indexContent.Contains($jsFiles[0].Name)) {
+            throw "Mismatch: index.html does not reference JS bundle $($jsFiles[0].Name)"
+          }
+          Write-Host "Verified index.html correctly references $($jsFiles[0].Name)"
+
+          # Ensure web.config does not contain conflicting rewrite rules
+          $webConfigContent = Get-Content -Path "./publish/web.config" -Raw
+          if ($webConfigContent.Contains("<rewrite>")) {
+            throw "Detected unwanted <rewrite> rule in web.config that interferes with static asset serving."
+          }
+          Write-Host "Verified web.config is free of conflicting IIS rewrite rules."
+
       # -----------------------------------------------------------------------
       # Deploy via WebDeploy
       # -----------------------------------------------------------------------
@@ -124,7 +152,16 @@ jobs:
           }
 
           Write-Host "Verifying deployment endpoint at: $baseUrl"
+
+          # Extract JS bundle name from published index.html
+          $jsFiles = Get-ChildItem -Path "./publish/wwwroot/assets" -Filter "index-*.js"
+          $jsEndpoint = if ($jsFiles.Count -gt 0) { "/assets/$($jsFiles[0].Name)" } else { "" }
+
           $endpoints = @("/", "/swagger/v1/swagger.json", "/api/categories")
+          if (-not [string]::IsNullOrEmpty($jsEndpoint)) {
+            $endpoints += $jsEndpoint
+          }
+
           $maxAttempts = 10
           $delaySeconds = 12
 
@@ -139,6 +176,14 @@ jobs:
               try {
                 $response = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 15 -SkipCertificateCheck
                 if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 400) {
+                  # For JS asset endpoint, verify MIME type is not text/html
+                  if ($endpoint.EndsWith(".js")) {
+                    $contentType = $response.Headers["Content-Type"]
+                    Write-Host "JS Content-Type: $contentType"
+                    if ($contentType -like "*text/html*") {
+                      throw "MIME ERROR: JS endpoint returned HTML instead of JavaScript! Fallback rewrite rule is interfering."
+                    }
+                  }
                   Write-Host "✅ Reached $url with HTTP $($response.StatusCode)"
                   $success = $true
                   break

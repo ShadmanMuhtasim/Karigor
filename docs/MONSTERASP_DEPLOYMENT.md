@@ -280,8 +280,8 @@ To guarantee that continuous deployment runs do not delete uploaded user files:
   - Temporarily set `stdoutLogEnabled="true"` in `web.config` to see the stack trace in `logs/stdout_*.log`.
 
 ### HTTP 500.19 — Internal Server Error (Configuration Error)
-- **Cause:** Invalid XML or unrecognized section in `web.config` (e.g., URL Rewrite module missing).
-- **Solution:** Verify `web.config` syntax. MonsterASP includes IIS URL Rewrite module 2.x by default.
+- **Cause:** Invalid XML or unrecognized section in `web.config`.
+- **Solution:** Verify `web.config` syntax. Note: Do not add IIS `<rewrite>` rules for React SPA routing—SPA fallback is handled natively in-process by ASP.NET Core's `app.MapFallbackToFile("index.html")`. Adding IIS rewrite rules can cause static assets (`.js`, `.css`) to be incorrectly rewritten to `index.html` (causing module script MIME errors).
 
 ### HTTP 502 / 504 on Local Dev
 - **Cause:** Backend API is not running on `localhost:5253`.

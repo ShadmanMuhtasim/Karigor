@@ -61,6 +61,7 @@ export function WorkerBookingsTab() {
         notif.type === 'QuotationCountered' ||
         notif.type === 'BookingCreated' ||
         notif.type === 'BookingStatusChanged' ||
+        notif.type === 'PaymentReceived' ||
         notif.type === 'ReviewCreated' ||
         notif.type === 'ReviewResponse'
       ) {
@@ -566,6 +567,41 @@ export function WorkerBookingsTab() {
                   </div>
                   <StatusBadge status={b.status} />
                 </div>
+
+                {/* Payment Status for Completed Booking */}
+                {b.status === 'Completed' && (
+                  b.paymentStatus === 'Paid' ? (
+                    <div className="mt-3 bg-emerald-50/70 dark:bg-emerald-950/30 rounded-2xl p-4 border border-emerald-200 dark:border-emerald-800/60 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black text-emerald-800 dark:text-emerald-200 flex items-center gap-1.5">
+                          <span className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-black">✓</span>
+                          <span>Payment Received (SSLCommerz)</span>
+                        </span>
+                        <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">
+                          ৳ {(b.workerAmount ?? (b.agreedPrice * 0.99)).toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-emerald-700 dark:text-emerald-300">
+                        Agreed: ৳{b.agreedPrice.toLocaleString()} • 1% Karigor fee: ৳{(b.platformFee ?? (b.agreedPrice * 0.01)).toLocaleString()} • Net Payout credited to your balance
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="mt-3 bg-amber-50/70 dark:bg-amber-950/30 rounded-2xl p-4 border border-amber-200 dark:border-amber-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="space-y-0.5">
+                        <span className="text-xs font-black text-amber-800 dark:text-amber-200 flex items-center gap-1.5">
+                          <span>⏳</span>
+                          <span>Awaiting Customer Payment</span>
+                        </span>
+                        <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                          Job completed. Customer has been prompted to pay ৳{b.agreedPrice.toLocaleString()} via SSLCommerz.
+                        </p>
+                      </div>
+                      <span className="px-3 py-1 bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200 rounded-xl text-xs font-bold whitespace-nowrap self-start sm:self-auto">
+                        Your Payout: ৳{(b.workerAmount ?? (b.agreedPrice * 0.99)).toLocaleString()}
+                      </span>
+                    </div>
+                  )
+                )}
 
                 {/* Review Feedback on Completed Booking */}
                 {b.status === 'Completed' && b.review && (

@@ -20,6 +20,7 @@ import { SearchWorkersPage } from './pages/SearchWorkersPage';
 import { WorkerProfilePage } from './pages/WorkerProfilePage';
 import { BookingDetailPage } from './pages/BookingDetailPage';
 import { AdminDashboard } from './pages/AdminDashboard';
+import { PaymentCallbackPage } from './pages/PaymentCallbackPage';
 
 /**
  * RootRouteHandler — implements the routing logic requested:
@@ -60,6 +61,7 @@ function AppContent() {
         <Route path="/register/worker" element={<RegisterWorkerPage />} />
         <Route path="/unauthorized" element={<UnauthorizedPage />} />
         <Route path="/categories" element={<Categories />} />
+        <Route path="/payment/callback" element={<PaymentCallbackPage />} />
 
         {/* Smart redirect from /dashboard */}
         <Route

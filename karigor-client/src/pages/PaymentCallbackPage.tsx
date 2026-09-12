@@ -112,7 +112,7 @@ export const PaymentCallbackPage: React.FC = () => {
             {isSuccess && (
               <div className="pt-2 border-t border-gray-200 dark:border-gray-700 text-[11px] text-emerald-700 dark:text-emerald-300 font-medium flex items-center gap-1.5">
                 <span>🛡️</span>
-                <span>1% platform facilitation fee applied • 99% credited to artisan</span>
+                <span>Platform fee and service charges (6%) applied • 94% credited to artisan</span>
               </div>
             )}
           </div>

@@ -240,7 +240,7 @@ export function CustomerBookingsTab() {
                   </div>
                   <p className="text-[11px] text-gray-600 dark:text-gray-300 font-medium">
                     {b.paymentStatus === 'Paid'
-                      ? `Total ৳${b.agreedPrice.toLocaleString()} paid • 1% Karigor facilitation fee applied • Artisan credited`
+                      ? `Total ৳${b.agreedPrice.toLocaleString()} paid • Platform fee and service charges (6%) applied • Artisan credited`
                       : `The artisan has finished the job. Please pay the agreed service fee of ৳${b.agreedPrice.toLocaleString()} to complete the transaction.`}
                   </p>
                 </div>
@@ -535,16 +535,26 @@ export function CustomerBookingsTab() {
 
               <div className="pt-2 border-t border-emerald-500/20 space-y-1.5 text-xs">
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-600 dark:text-gray-300">Agreed Service Charge:</span>
+                  <span className="text-gray-600 dark:text-gray-300">Agreed Service Price:</span>
                   <span className="font-bold text-gray-900 dark:text-white">৳ {payingBooking.agreedPrice.toLocaleString()}</span>
                 </div>
                 <div className="flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400">
-                  <span>Karigor Facilitation Fee (1%):</span>
-                  <span>৳ {(payingBooking.agreedPrice * 0.01).toFixed(2)}</span>
+                  <span>Platform fee and service charges (6%):</span>
+                  <span>৳ {(payingBooking.agreedPrice * 0.06).toFixed(2)}</span>
+                </div>
+                <div className="pl-3 space-y-0.5 text-[10px] text-gray-400 dark:text-gray-500">
+                  <div className="flex items-center justify-between">
+                    <span>• Platform fee (2%):</span>
+                    <span>৳ {(payingBooking.agreedPrice * 0.02).toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>• Service charges (4%):</span>
+                    <span>৳ {(payingBooking.agreedPrice * 0.04).toFixed(2)}</span>
+                  </div>
                 </div>
                 <div className="flex items-center justify-between text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-                  <span>Artisan Net Payout (99%):</span>
-                  <span>৳ {(payingBooking.agreedPrice * 0.99).toFixed(2)}</span>
+                  <span>Artisan Net Payout (94%):</span>
+                  <span>৳ {(payingBooking.agreedPrice * 0.94).toFixed(2)}</span>
                 </div>
                 <div className="flex items-center justify-between pt-1 border-t border-emerald-500/20 text-sm">
                   <span className="font-black text-gray-900 dark:text-white">Total Payable:</span>

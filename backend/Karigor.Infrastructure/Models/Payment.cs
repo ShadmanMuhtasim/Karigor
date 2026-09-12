@@ -38,6 +38,9 @@ public partial class Payment
     public decimal PlatformFee { get; set; }
 
     [Column(TypeName = "decimal(18, 2)")]
+    public decimal ServiceCharge { get; set; }
+
+    [Column(TypeName = "decimal(18, 2)")]
     public decimal WorkerAmount { get; set; }
 
     [StringLength(50)]

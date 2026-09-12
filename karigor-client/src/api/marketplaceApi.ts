@@ -66,6 +66,8 @@ export interface BookingDto {
   };
   paymentStatus?: string;
   platformFee?: number;
+  serviceCharge?: number;
+  totalFee?: number;
   workerAmount?: number;
   paymentTransactionId?: string;
   paidAt?: string;

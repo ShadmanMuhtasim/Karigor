@@ -2353,3 +2353,78 @@ Integrated the SSLCommerz payment gateway (Sandbox V4 API) to support end-to-end
    - Backend (`dotnet build Karigor.slnx`): **0 Errors**
    - Frontend (`npm run build`): **0 TypeScript Errors, Vite build successful**
 
+---
+
+## 2026-09-12 | Milestone 10 Update — 6% Commission Rate (2% Platform Fee + 4% Service Charges)
+
+**Status:** VERIFIED COMPLETE  
+**Database:** `.\SQLEXPRESS` → `KarigorDev`  
+**Scope:** Updated transaction commission from 1% to 6% total, composed of:
+- **2% Platform Fee**
+- **4% Service Charges**
+- Combined label: **"Platform fee and service charges"** across Customer and Worker modules
+- Net Artisan Payout: **94%**
+
+### Database Schema Updates
+1. **Table `[dbo].[Payments]`**:
+   - Added column `[ServiceCharge] decimal(18, 2) NOT NULL DEFAULT 0.00`.
+   - Updated `database/004_add_payments.sql` table definition and idempotent `ALTER TABLE` script.
+   - Updated `backend/Karigor.Api/Program.cs` startup migration check to auto-add `ServiceCharge` if missing on database connection.
+
+### Backend Updates (.NET 10)
+1. **Models & DTOs**:
+   - `Payment.cs`: Added `ServiceCharge` decimal column.
+   - `PaymentDtos.cs`:
+     - Added `ServiceCharge` and computed `TotalFee => PlatformFee + ServiceCharge` to `InitiatePaymentResponseDto` and `PaymentDetailsDto`.
+   - `BookingDto.cs`:
+     - Added `ServiceCharge` and computed `TotalFee` helper to `BookingDto`.
+2. **PaymentService (`PaymentService.cs`)**:
+   - `var platformFee = Math.Round(totalAmount * 0.02m, 2);`
+   - `var serviceCharge = Math.Round(totalAmount * 0.04m, 2);`
+   - `var totalFee = platformFee + serviceCharge;`
+   - `var workerAmount = totalAmount - totalFee;` (94% net payout)
+   - Stored in `Payment` record and transmitted to SSLCommerz.
+   - Worker in-app notification updated to:
+     `"💰 Payment Received! {customerName} paid ৳{payment.TotalAmount:N0} for Booking #{booking.Id}. Your payout of ৳{payment.WorkerAmount:N0} (94%) has been credited after platform fee and service charges (6%)."`
+   - SignalR `PaymentReceived` broadcast updated with `serviceCharge` and `totalFee`.
+3. **MarketplaceService (`MarketplaceService.cs`)**:
+   - Updated `GetCustomerBookingsAsync`, `GetWorkerBookingsAsync`, `GetBookingAsync`, and `BookingDtoAsync` to calculate `PlatformFee` (2%), `ServiceCharge` (4%), and `WorkerAmount` (94%).
+
+### Frontend Updates (React + TypeScript)
+1. **API Contracts**:
+   - `paymentApi.ts`: Added `serviceCharge` and `totalFee` to `InitiatePaymentResponseDto` and `PaymentDetailsDto`.
+   - `marketplaceApi.ts`: Added `serviceCharge?: number; totalFee?: number;` to `BookingDto`.
+2. **Customer Bookings Tab (`CustomerBookingsTab.tsx`)**:
+   - Paid booking badge: `"Total ৳{b.agreedPrice} paid • Platform fee and service charges (6%) applied • Artisan credited"`.
+   - Payment Confirmation Modal:
+     - Agreed Service Price: `৳{payingBooking.agreedPrice}`
+     - Platform fee and service charges (6%): `৳{(agreedPrice * 0.06)}`
+     - Breakdown: `• Platform fee (2%): ৳...`, `• Service charges (4%): ৳...`
+     - Artisan Net Payout (94%): `৳{(agreedPrice * 0.94)}`
+     - Total Payable: `৳{payingBooking.agreedPrice}`
+3. **Worker Bookings Tab (`WorkerBookingsTab.tsx`)**:
+   - Paid card badge: `৳{(b.workerAmount ?? (b.agreedPrice * 0.94))}`.
+   - Description: `"Agreed: ৳{b.agreedPrice} • Platform fee and service charges: ৳{totalFee} (2% platform + 4% service) • Net Payout (94%) credited to your balance"`.
+   - Pending card badge: `"Your Payout: ৳{b.workerAmount ?? (b.agreedPrice * 0.94)} (94%)"`.
+4. **Booking Detail Page (`BookingDetailPage.tsx`)**:
+   - Updated payment summary card with 6% "Platform fee and service charges" and 2% platform + 4% service charges sub-itemization, and 94% Artisan Net Payout.
+5. **Payment Callback Page (`PaymentCallbackPage.tsx`)**:
+   - Banner updated to `"Platform fee and service charges (6%) applied • 94% credited to artisan"`.
+
+### Verification Results
+1. **Automated End-to-End Test (`test_sslcommerz_payment.ps1`)**:
+   - ৳5,000 Booking Tested:
+     - 2% Platform Fee: ৳100.00 (**PASS**)
+     - 4% Service Charge: ৳200.00 (**PASS**)
+     - 6% Total Fee: ৳300.00 (**PASS**)
+     - 94% Worker Payout: ৳4,700.00 (**PASS**)
+     - SSLCommerz Session Gateway URL generated (**PASS**)
+     - Gateway callback handled with 302 redirect (**PASS**)
+     - Database Payment marked `Completed` with ৳200 service charge & ৳4,700 payout (**PASS**)
+     - Worker received notification with 94% payout & 6% fee explanation (**PASS**)
+     - 401 unauthenticated guard verified (**PASS**)
+2. **Build Verifications**:
+   - Backend (`dotnet build Karigor.slnx`): **0 Warnings, 0 Errors**
+   - Frontend (`npm run build`): **0 TypeScript Errors, Vite build successful**
+
+

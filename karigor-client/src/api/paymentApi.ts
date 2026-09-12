@@ -5,6 +5,8 @@ export interface InitiatePaymentResponseDto {
   transactionId: string;
   totalAmount: number;
   platformFee: number;
+  serviceCharge: number;
+  totalFee: number;
   workerAmount: number;
 }
 
@@ -18,6 +20,8 @@ export interface PaymentDetailsDto {
   currency: string;
   totalAmount: number;
   platformFee: number;
+  serviceCharge: number;
+  totalFee: number;
   workerAmount: number;
   status: string;
   createdAt: string;

@@ -634,8 +634,9 @@ public class MarketplaceService(
                     BookingDate    = b.ScheduledDate
                 } : null,
                 PaymentStatus  = b.PaymentStatus ?? "Unpaid",
-                PlatformFee    = Math.Round(b.AgreedPrice * 0.01m, 2),
-                WorkerAmount   = b.AgreedPrice - Math.Round(b.AgreedPrice * 0.01m, 2)
+                PlatformFee    = Math.Round(b.AgreedPrice * 0.02m, 2),
+                ServiceCharge  = Math.Round(b.AgreedPrice * 0.04m, 2),
+                WorkerAmount   = b.AgreedPrice - Math.Round(b.AgreedPrice * 0.06m, 2)
             })
             .ToListAsync();
     }
@@ -682,8 +683,9 @@ public class MarketplaceService(
                     BookingDate    = b.ScheduledDate
                 } : null,
                 PaymentStatus  = b.PaymentStatus ?? "Unpaid",
-                PlatformFee    = Math.Round(b.AgreedPrice * 0.01m, 2),
-                WorkerAmount   = b.AgreedPrice - Math.Round(b.AgreedPrice * 0.01m, 2)
+                PlatformFee    = Math.Round(b.AgreedPrice * 0.02m, 2),
+                ServiceCharge  = Math.Round(b.AgreedPrice * 0.04m, 2),
+                WorkerAmount   = b.AgreedPrice - Math.Round(b.AgreedPrice * 0.06m, 2)
             })
             .ToListAsync();
     }
@@ -736,8 +738,9 @@ public class MarketplaceService(
                 BookingDate    = booking.ScheduledDate
             } : null,
             PaymentStatus  = booking.PaymentStatus ?? "Unpaid",
-            PlatformFee    = Math.Round(booking.AgreedPrice * 0.01m, 2),
-            WorkerAmount   = booking.AgreedPrice - Math.Round(booking.AgreedPrice * 0.01m, 2)
+            PlatformFee    = Math.Round(booking.AgreedPrice * 0.02m, 2),
+            ServiceCharge  = Math.Round(booking.AgreedPrice * 0.04m, 2),
+            WorkerAmount   = booking.AgreedPrice - Math.Round(booking.AgreedPrice * 0.06m, 2)
         };
     }
 
@@ -902,8 +905,9 @@ public class MarketplaceService(
                 BookingDate    = x.ScheduledDate
             } : null,
             PaymentStatus  = x.PaymentStatus ?? "Unpaid",
-            PlatformFee    = Math.Round(x.AgreedPrice * 0.01m, 2),
-            WorkerAmount   = x.AgreedPrice - Math.Round(x.AgreedPrice * 0.01m, 2)
+            PlatformFee    = Math.Round(x.AgreedPrice * 0.02m, 2),
+            ServiceCharge  = Math.Round(x.AgreedPrice * 0.04m, 2),
+            WorkerAmount   = x.AgreedPrice - Math.Round(x.AgreedPrice * 0.06m, 2)
         };
     }
 

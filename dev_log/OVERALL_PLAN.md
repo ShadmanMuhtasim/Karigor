@@ -23,7 +23,7 @@
 
 | \*\*Milestone 9\*\* | Admin Dashboard \& Platform Moderation | 
 
-| \*\*Milestone 10\*\* | SSLCommerz Payment Gateway Integration (Sandbox V4, 1% Platform Cut, Artisan Payout Alerts, Customer Checkout Flow) | 
+| \*\*Milestone 10\*\* | SSLCommerz Payment Gateway Integration (Sandbox V4, 6% Platform Fee and Service Charges [2% platform + 4% service], Artisan Payout Alerts, Customer Checkout Flow) | 
 
 
 

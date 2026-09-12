@@ -59,10 +59,12 @@ public class PaymentService : IPaymentService
         if (string.Equals(booking.PaymentStatus, "Paid", StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Payment for this booking has already been completed.");
 
-        // Fee calculations: 1% platform fee, 99% artisan payout
+        // Fee calculations: 2% platform fee, 4% service charges = 6% total deduction, 94% artisan net payout
         var totalAmount = booking.AgreedPrice;
-        var platformFee = Math.Round(totalAmount * 0.01m, 2);
-        var workerAmount = totalAmount - platformFee;
+        var platformFee = Math.Round(totalAmount * 0.02m, 2);   // 2% platform fee
+        var serviceCharge = Math.Round(totalAmount * 0.04m, 2); // 4% service charges
+        var totalFee = platformFee + serviceCharge;             // 6% combined platform fee and service charges
+        var workerAmount = totalAmount - totalFee;              // 94% net payout
 
         // Unique transaction identifier
         var transactionId = $"TXN_B{booking.Id}_{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}_{Random.Shared.Next(100, 999)}";
@@ -74,6 +76,7 @@ public class PaymentService : IPaymentService
             TransactionId   = transactionId,
             TotalAmount     = totalAmount,
             PlatformFee     = platformFee,
+            ServiceCharge   = serviceCharge,
             WorkerAmount    = workerAmount,
             Currency        = "BDT",
             Status          = "Initiated",
@@ -92,7 +95,7 @@ public class PaymentService : IPaymentService
         var initResult = await _sslCommerzClient.InitiateTransactionAsync(
             transactionId: transactionId,
             totalAmount: totalAmount,
-            platformFee: platformFee,
+            platformFee: totalFee,
             bookingId: booking.Id,
             customerId: customer.Id,
             workerId: booking.WorkerId,
@@ -110,6 +113,7 @@ public class PaymentService : IPaymentService
             TransactionId = transactionId,
             TotalAmount   = totalAmount,
             PlatformFee   = platformFee,
+            ServiceCharge = serviceCharge,
             WorkerAmount  = workerAmount
         };
     }
@@ -227,7 +231,7 @@ public class PaymentService : IPaymentService
                 {
                     UserId          = booking.Worker.UserId,
                     Type            = "PaymentReceived",
-                    Message         = $"💰 Payment Received! {customerName} paid ৳{payment.TotalAmount:N0} for Booking #{booking.Id}. Your payout of ৳{payment.WorkerAmount:N0} (99%) has been credited.",
+                    Message         = $"💰 Payment Received! {customerName} paid ৳{payment.TotalAmount:N0} for Booking #{booking.Id}. Your payout of ৳{payment.WorkerAmount:N0} (94%) has been credited after platform fee and service charges (6%).",
                     RelatedEntityId = booking.Id
                 });
             }
@@ -245,6 +249,9 @@ public class PaymentService : IPaymentService
                 bookingId     = payment.BookingId,
                 transactionId = payment.TransactionId,
                 totalAmount   = payment.TotalAmount,
+                platformFee   = payment.PlatformFee,
+                serviceCharge = payment.ServiceCharge,
+                totalFee      = payment.PlatformFee + payment.ServiceCharge,
                 workerAmount  = payment.WorkerAmount,
                 status        = "Completed"
             });
@@ -343,6 +350,7 @@ public class PaymentService : IPaymentService
         Currency      = p.Currency,
         TotalAmount   = p.TotalAmount,
         PlatformFee   = p.PlatformFee,
+        ServiceCharge = p.ServiceCharge,
         WorkerAmount  = p.WorkerAmount,
         Status        = p.Status,
         CreatedAt     = p.CreatedAt,

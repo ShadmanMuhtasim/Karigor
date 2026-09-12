@@ -300,6 +300,7 @@ try
                     [Currency]        nvarchar(10)   NOT NULL DEFAULT 'BDT',
                     [TotalAmount]     decimal(18, 2) NOT NULL,
                     [PlatformFee]     decimal(18, 2) NOT NULL,
+                    [ServiceCharge]   decimal(18, 2) NOT NULL DEFAULT 0.00,
                     [WorkerAmount]    decimal(18, 2) NOT NULL,
                     [Status]          nvarchar(50)   NOT NULL DEFAULT 'Initiated',
                     [CreatedAt]       datetime2      NOT NULL DEFAULT SYSUTCDATETIME(),
@@ -313,6 +314,13 @@ try
 
                 CREATE INDEX [IX_Payments_BookingId] ON [dbo].[Payments] ([BookingId]);
                 CREATE INDEX [IX_Payments_Status] ON [dbo].[Payments] ([Status]);
+            END
+            ELSE
+            BEGIN
+                IF NOT EXISTS(SELECT 1 FROM sys.columns WHERE Name = N'ServiceCharge' AND Object_ID = Object_ID(N'dbo.Payments'))
+                BEGIN
+                    ALTER TABLE [dbo].[Payments] ADD [ServiceCharge] decimal(18, 2) NOT NULL DEFAULT 0.00;
+                END
             END
         ");
         var starterCategories = new (string Name, string IconUrl)[]

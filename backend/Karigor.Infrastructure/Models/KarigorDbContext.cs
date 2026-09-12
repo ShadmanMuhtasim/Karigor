@@ -44,6 +44,8 @@ public partial class KarigorDbContext : IdentityDbContext<ApplicationUser>
 
     public virtual DbSet<SosAlert> SosAlerts { get; set; }
 
+    public virtual DbSet<Payment> Payments { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

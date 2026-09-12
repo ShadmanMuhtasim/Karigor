@@ -300,12 +300,22 @@ export function BookingDetailPage() {
                       <span className="font-extrabold text-gray-900 dark:text-white">৳ {data.agreedPrice.toLocaleString()}</span>
                     </div>
                     <div className="flex items-center justify-between text-[11px] text-gray-500">
-                      <span>Karigor Platform Facilitation Fee (1%):</span>
-                      <span>৳ {(data.agreedPrice * 0.01).toFixed(2)}</span>
+                      <span>Platform fee and service charges (6%):</span>
+                      <span>৳ {(data.agreedPrice * 0.06).toFixed(2)}</span>
+                    </div>
+                    <div className="pl-3 space-y-0.5 text-[10px] text-gray-400 dark:text-gray-500">
+                      <div className="flex items-center justify-between">
+                        <span>• Platform fee (2%):</span>
+                        <span>৳ {(data.agreedPrice * 0.02).toFixed(2)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>• Service charges (4%):</span>
+                        <span>৳ {(data.agreedPrice * 0.04).toFixed(2)}</span>
+                      </div>
                     </div>
                     <div className="flex items-center justify-between text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-                      <span>Artisan Net Payout (99%):</span>
-                      <span>৳ {(data.agreedPrice * 0.99).toFixed(2)}</span>
+                      <span>Artisan Net Payout (94%):</span>
+                      <span>৳ {(data.agreedPrice * 0.94).toFixed(2)}</span>
                     </div>
 
                     {paymentError && (

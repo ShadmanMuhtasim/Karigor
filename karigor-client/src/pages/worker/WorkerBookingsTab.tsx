@@ -578,11 +578,11 @@ export function WorkerBookingsTab() {
                           <span>Payment Received (SSLCommerz)</span>
                         </span>
                         <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">
-                          ৳ {(b.workerAmount ?? (b.agreedPrice * 0.99)).toLocaleString()}
+                          ৳ {(b.workerAmount ?? (b.agreedPrice * 0.94)).toLocaleString()}
                         </span>
                       </div>
                       <p className="text-[11px] text-emerald-700 dark:text-emerald-300">
-                        Agreed: ৳{b.agreedPrice.toLocaleString()} • 1% Karigor fee: ৳{(b.platformFee ?? (b.agreedPrice * 0.01)).toLocaleString()} • Net Payout credited to your balance
+                        Agreed: ৳{b.agreedPrice.toLocaleString()} • Platform fee and service charges: ৳{((b.totalFee ?? (b.platformFee != null && b.serviceCharge != null ? b.platformFee + b.serviceCharge : null)) ?? (b.agreedPrice * 0.06)).toLocaleString()} (2% platform + 4% service) • Net Payout (94%) credited to your balance
                       </p>
                     </div>
                   ) : (
@@ -597,7 +597,7 @@ export function WorkerBookingsTab() {
                         </p>
                       </div>
                       <span className="px-3 py-1 bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200 rounded-xl text-xs font-bold whitespace-nowrap self-start sm:self-auto">
-                        Your Payout: ৳{(b.workerAmount ?? (b.agreedPrice * 0.99)).toLocaleString()}
+                        Your Payout: ৳{(b.workerAmount ?? (b.agreedPrice * 0.94)).toLocaleString()} (94%)
                       </span>
                     </div>
                   )

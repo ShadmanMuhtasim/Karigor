@@ -29,8 +29,9 @@ BEGIN
         [CardType]        nvarchar(100)  NULL,
         [Currency]        nvarchar(10)   NOT NULL DEFAULT 'BDT',
         [TotalAmount]     decimal(18, 2) NOT NULL,
-        [PlatformFee]     decimal(18, 2) NOT NULL, -- 1% platform facilitation fee
-        [WorkerAmount]    decimal(18, 2) NOT NULL, -- 99% worker payout
+        [PlatformFee]     decimal(18, 2) NOT NULL, -- 2% platform fee
+        [ServiceCharge]   decimal(18, 2) NOT NULL DEFAULT 0.00, -- 4% service charges
+        [WorkerAmount]    decimal(18, 2) NOT NULL, -- 94% worker payout
         [Status]          nvarchar(50)   NOT NULL DEFAULT 'Initiated', -- Initiated, Completed, Failed, Cancelled
         [CreatedAt]       datetime2      NOT NULL DEFAULT SYSUTCDATETIME(),
         [PaidAt]          datetime2      NULL,
@@ -45,5 +46,13 @@ BEGIN
     CREATE INDEX [IX_Payments_Status] ON [dbo].[Payments] ([Status]);
 
     PRINT 'Created Payments table and indexes.';
+END
+ELSE
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM sys.columns WHERE Name = N'ServiceCharge' AND Object_ID = Object_ID(N'dbo.Payments'))
+    BEGIN
+        ALTER TABLE [dbo].[Payments] ADD [ServiceCharge] decimal(18, 2) NOT NULL DEFAULT 0.00;
+        PRINT 'Added ServiceCharge column to Payments';
+    END
 END
 GO

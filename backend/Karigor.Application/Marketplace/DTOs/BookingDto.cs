@@ -23,6 +23,8 @@ public class BookingDto
     public ReviewDto? Review { get; set; }
     public string PaymentStatus { get; set; } = "Unpaid";
     public decimal? PlatformFee { get; set; }
+    public decimal? ServiceCharge { get; set; }
+    public decimal? TotalFee => (PlatformFee.HasValue || ServiceCharge.HasValue) ? (PlatformFee ?? 0m) + (ServiceCharge ?? 0m) : null;
     public decimal? WorkerAmount { get; set; }
     public string? PaymentTransactionId { get; set; }
     public DateTime? PaidAt { get; set; }

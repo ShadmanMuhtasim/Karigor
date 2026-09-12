@@ -638,21 +638,21 @@ Implemented the Customer Worker Verification UI in \BookingDetailPage.tsx\.
 
 # Milestone 10 — SSLCommerz Payment Gateway Integration
 
-- [x] `database/004_add_payments.sql`: Added `PaymentStatus` to `Bookings` and created `[dbo].[Payments]` table
-- [x] EF Core Models: Created `Payment.cs`, updated `Booking.cs` and `KarigorDbContext.cs`
+- [x] `database/004_add_payments.sql`: Added `PaymentStatus` to `Bookings` and created `[dbo].[Payments]` table with `ServiceCharge` column
+- [x] EF Core Models: Created `Payment.cs` (with `PlatformFee` and `ServiceCharge`), updated `Booking.cs` and `KarigorDbContext.cs`
 - [x] `SslCommerzOptions.cs` & `SslCommerzClient.cs`: V4 API session initiation & server validation with automatic sandbox failover
-- [x] `IPaymentService.cs` & `PaymentService.cs`: 1% platform fee calculation, 99% artisan payout, callback validation, real-time SignalR push, and in-app notifications
+- [x] `IPaymentService.cs` & `PaymentService.cs`: 6% commission calculation (2% platform fee + 4% service charge), 94% artisan payout, callback validation, real-time SignalR push, and in-app notifications
 - [x] `PaymentsController.cs`: `/api/payments/initiate`, `/sslcommerz/success`, `/sslcommerz/fail`, `/sslcommerz/cancel`, `/sslcommerz/ipn`, `/booking/{bookingId}`
-- [x] Startup Migration check in `Program.cs` for idempotent schema upgrades
-- [x] `paymentApi.ts`: Frontend API methods for payment initiation and details query
-- [x] `CustomerBookingsTab.tsx`: "Pay Now" button on completed bookings, transparent fee confirmation modal, and "✓ Paid via SSLCommerz" badge
-- [x] `WorkerBookingsTab.tsx`: "Payment Received" badge with 99% payout calculation and "Awaiting Customer Payment" status indicator
-- [x] `BookingDetailPage.tsx`: Payment summary card with fee breakdown and Pay Now trigger
-- [x] `PaymentCallbackPage.tsx`: Dedicated callback landing route with animated status screen, countdown redirect, and query invalidation
+- [x] Startup Migration check in `Program.cs` for idempotent schema upgrades (including `ServiceCharge` column)
+- [x] `paymentApi.ts` & `marketplaceApi.ts`: Frontend API methods and DTO interfaces with `serviceCharge` and `totalFee`
+- [x] `CustomerBookingsTab.tsx`: "Pay Now" button on completed bookings, transparent fee confirmation modal ("Platform fee and service charges" breakdown: 2% platform + 4% service, 94% artisan payout), and "✓ Paid via SSLCommerz" badge
+- [x] `WorkerBookingsTab.tsx`: "Payment Received" badge with 94% payout calculation and "Platform fee and service charges: ৳... (2% platform + 4% service)"
+- [x] `BookingDetailPage.tsx`: Payment summary card with 6% "Platform fee and service charges" breakdown and Pay Now trigger
+- [x] `PaymentCallbackPage.tsx`: Dedicated callback landing route with animated status screen, countdown redirect, query invalidation, and 6% fee label
 - [x] Security: Server-side credentials protection (`store_passwd` concealed), customer booking ownership validation, and 401 unauthenticated guards
-- [x] End-to-End Automated Integration Test (`test_sslcommerz_payment.ps1`): 100% PASS
-- [x] Backend Build: 0 Errors
-- [x] Frontend Build: 0 Errors
+- [x] End-to-End Automated Integration Test (`test_sslcommerz_payment.ps1`): 100% PASS (2% platform fee, 4% service charge, 94% worker payout)
+- [x] Backend Build: 0 Warnings, 0 Errors
+- [x] Frontend Build: 0 TypeScript Errors
 
 **MILESTONE_10_STATUS=COMPLETE**
 

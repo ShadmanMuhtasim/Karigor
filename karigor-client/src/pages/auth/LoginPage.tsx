@@ -7,10 +7,11 @@ import { Footer } from '../../components/Footer';
 import { PasswordInput } from '../../components/PasswordInput';
 import { extractErrorMessage } from '../../lib/errorUtils';
 import { ZapIcon, ShieldCheckIcon, BanknoteIcon, SirenIcon, AlertTriangleIcon } from '../../components/icons/Icons';
+import { GoogleSignInButton } from '../../components/auth/GoogleSignInButton';
 
 export function LoginPage() {
   const { t } = useTranslation();
-  const { loginUser } = useAuth();
+  const { loginUser, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const sessionExpired = searchParams.get('sessionExpired') === 'true';
@@ -28,6 +29,19 @@ export function LoginPage() {
       navigate('/dashboard', { replace: true });
     } catch (err: unknown) {
       setError(extractErrorMessage(err, 'Login failed. Please check your credentials.'));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleGoogleSuccess(idToken: string) {
+    setError('');
+    setLoading(true);
+    try {
+      await loginWithGoogle({ idToken });
+      navigate('/dashboard', { replace: true });
+    } catch (err: unknown) {
+      setError(extractErrorMessage(err, 'Google authentication failed. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -218,6 +232,25 @@ export function LoginPage() {
               >
                 {loading ? t('auth.signingIn', 'Signing in...') : t('auth.loginButton', 'Sign in to Account')}
               </button>
+
+              {/* Or Divider */}
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200 dark:border-gray-800" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-white dark:bg-gray-900 px-3 text-gray-500 dark:text-gray-400 font-semibold tracking-wider">
+                    {t('auth.orContinueWith', 'Or continue with')}
+                  </span>
+                </div>
+              </div>
+
+              {/* Google Sign-In */}
+              <GoogleSignInButton
+                text="continue_with"
+                onSuccess={handleGoogleSuccess}
+                onError={(msg) => setError(msg)}
+              />
             </form>
 
             {/* Quick Demo Login Helpers */}

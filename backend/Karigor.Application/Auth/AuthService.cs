@@ -1,3 +1,4 @@
+using Google.Apis.Auth;
 using Karigor.Application.Auth.DTOs;
 using Karigor.Infrastructure.Models;
 using Microsoft.AspNetCore.Identity;
@@ -144,6 +145,143 @@ public class AuthService : IAuthService
 
         if (!await _userManager.CheckPasswordAsync(user, dto.Password))
             throw new UnauthorizedAccessException("Invalid email or password.");
+
+        return await BuildAuthResultAsync(user);
+    }
+
+    // -------------------------------------------------------------------------
+    // Google OAuth Login
+    // -------------------------------------------------------------------------
+    public async Task<(AuthResultDto result, string rawRefreshToken)> GoogleLoginAsync(GoogleLoginDto dto)
+    {
+        GoogleJsonWebSignature.Payload googlePayload;
+        try
+        {
+            var expectedClientId = _config["Authentication:Google:ClientId"]
+                ?? _config["Google:ClientId"];
+
+            var validationSettings = new GoogleJsonWebSignature.ValidationSettings
+            {
+                IssuedAtClockTolerance = TimeSpan.FromMinutes(10),
+                ExpirationTimeClockTolerance = TimeSpan.FromMinutes(10)
+            };
+            if (!string.IsNullOrWhiteSpace(expectedClientId))
+            {
+                validationSettings.Audience = new[] { expectedClientId };
+            }
+
+            googlePayload = await GoogleJsonWebSignature.ValidateAsync(dto.IdToken, validationSettings);
+        }
+        catch (Exception ex)
+        {
+            throw new UnauthorizedAccessException($"Invalid Google authentication token: {ex.Message}");
+        }
+
+        if (string.IsNullOrWhiteSpace(googlePayload.Email))
+        {
+            throw new UnauthorizedAccessException("Google account must provide an email address.");
+        }
+
+        const string provider = "Google";
+        var user = await _userManager.FindByLoginAsync(provider, googlePayload.Subject);
+
+        if (user is null)
+        {
+            // Check if account with same email already exists (e.g. registered with password)
+            user = await _userManager.FindByEmailAsync(googlePayload.Email);
+            if (user is not null)
+            {
+                // Link Google to existing user account
+                await _userManager.AddLoginAsync(user, new UserLoginInfo(provider, googlePayload.Subject, "Google"));
+            }
+        }
+
+        // If user still doesn't exist, create a new user
+        if (user is null)
+        {
+            var strategy = _db.Database.CreateExecutionStrategy();
+            return await strategy.ExecuteAsync(async () =>
+            {
+                await using var tx = await _db.Database.BeginTransactionAsync();
+                try
+                {
+                    var newUser = new ApplicationUser
+                    {
+                        UserName = googlePayload.Email,
+                        Email = googlePayload.Email,
+                        EmailConfirmed = googlePayload.EmailVerified
+                    };
+
+                    var createResult = await _userManager.CreateAsync(newUser);
+                    if (!createResult.Succeeded)
+                    {
+                        throw new AuthValidationException(string.Join("; ", createResult.Errors.Select(e => e.Description)));
+                    }
+
+                    var role = string.Equals(dto.Role, "Worker", StringComparison.OrdinalIgnoreCase) ? "Worker" : "Customer";
+                    await _userManager.AddToRoleAsync(newUser, role);
+
+                    var addLoginResult = await _userManager.AddLoginAsync(newUser, new UserLoginInfo(provider, googlePayload.Subject, "Google"));
+                    if (!addLoginResult.Succeeded)
+                    {
+                        throw new AuthValidationException(string.Join("; ", addLoginResult.Errors.Select(e => e.Description)));
+                    }
+
+                    if (role == "Customer")
+                    {
+                        _db.CustomerProfiles.Add(new CustomerProfile
+                        {
+                            UserId = newUser.Id,
+                            FullName = string.IsNullOrWhiteSpace(googlePayload.Name) ? googlePayload.Email : googlePayload.Name,
+                            Address = null,
+                            ProfileImageUrl = googlePayload.Picture
+                        });
+                    }
+                    else
+                    {
+                        _db.WorkerProfiles.Add(new WorkerProfile
+                        {
+                            UserId = newUser.Id,
+                            Bio = "Professional artisan",
+                            HourlyRate = 500,
+                            ServiceRadiusKm = 10.0,
+                            VerificationStatus = "Pending",
+                            AverageRating = 0.0,
+                            Categories = new List<ServiceCategory>()
+                        });
+                    }
+
+                    await _db.SaveChangesAsync();
+
+                    var authResult = await BuildAuthResultAsync(newUser);
+                    await tx.CommitAsync();
+
+                    return authResult;
+                }
+                catch
+                {
+                    await tx.RollbackAsync();
+                    throw;
+                }
+            });
+        }
+
+        // Check if account is suspended
+        if (user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTimeOffset.UtcNow)
+        {
+            throw new UnauthorizedAccessException("Your account has been suspended by an administrator.");
+        }
+
+        // Update profile picture if missing and provided by Google
+        if (!string.IsNullOrEmpty(googlePayload.Picture))
+        {
+            var customerProfile = await _db.CustomerProfiles.FirstOrDefaultAsync(c => c.UserId == user.Id);
+            if (customerProfile != null && string.IsNullOrEmpty(customerProfile.ProfileImageUrl))
+            {
+                customerProfile.ProfileImageUrl = googlePayload.Picture;
+                await _db.SaveChangesAsync();
+            }
+        }
 
         return await BuildAuthResultAsync(user);
     }

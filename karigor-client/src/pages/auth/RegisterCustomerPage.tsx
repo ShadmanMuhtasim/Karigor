@@ -6,10 +6,11 @@ import { Navbar } from '../../components/Navbar';
 import { Footer } from '../../components/Footer';
 import { PasswordInput } from '../../components/PasswordInput';
 import { extractErrorMessage } from '../../lib/errorUtils';
+import { GoogleSignInButton } from '../../components/auth/GoogleSignInButton';
 
 export function RegisterCustomerPage() {
   const { t } = useTranslation();
-  const { registerAsCustomer } = useAuth();
+  const { registerAsCustomer, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: '', password: '', fullName: '', address: '' });
   const [error, setError] = useState('');
@@ -38,6 +39,19 @@ export function RegisterCustomerPage() {
           'Something went wrong while creating your account. Please try again in a moment.'
         )
       );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleGoogleSuccess(idToken: string) {
+    setError('');
+    setLoading(true);
+    try {
+      await loginWithGoogle({ idToken, role: 'Customer' });
+      navigate('/dashboard/customer', { replace: true });
+    } catch (err: unknown) {
+      setError(extractErrorMessage(err, 'Google registration failed. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -118,6 +132,26 @@ export function RegisterCustomerPage() {
               >
                 {loading ? t('auth.creatingAccount') : t('auth.createCustomerBtn')}
               </button>
+
+              {/* Or Divider */}
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200 dark:border-gray-800" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-white dark:bg-gray-900 px-3 text-gray-500 dark:text-gray-400 font-semibold tracking-wider">
+                    {t('auth.orSignUpWith', 'Or sign up with')}
+                  </span>
+                </div>
+              </div>
+
+              {/* Google Sign-Up */}
+              <GoogleSignInButton
+                text="signup_with"
+                role="Customer"
+                onSuccess={handleGoogleSuccess}
+                onError={(msg) => setError(msg)}
+              />
             </form>
 
             <p className="mt-6 text-center text-xs text-gray-600 dark:text-gray-400">

@@ -14,6 +14,8 @@ public class InitiatePaymentResponseDto
     public string TransactionId { get; set; } = string.Empty;
     public decimal TotalAmount { get; set; }
     public decimal PlatformFee { get; set; }
+    public decimal ServiceCharge { get; set; }
+    public decimal TotalFee => PlatformFee + ServiceCharge;
     public decimal WorkerAmount { get; set; }
 }
 
@@ -28,6 +30,8 @@ public class PaymentDetailsDto
     public string Currency { get; set; } = "BDT";
     public decimal TotalAmount { get; set; }
     public decimal PlatformFee { get; set; }
+    public decimal ServiceCharge { get; set; }
+    public decimal TotalFee => PlatformFee + ServiceCharge;
     public decimal WorkerAmount { get; set; }
     public string Status { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }

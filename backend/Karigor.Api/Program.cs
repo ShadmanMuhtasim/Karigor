@@ -163,6 +163,31 @@ try
     builder.Services.AddScoped<Karigor.Application.Admin.IAdminService, Karigor.Application.Admin.AdminService>();
     builder.Services.AddScoped<Karigor.Application.Sos.ISosService, Karigor.Application.Sos.SosService>();
 
+    // SSLCommerz Payment Gateway
+    builder.Services.Configure<Karigor.Application.Payments.SslCommerz.SslCommerzOptions>(options =>
+    {
+        builder.Configuration.GetSection(Karigor.Application.Payments.SslCommerz.SslCommerzOptions.SectionName).Bind(options);
+
+        var envStoreId = Environment.GetEnvironmentVariable("SSLCOMMERZ_STORE_ID");
+        if (!string.IsNullOrWhiteSpace(envStoreId)) options.StoreId = envStoreId;
+
+        var envStorePassword = Environment.GetEnvironmentVariable("SSLCOMMERZ_STORE_PASSWORD");
+        if (!string.IsNullOrWhiteSpace(envStorePassword)) options.StorePassword = envStorePassword;
+
+        var envSandbox = Environment.GetEnvironmentVariable("SSLCOMMERZ_SANDBOX");
+        if (!string.IsNullOrWhiteSpace(envSandbox) && bool.TryParse(envSandbox, out var isSandbox))
+            options.IsSandbox = isSandbox;
+
+        var envAppBaseUrl = Environment.GetEnvironmentVariable("SSLCOMMERZ_APP_BASE_URL");
+        if (!string.IsNullOrWhiteSpace(envAppBaseUrl)) options.AppBaseUrl = envAppBaseUrl;
+
+        var envClientBaseUrl = Environment.GetEnvironmentVariable("SSLCOMMERZ_CLIENT_BASE_URL");
+        if (!string.IsNullOrWhiteSpace(envClientBaseUrl)) options.ClientBaseUrl = envClientBaseUrl;
+    });
+
+    builder.Services.AddHttpClient<Karigor.Application.Payments.SslCommerz.SslCommerzClient>();
+    builder.Services.AddScoped<Karigor.Application.Payments.IPaymentService, Karigor.Application.Payments.PaymentService>();
+
     // -------------------------------------------------------------------------
     // CORS — configure allowed origins dynamically (with localhost fallback)
     // -------------------------------------------------------------------------
@@ -255,6 +280,39 @@ try
                     [VerificationCodeExpiresAt] datetime2     NULL,
                     [VerificationAttempts]      int           NOT NULL DEFAULT 0,
                     [CheckedInAt]               datetime2     NULL;
+            END
+
+            IF NOT EXISTS(SELECT 1 FROM sys.columns WHERE Name = N'PaymentStatus' AND Object_ID = Object_ID(N'dbo.Bookings'))
+            BEGIN
+                ALTER TABLE [dbo].[Bookings]
+                ADD [PaymentStatus] nvarchar(50) NOT NULL DEFAULT 'Unpaid';
+            END
+
+            IF OBJECT_ID(N'[dbo].[Payments]', N'U') IS NULL
+            BEGIN
+                CREATE TABLE [dbo].[Payments] (
+                    [Id]              int            NOT NULL IDENTITY,
+                    [BookingId]       int            NOT NULL,
+                    [TransactionId]   nvarchar(100)  NOT NULL,
+                    [ValId]           nvarchar(100)  NULL,
+                    [BankTranId]      nvarchar(100)  NULL,
+                    [CardType]        nvarchar(100)  NULL,
+                    [Currency]        nvarchar(10)   NOT NULL DEFAULT 'BDT',
+                    [TotalAmount]     decimal(18, 2) NOT NULL,
+                    [PlatformFee]     decimal(18, 2) NOT NULL,
+                    [WorkerAmount]    decimal(18, 2) NOT NULL,
+                    [Status]          nvarchar(50)   NOT NULL DEFAULT 'Initiated',
+                    [CreatedAt]       datetime2      NOT NULL DEFAULT SYSUTCDATETIME(),
+                    [PaidAt]          datetime2      NULL,
+                    [GatewayResponse] nvarchar(max)  NULL,
+                    CONSTRAINT [PK_Payments] PRIMARY KEY ([Id]),
+                    CONSTRAINT [FK_Payments_Bookings_BookingId]
+                        FOREIGN KEY ([BookingId]) REFERENCES [dbo].[Bookings] ([Id]) ON DELETE CASCADE,
+                    CONSTRAINT [UQ_Payments_TransactionId] UNIQUE ([TransactionId])
+                );
+
+                CREATE INDEX [IX_Payments_BookingId] ON [dbo].[Payments] ([BookingId]);
+                CREATE INDEX [IX_Payments_Status] ON [dbo].[Payments] ([Status]);
             END
         ");
         var starterCategories = new (string Name, string IconUrl)[]

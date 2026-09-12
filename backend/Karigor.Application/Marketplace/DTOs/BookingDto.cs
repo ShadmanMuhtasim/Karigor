@@ -21,4 +21,9 @@ public class BookingDto
     public bool HasActiveVerificationCode { get; set; }
     public DateTime? VerificationCodeExpiresAt { get; set; }
     public ReviewDto? Review { get; set; }
+    public string PaymentStatus { get; set; } = "Unpaid";
+    public decimal? PlatformFee { get; set; }
+    public decimal? WorkerAmount { get; set; }
+    public string? PaymentTransactionId { get; set; }
+    public DateTime? PaidAt { get; set; }
 }

@@ -304,7 +304,7 @@ public class ReviewService : IReviewService
                 ServiceRequestId = b.ServiceRequestId,
                 CategoryName = b.ServiceRequest.Category.Name,
                 WorkerId = b.WorkerId,
-                WorkerName = b.Worker.User.Email,
+                WorkerName = b.Worker.User.Email ?? $"Worker #{b.WorkerId}",
                 CustomerId = b.CustomerId,
                 CustomerName = customer.FullName ?? "Customer",
                 AgreedPrice = b.AgreedPrice,

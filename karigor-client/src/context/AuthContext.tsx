@@ -1,8 +1,9 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { login, logout, refreshSession, registerCustomer, registerWorker } from '../api/authApi';
+import { googleLogin, login, logout, refreshSession, registerCustomer, registerWorker } from '../api/authApi';
 import type {
   AuthUser,
+  GoogleLoginPayload,
   LoginPayload,
   RegisterCustomerPayload,
   RegisterWorkerPayload,
@@ -14,6 +15,7 @@ interface AuthContextValue {
   user: AuthUser | null;
   isLoading: boolean;
   loginUser: (payload: LoginPayload) => Promise<void>;
+  loginWithGoogle: (payload: GoogleLoginPayload) => Promise<void>;
   logoutUser: () => Promise<void>;
   registerAsCustomer: (payload: RegisterCustomerPayload) => Promise<void>;
   registerAsWorker: (payload: RegisterWorkerPayload) => Promise<void>;
@@ -157,6 +159,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAccessToken(userData.accessToken);
   }, []);
 
+  const loginWithGoogle = useCallback(async (payload: GoogleLoginPayload) => {
+    const userData = await googleLogin(payload);
+    setUser(userData);
+    setAccessToken(userData.accessToken);
+  }, []);
+
   const logoutUser = useCallback(async () => {
     if (user?.accessToken) {
       try { await logout(user.accessToken); } catch { /* ignore revocation errors */ }
@@ -179,7 +187,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, loginUser, logoutUser, registerAsCustomer, registerAsWorker }}>
+    <AuthContext.Provider value={{ user, isLoading, loginUser, loginWithGoogle, logoutUser, registerAsCustomer, registerAsWorker }}>
       {children}
     </AuthContext.Provider>
   );

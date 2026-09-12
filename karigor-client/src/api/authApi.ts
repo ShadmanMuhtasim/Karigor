@@ -30,6 +30,27 @@ export interface LoginPayload {
   password: string;
 }
 
+export interface GoogleLoginPayload {
+  idToken: string;
+  role?: string;
+}
+
+export interface AuthConfig {
+  googleClientId: string;
+}
+
+/** Retrieve dynamic auth configuration (e.g. Google Client ID from backend) */
+export async function getAuthConfig(): Promise<AuthConfig> {
+  const { data } = await axios.get<AuthConfig>('/api/auth/config');
+  return data;
+}
+
+/** Authenticate using Google ID Token */
+export async function googleLogin(payload: GoogleLoginPayload): Promise<AuthUser> {
+  const { data } = await axios.post<AuthUser>('/api/auth/google', payload, { withCredentials: true });
+  return data;
+}
+
 /** Register a new customer account */
 export async function registerCustomer(payload: RegisterCustomerPayload): Promise<AuthUser> {
   const { data } = await axios.post('/api/auth/register/customer', payload, { withCredentials: true });
@@ -60,3 +81,4 @@ export async function logout(accessToken: string): Promise<void> {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 }
+

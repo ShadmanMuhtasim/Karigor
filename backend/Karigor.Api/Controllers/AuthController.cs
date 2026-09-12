@@ -12,14 +12,35 @@ public class AuthController : ControllerBase
     private readonly IAuthService _authService;
     private readonly ILogger<AuthController> _logger;
     private readonly IWebHostEnvironment _env;
+    private readonly IConfiguration _config;
     private const string RefreshTokenCookieName = "karigor_rt";
     private const int RefreshTokenExpiryDays = 7;
 
-    public AuthController(IAuthService authService, ILogger<AuthController> logger, IWebHostEnvironment env)
+    public AuthController(
+        IAuthService authService,
+        ILogger<AuthController> logger,
+        IWebHostEnvironment env,
+        IConfiguration config)
     {
         _authService = authService;
         _logger = logger;
         _env = env;
+        _config = config;
+    }
+
+    // GET /api/auth/config
+    [HttpGet("config")]
+    [AllowAnonymous]
+    public IActionResult GetAuthConfig()
+    {
+        var googleClientId = _config["Authentication:Google:ClientId"]
+            ?? _config["Google:ClientId"]
+            ?? string.Empty;
+
+        return Ok(new
+        {
+            googleClientId
+        });
     }
 
     // POST /api/auth/register/customer
@@ -86,6 +107,34 @@ public class AuthController : ControllerBase
         catch (UnauthorizedAccessException ex)
         {
             return Unauthorized(new { error = ex.Message });
+        }
+    }
+
+    // POST /api/auth/google
+    [HttpPost("google")]
+    public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginDto dto)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+        try
+        {
+            var (result, rawRefreshToken) = await _authService.GoogleLoginAsync(dto);
+            SetRefreshCookie(rawRefreshToken);
+            return Ok(result);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(new { error = ex.Message });
+        }
+        catch (AuthValidationException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error during Google login");
+            return StatusCode(500, new { error = "Something went wrong while authenticating with Google. Please try again." });
         }
     }
 

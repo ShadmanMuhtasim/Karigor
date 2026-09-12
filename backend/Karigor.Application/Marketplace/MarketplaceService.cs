@@ -632,7 +632,10 @@ public class MarketplaceService(
                     Comment        = b.Review.Comment,
                     WorkerResponse = b.Review.WorkerResponse,
                     BookingDate    = b.ScheduledDate
-                } : null
+                } : null,
+                PaymentStatus  = b.PaymentStatus ?? "Unpaid",
+                PlatformFee    = Math.Round(b.AgreedPrice * 0.01m, 2),
+                WorkerAmount   = b.AgreedPrice - Math.Round(b.AgreedPrice * 0.01m, 2)
             })
             .ToListAsync();
     }
@@ -677,7 +680,10 @@ public class MarketplaceService(
                     Comment        = b.Review.Comment,
                     WorkerResponse = b.Review.WorkerResponse,
                     BookingDate    = b.ScheduledDate
-                } : null
+                } : null,
+                PaymentStatus  = b.PaymentStatus ?? "Unpaid",
+                PlatformFee    = Math.Round(b.AgreedPrice * 0.01m, 2),
+                WorkerAmount   = b.AgreedPrice - Math.Round(b.AgreedPrice * 0.01m, 2)
             })
             .ToListAsync();
     }
@@ -728,7 +734,10 @@ public class MarketplaceService(
                 Comment        = booking.Review.Comment,
                 WorkerResponse = booking.Review.WorkerResponse,
                 BookingDate    = booking.ScheduledDate
-            } : null
+            } : null,
+            PaymentStatus  = booking.PaymentStatus ?? "Unpaid",
+            PlatformFee    = Math.Round(booking.AgreedPrice * 0.01m, 2),
+            WorkerAmount   = booking.AgreedPrice - Math.Round(booking.AgreedPrice * 0.01m, 2)
         };
     }
 
@@ -891,7 +900,10 @@ public class MarketplaceService(
                 Comment        = x.Review.Comment,
                 WorkerResponse = x.Review.WorkerResponse,
                 BookingDate    = x.ScheduledDate
-            } : null
+            } : null,
+            PaymentStatus  = x.PaymentStatus ?? "Unpaid",
+            PlatformFee    = Math.Round(x.AgreedPrice * 0.01m, 2),
+            WorkerAmount   = x.AgreedPrice - Math.Round(x.AgreedPrice * 0.01m, 2)
         };
     }
 

@@ -9,7 +9,21 @@
 
 | \*\*Milestone 2\*\* | JWT Authentication, Role-based Authorization, Registration/Login, Refresh Token rotation, Frontend Auth Context, Protected Routes | 
 
-| \*\*Milestone 3 (Partial)\*\* | Worker Backend (10 endpoints: profile, skills, availability, documents, dashboard), Worker Frontend (Overview, Profile, Skills, Availability, Documents tabs) | 
+| \*\*Milestone 3\*\* | Worker Backend (10 endpoints: profile, skills, availability, documents, dashboard), Worker Frontend (Overview, Profile, Skills, Availability, Documents tabs) | 
+
+| \*\*Milestone 4\*\* | Customer Module \& Service Requests | 
+
+| \*\*Milestone 5\*\* | Marketplace, Quotations \& Bidding | 
+
+| \*\*Milestone 6\*\* | Real-time Chat \& In-App Notifications | 
+
+| \*\*Milestone 7\*\* | Location-based Search \& Geolocation | 
+
+| \*\*Milestone 8\*\* | Customer Reviews, Ratings \& Artisan Reputation | 
+
+| \*\*Milestone 9\*\* | Admin Dashboard \& Platform Moderation | 
+
+| \*\*Milestone 10\*\* | SSLCommerz Payment Gateway Integration (Sandbox V4, 1% Platform Cut, Artisan Payout Alerts, Customer Checkout Flow) | 
 
 
 
@@ -690,7 +704,35 @@ npm run dev
 
 
 
-\---
+---
+
+## MILESTONE 10 — SSLCommerz Payment Gateway Integration
+
+### Overview
+Integrates the SSLCommerz payment gateway (Sandbox V4 API) for automated, secure settlement between customers and artisans upon service completion. The platform collects a 1% facilitation cut while 99% is credited to the artisan.
+
+### Workflow & Core Rules
+1. **Completion Trigger**: When an artisan marks a booking as `Completed`, the customer interface reveals a prominent "Pay Now" action. Payment through the platform is mandatory before leaving a review.
+2. **Fee Calculation**:
+   - Total Amount = Agreed Price (100%)
+   - Platform Facilitation Fee = 1% (`AgreedPrice * 0.01`)
+   - Artisan Payout = 99% (`AgreedPrice * 0.99`)
+3. **Gateway Checkout**:
+   - Customer clicks "Pay Now" -> Sees transparent fee breakdown modal.
+   - On confirmation, backend creates an `Initiated` payment record with a unique `TXN_B{bookingId}_{timestamp}_{rand}` identifier.
+   - User is redirected to the SSLCommerz EasyCheckout portal (cards, bKash, Nagad, Internet Banking).
+4. **Validation & Payout Dispatch**:
+   - SSLCommerz posts callback to `/api/payments/sslcommerz/success`.
+   - Backend performs server-to-server validation with SSLCommerz Order Validation API (`/validator/api/validationserverAPI.php`).
+   - Payment status is set to `Completed` and `Bookings.PaymentStatus` updated to `'Paid'`.
+   - Artisan receives an immediate in-app notification & SignalR push:
+     `💰 Payment Received! Customer {Name} paid ৳{Total} for Booking #{Id}. Your payout of ৳{Payout} (99%) has been credited.`
+   - Browser redirects to `/payment/callback?status=success...` with automatic countdown back to dashboard.
+5. **Security & Credentials**:
+   - Sensitive credentials (`store_passwd`, card numbers, OTPs) are never exposed to the browser.
+   - Strict `[Authorize(Roles = "Customer")]` ownership check on payment initiation.
+
+----
 
 
 

@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { marketplaceApi } from '../api/marketplaceApi';
+import { paymentApi } from '../api/paymentApi';
 import { useAuth } from '../context/AuthContext';
 import { ChatBox } from '../components/chat/ChatBox';
 import { RatingStars } from '../components/reviews/RatingStars';
@@ -30,6 +31,8 @@ export function BookingDetailPage() {
 
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [isResponseModalOpen, setIsResponseModalOpen] = useState(false);
+  const [isInitiatingPayment, setIsInitiatingPayment] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubRevCreated = signalRService.onReviewCreated((data) => {
@@ -46,7 +49,7 @@ export function BookingDetailPage() {
 
     const unsubNotif = signalRService.onNotification((notif) => {
       if (
-        (notif.type === 'ReviewCreated' || notif.type === 'ReviewResponse' || notif.type === 'BookingStatusChanged') &&
+        (notif.type === 'ReviewCreated' || notif.type === 'ReviewResponse' || notif.type === 'BookingStatusChanged' || notif.type === 'PaymentReceived') &&
         notif.relatedEntityId === id
       ) {
         queryClient.invalidateQueries({ queryKey: ['booking', id] });
@@ -260,6 +263,101 @@ export function BookingDetailPage() {
                     <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-0.5">
                       Checked in at {new Date(data.checkedInAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
+                  </div>
+                </article>
+              )}
+
+              {/* ── Payment Card (Completed Service) ── */}
+              {data.status === 'Completed' && (
+                <article className={`card-lift rounded-3xl border p-6 shadow-sm space-y-4 ${
+                  data.paymentStatus === 'Paid'
+                    ? 'border-emerald-200 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-900/20'
+                    : 'border-amber-200 dark:border-amber-800 bg-amber-50/70 dark:bg-amber-900/20'
+                }`}>
+                  <div className="flex items-center justify-between border-b border-gray-200/50 dark:border-gray-800/50 pb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">💳</span>
+                      <h3 className="font-bold text-base text-gray-900 dark:text-white">
+                        Service Payment Status
+                      </h3>
+                    </div>
+                    {data.paymentStatus === 'Paid' ? (
+                      <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 flex items-center gap-1">
+                        <span>✓</span>
+                        <span>Paid via SSLCommerz</span>
+                      </span>
+                    ) : (
+                      <span className="px-3 py-1 rounded-full text-xs font-black bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-800 flex items-center gap-1">
+                        <span>⏳</span>
+                        <span>Payment Due</span>
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="space-y-3 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Total Agreed Charge:</span>
+                      <span className="font-extrabold text-gray-900 dark:text-white">৳ {data.agreedPrice.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] text-gray-500">
+                      <span>Karigor Platform Facilitation Fee (1%):</span>
+                      <span>৳ {(data.agreedPrice * 0.01).toFixed(2)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                      <span>Artisan Net Payout (99%):</span>
+                      <span>৳ {(data.agreedPrice * 0.99).toFixed(2)}</span>
+                    </div>
+
+                    {paymentError && (
+                      <div className="p-3 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 rounded-xl text-rose-700 dark:text-rose-300 font-semibold">
+                        ⚠️ {paymentError}
+                      </div>
+                    )}
+
+                    {isCustomer && data.paymentStatus !== 'Paid' && (
+                      <div className="pt-2">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              setIsInitiatingPayment(true);
+                              setPaymentError(null);
+                              const res = await paymentApi.initiatePayment(data.id);
+                              if (res.gatewayUrl) {
+                                window.location.href = res.gatewayUrl;
+                              }
+                            } catch (err: any) {
+                              setPaymentError(err.response?.data?.error || 'Failed to initiate payment.');
+                            } finally {
+                              setIsInitiatingPayment(false);
+                            }
+                          }}
+                          disabled={isInitiatingPayment}
+                          className="w-full py-3 px-6 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
+                        >
+                          {isInitiatingPayment ? (
+                            <>
+                              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              <span>Redirecting to SSLCommerz Checkout...</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>💳</span>
+                              <span>Pay ৳{data.agreedPrice.toLocaleString()} Now via SSLCommerz</span>
+                            </>
+                          )}
+                        </button>
+                        <p className="text-[10px] text-gray-500 text-center mt-2">
+                          🛡️ 256-bit SSL encrypted checkout. No sensitive card credentials touch our servers.
+                        </p>
+                      </div>
+                    )}
+
+                    {!isCustomer && data.paymentStatus !== 'Paid' && (
+                      <div className="p-3 rounded-xl bg-amber-100/60 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 font-medium">
+                        Customer has been notified to complete the ৳{data.agreedPrice.toLocaleString()} payment through the website. You will receive an instant notification when credited.
+                      </div>
+                    )}
                   </div>
                 </article>
               )}

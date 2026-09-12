@@ -64,6 +64,11 @@ export interface BookingDto {
     workerResponse?: string;
     bookingDate: string;
   };
+  paymentStatus?: string;
+  platformFee?: number;
+  workerAmount?: number;
+  paymentTransactionId?: string;
+  paidAt?: string;
 }
 
 export interface AvailableRequestDto {

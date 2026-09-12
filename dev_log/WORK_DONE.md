@@ -2274,3 +2274,82 @@ Completed and verified the end-to-end emergency SOS safety alert chain connectin
 2. **Production Compilation**:
    - Backend (`dotnet build Karigor.slnx`): **0 warnings, 0 errors**.
    - Frontend (`npm run build`): **0 warnings, 0 errors**.
+
+---
+
+## 2026-09-12 07:30 | Milestone 10 — SSLCommerz Payment Gateway Integration (Sandbox V4)
+
+### Feature Overview
+Integrated the SSLCommerz payment gateway (Sandbox V4 API) to support end-to-end digital transactions following job completion. Implemented platform fee splitting (1% Karigor facilitation cut, 99% artisan net payout), automated worker notifications & SignalR broadcasts, customer payment checkout flow, and server-side validation.
+
+### Key Functional Requirements Fulfilled
+1. **Payment Flow**: Worker completes job (`Status = 'Completed'`) -> "Pay Now" becomes visible to customer -> Customer reviews fee breakdown and completes checkout on SSLCommerz -> Gateway callback validates payment -> 99% payout credited to worker.
+2. **Platform Commission**: 1% facilitation cut automatically calculated and retained on every transaction.
+3. **Mandatory Payment**: Payment through the website is mandatory after job completion before a customer can submit reviews.
+4. **Artisan Notification**: Worker receives an immediate in-app notification and real-time SignalR toast with exact 99% payout figures.
+5. **Security & Sensitive Information**:
+   - `store_passwd` and secret keys are concealed on the server and never exposed to the client.
+   - All initiation requests require authenticated `Customer` role and verify booking ownership.
+   - Payment status is verified server-to-server with SSLCommerz Order Validation API.
+
+### Database Layer
+1. **Migration (`database/004_add_payments.sql`)**:
+   - Added `PaymentStatus` (`nvarchar(50) NOT NULL DEFAULT 'Unpaid'`) to `[dbo].[Bookings]`.
+   - Created `[dbo].[Payments]` table with fields: `Id`, `BookingId`, `TransactionId`, `ValId`, `BankTranId`, `CardType`, `Currency`, `TotalAmount`, `PlatformFee`, `WorkerAmount`, `Status`, `CreatedAt`, `PaidAt`, `GatewayResponse`.
+   - Applied to local SQL Server `KarigorDev`.
+   - Added idempotent startup execution check in `Program.cs` so any new developer database auto-migrates.
+
+### Backend Implementation (.NET 10)
+1. **EF Core Infrastructure Models**:
+   - Created `Karigor.Infrastructure/Models/Payment.cs`.
+   - Updated `Booking.cs` with `PaymentStatus` and `Payments` navigation collection.
+   - Updated `KarigorDbContext.cs` with `DbSet<Payment> Payments`.
+2. **SSLCommerz Client & Configuration**:
+   - `SslCommerzOptions.cs`: Options pattern binding with `StoreId`, `StorePassword`, `IsSandbox`, `AppBaseUrl`, `ClientBaseUrl`.
+   - `SslCommerzClient.cs`: Handles `POST /gwprocess/v4/api.php` session initiation and `GET /validator/api/validationserverAPI.php` order validation. Includes automatic sandbox failover for local developer setups.
+3. **Application Layer (`PaymentService.cs`)**:
+   - `InitiatePaymentAsync`: Validates customer ownership and completed booking state, calculates 1% platform fee and 99% worker payout, generates unique transaction ID, creates pending `Payment` record, and returns SSLCommerz `gatewayUrl`.
+   - `ProcessSuccessCallbackAsync`: Handles SSLCommerz POST callback, validates transaction with gateway, updates `Payment` to `Completed`, marks `Booking.PaymentStatus = 'Paid'`, saves payment timestamp and card details, dispatches worker notification, and emits SignalR events.
+   - `ProcessFailCallbackAsync` & `ProcessCancelCallbackAsync`: Updates status and redirects user.
+   - `GetBookingPaymentAsync`: Returns payment status and fee breakdown.
+4. **API Layer (`PaymentsController.cs`)**:
+   - `POST /api/payments/initiate` — `[Authorize(Roles = "Customer")]`
+   - `POST /api/payments/sslcommerz/success` — Public callback, 302 redirects to client frontend
+   - `POST /api/payments/sslcommerz/fail` — Public callback
+   - `POST /api/payments/sslcommerz/cancel` — Public callback
+   - `POST /api/payments/sslcommerz/ipn` — IPN webhook
+   - `GET /api/payments/booking/{bookingId}` — `[Authorize]`
+
+### Frontend Implementation (React + TypeScript + Tailwind)
+1. **API Module (`src/api/paymentApi.ts`)**:
+   - `initiatePayment(bookingId)` and `getBookingPayment(bookingId)`.
+   - Updated `src/api/marketplaceApi.ts` `BookingDto` with payment fields.
+2. **Customer Bookings Tab (`CustomerBookingsTab.tsx`)**:
+   - When a booking is `Completed` and `PaymentStatus !== 'Paid'`: renders an amber payment banner and prominent "Pay Now" button.
+   - Confirmation Modal: Displays transparent fee breakdown (Agreed Service Price, Karigor 1% Platform Fee, Artisan Payout 99%) and direct SSLCommerz checkout button.
+   - When `PaymentStatus === 'Paid'`: Displays emerald "✓ Paid via SSLCommerz" badge and unlocks the "Write a Review" button.
+3. **Worker Bookings Tab (`WorkerBookingsTab.tsx`)**:
+   - For completed bookings: Displays green "✓ Payment Received" badge with exact 99% payout calculation (`৳{workerAmount}`) and transaction ID.
+   - Displays "⏳ Awaiting Customer Payment" when payment is still pending.
+   - Subscribes to real-time `PaymentReceived` SignalR notifications to immediately refresh booking cards.
+4. **Booking Detail Page (`BookingDetailPage.tsx`)**:
+   - Embedded Payment Summary Card with price breakdown and Pay Now button.
+5. **Payment Callback Page (`PaymentCallbackPage.tsx`)**:
+   - Route `/payment/callback` handling `status=success|failed|cancelled|error`.
+   - Animated visual feedback, transaction ID display, amount display, and 5-second auto-redirect back to bookings dashboard.
+
+### Verification Results
+1. **Automated End-to-End Test (`scratch/test_sslcommerz_payment.ps1`)**:
+   - Dynamic customer and worker registration: **PASS**
+   - Completed booking setup: **PASS**
+   - Payment session initiation (`POST /api/payments/initiate`): **PASS**
+   - Fee math verification (৳5,000 total -> ৳50 fee, ৳4,950 payout): **PASS**
+   - SSLCommerz gateway URL generation: **PASS**
+   - Gateway callback handling & 302 redirect: **PASS**
+   - Database payment status update (`Completed`, `Paid`): **PASS**
+   - Worker in-app notification dispatch: **PASS**
+   - Security guards (401 unauthenticated): **PASS**
+2. **Solution Builds**:
+   - Backend (`dotnet build Karigor.slnx`): **0 Errors**
+   - Frontend (`npm run build`): **0 TypeScript Errors, Vite build successful**
+

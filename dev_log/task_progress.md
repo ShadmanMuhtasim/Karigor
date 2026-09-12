@@ -633,3 +633,26 @@ Implemented the Customer Worker Verification UI in \BookingDetailPage.tsx\.
 - Prominently integrated OTP generation inside CustomerBookingsTab.tsx.
 - Handled the Scheduled state with a visually distinct card to generate/show the OTP.
 - Handled the InProgress state with a "Worker Verified" success confirmation displaying checkedInAt.
+
+---
+
+# Milestone 10 — SSLCommerz Payment Gateway Integration
+
+- [x] `database/004_add_payments.sql`: Added `PaymentStatus` to `Bookings` and created `[dbo].[Payments]` table
+- [x] EF Core Models: Created `Payment.cs`, updated `Booking.cs` and `KarigorDbContext.cs`
+- [x] `SslCommerzOptions.cs` & `SslCommerzClient.cs`: V4 API session initiation & server validation with automatic sandbox failover
+- [x] `IPaymentService.cs` & `PaymentService.cs`: 1% platform fee calculation, 99% artisan payout, callback validation, real-time SignalR push, and in-app notifications
+- [x] `PaymentsController.cs`: `/api/payments/initiate`, `/sslcommerz/success`, `/sslcommerz/fail`, `/sslcommerz/cancel`, `/sslcommerz/ipn`, `/booking/{bookingId}`
+- [x] Startup Migration check in `Program.cs` for idempotent schema upgrades
+- [x] `paymentApi.ts`: Frontend API methods for payment initiation and details query
+- [x] `CustomerBookingsTab.tsx`: "Pay Now" button on completed bookings, transparent fee confirmation modal, and "✓ Paid via SSLCommerz" badge
+- [x] `WorkerBookingsTab.tsx`: "Payment Received" badge with 99% payout calculation and "Awaiting Customer Payment" status indicator
+- [x] `BookingDetailPage.tsx`: Payment summary card with fee breakdown and Pay Now trigger
+- [x] `PaymentCallbackPage.tsx`: Dedicated callback landing route with animated status screen, countdown redirect, and query invalidation
+- [x] Security: Server-side credentials protection (`store_passwd` concealed), customer booking ownership validation, and 401 unauthenticated guards
+- [x] End-to-End Automated Integration Test (`test_sslcommerz_payment.ps1`): 100% PASS
+- [x] Backend Build: 0 Errors
+- [x] Frontend Build: 0 Errors
+
+**MILESTONE_10_STATUS=COMPLETE**
+

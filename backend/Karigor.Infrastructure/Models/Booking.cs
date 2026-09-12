@@ -52,6 +52,12 @@ public partial class Booking
     [InverseProperty("Bookings")]
     public virtual WorkerProfile Worker { get; set; } = null!;
 
+    [StringLength(50)]
+    public string PaymentStatus { get; set; } = "Unpaid";
+
     [InverseProperty("Booking")]
     public virtual ICollection<SosAlert> SosAlerts { get; set; } = new List<SosAlert>();
+
+    [InverseProperty("Booking")]
+    public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>();
 }

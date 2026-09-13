@@ -2419,12 +2419,67 @@ Integrated the SSLCommerz payment gateway (Sandbox V4 API) to support end-to-end
      - 6% Total Fee: ৳300.00 (**PASS**)
      - 94% Worker Payout: ৳4,700.00 (**PASS**)
      - SSLCommerz Session Gateway URL generated (**PASS**)
-     - Gateway callback handled with 302 redirect (**PASS**)
      - Database Payment marked `Completed` with ৳200 service charge & ৳4,700 payout (**PASS**)
      - Worker received notification with 94% payout & 6% fee explanation (**PASS**)
      - 401 unauthenticated guard verified (**PASS**)
 2. **Build Verifications**:
    - Backend (`dotnet build Karigor.slnx`): **0 Warnings, 0 Errors**
    - Frontend (`npm run build`): **0 TypeScript Errors, Vite build successful**
+
+---
+
+## 2026-09-12 | Collaborator Integration — Google OAuth Authentication
+
+**Status:** VERIFIED COMPLETE  
+**Merged via:** Pull Request #34 (`googleAuth` branch)  
+**Scope:** Added Google OAuth 2.0 social login support for Customers across frontend and backend.
+
+### Backend Implementation (.NET 10)
+1. **Google Token Verification (`GoogleJsonWebSignature`)**:
+   - Added `Google.Apis.Auth` dependency to `Karigor.Application.csproj`.
+   - Created `backend/Karigor.Application/Auth/DTOs/GoogleLoginDto.cs` accepting `Credential` (ID token) and `ClientId`.
+   - Updated `IAuthService` and `AuthService.cs` with `GoogleLoginAsync`:
+     - Validates Google ID token cryptographically using `GoogleJsonWebSignature.ValidateAsync`.
+     - Automatically registers or finds user by Google email.
+     - Creates `CustomerProfile` automatically if not already registered.
+     - Issues Karigor JWT access token and HTTP-only refresh token.
+2. **Endpoints (`AuthController.cs`)**:
+   - `POST /api/auth/google-login` — Public endpoint accepting Google ID token.
+3. **Configuration**:
+   - Added `Authentication:Google:ClientId` (`377819297478-7er2p8476d0ap0rejp1kradvh2ct3opn.apps.googleusercontent.com`) to `appsettings.json` and `appsettings.Development.json`.
+
+### Frontend Implementation (React + TypeScript)
+1. **Components & API**:
+   - `GoogleSignInButton.tsx`: Loads Google Identity Services client script and renders customizable Google Sign-In button with client-side credential handler.
+   - `authApi.ts`: Added `googleLogin(dto)` API method.
+   - `AuthContext.tsx`: Added `loginWithGoogle` method storing user state and token.
+   - `LoginPage.tsx` & `RegisterCustomerPage.tsx`: Integrated Google Sign-In button with divider ("Or continue with").
+
+---
+
+## 2026-09-13 | Milestone 10 Fix — SSLCommerz Return Navigation & Mixed Content Redirection
+
+**Status:** VERIFIED COMPLETE  
+**Issue Resolved:** After clicking "Successful" on the SSLCommerz dummy payment page, modern browsers blocked cross-origin POST 302 redirects from external HTTPS sandbox (`https://sandbox.sslcommerz.com`) to local HTTP (`http://localhost:5253`), leaving the user stuck on the sandbox page even though the backend completed the transaction.
+
+### Fixes Applied:
+1. **HTML Auto-Redirect Landing Response (`PaymentsController.cs`)**:
+   - Replaced raw 302 `Redirect(...)` with a 200 OK HTML auto-redirect document containing:
+     - Immediate JavaScript redirection: `window.location.replace('{redirectUrl}')`
+     - Meta refresh tag fallback: `<meta http-equiv="refresh" content="0;url={redirectUrl}" />`
+     - Clean, responsive UI with manual fallback link: `"Return to Karigor Dashboard →"`
+   - Eliminates browser mixed-content POST redirect blocking and ensures reliable return to Karigor frontend (`/payment/callback`).
+2. **Base URL Resolution (`PaymentsController.cs`)**:
+   - Prioritized configured `_sslOptions.AppBaseUrl` directly instead of allowing Vite dev server's `X-Forwarded-Host: localhost:5173` to misdirect backend callback endpoints to the frontend port.
+3. **Dual POST & GET Support (`PaymentsController.cs`)**:
+   - Added `[HttpGet]` and `[HttpPost]` attributes to `sslcommerz/success`, `sslcommerz/fail`, and `sslcommerz/cancel`.
+   - Updated `PopulateFromRequest` to extract callback parameters from both form body and query string.
+4. **Development HTTPS Redirection (`Program.cs`)**:
+   - Wrapped `app.UseHttpsRedirection()` in `if (!app.Environment.IsDevelopment())` to prevent local HTTP requests from being forcibly redirected to untrusted dev HTTPS certificates.
+
+### Verification Results:
+- `test_sslcommerz_payment.ps1`: **100% PASS** (200 OK HTML auto-redirect returned, payment completed, worker notified).
+- Backend Build (`dotnet build Karigor.slnx`): **0 Warnings, 0 Errors**.
+- Frontend Build (`npm run build`): **0 TypeScript Errors**.
 
 

@@ -364,7 +364,10 @@ try
         c.RoutePrefix = "swagger";
     });
 
-    app.UseHttpsRedirection();
+    if (!app.Environment.IsDevelopment())
+    {
+        app.UseHttpsRedirection();
+    }
     app.UseDefaultFiles();  // serves index.html by default
     app.UseStaticFiles();   // serves wwwroot/assets, wwwroot/uploads, etc.
     app.UseCors(CorsPolicyName);

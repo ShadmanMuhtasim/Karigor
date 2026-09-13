@@ -651,8 +651,23 @@ Implemented the Customer Worker Verification UI in \BookingDetailPage.tsx\.
 - [x] `PaymentCallbackPage.tsx`: Dedicated callback landing route with animated status screen, countdown redirect, query invalidation, and 6% fee label
 - [x] Security: Server-side credentials protection (`store_passwd` concealed), customer booking ownership validation, and 401 unauthenticated guards
 - [x] End-to-End Automated Integration Test (`test_sslcommerz_payment.ps1`): 100% PASS (2% platform fee, 4% service charge, 94% worker payout)
+- [x] Gateway Return Navigation Fix: Replaced raw 302 redirect with 200 OK HTML auto-redirect page preventing browser mixed-content POST blocking
+- [x] Base URL Resolution Fix: Fixed `appBaseUrl` resolution to keep API callback endpoints directed to backend host
+- [x] Dual HTTP Method Support: Enabled `[HttpPost]` and `[HttpGet]` with form and query parameter extraction
+- [x] Conditional HTTPS Redirection: Restricted `UseHttpsRedirection` to non-development environments
 - [x] Backend Build: 0 Warnings, 0 Errors
 - [x] Frontend Build: 0 TypeScript Errors
 
 **MILESTONE_10_STATUS=COMPLETE**
+
+---
+
+# Additional Features — Google OAuth Authentication (PR #34)
+
+- [x] `GoogleLoginDto.cs`: DTO accepting Google credential ID token
+- [x] `AuthService.cs`: `GoogleLoginAsync` using `GoogleJsonWebSignature.ValidateAsync`
+- [x] `AuthController.cs`: `POST /api/auth/google-login` public endpoint
+- [x] `GoogleSignInButton.tsx`: Google Identity Services button with JWT response handler
+- [x] `LoginPage.tsx` & `RegisterCustomerPage.tsx`: Integrated Google sign-in button
+- [x] `AuthContext.tsx`: `loginWithGoogle` context action
 

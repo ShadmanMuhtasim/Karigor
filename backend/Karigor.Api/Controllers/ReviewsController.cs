@@ -6,11 +6,13 @@ using Karigor.Application.Reviews;
 using Karigor.Application.Reviews.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Karigor.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[EnableRateLimiting("PublicLimiter")]
 public class ReviewsController : ControllerBase
 {
     private readonly IReviewService _reviewService;
@@ -28,6 +30,7 @@ public class ReviewsController : ControllerBase
     /// </summary>
     [HttpPost]
     [Authorize(Roles = "Customer")]
+    [EnableRateLimiting("AuthenticatedLimiter")]
     public async Task<IActionResult> CreateReview([FromBody] CreateReviewDto dto)
     {
         var userId = GetUserId();

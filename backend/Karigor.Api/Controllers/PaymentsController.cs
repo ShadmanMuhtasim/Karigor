@@ -6,6 +6,7 @@ using Karigor.Application.Payments.DTOs;
 using Karigor.Application.Payments.SslCommerz;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -13,6 +14,7 @@ namespace Karigor.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[EnableRateLimiting("AuthenticatedLimiter")]
 public class PaymentsController : ControllerBase
 {
     private readonly IPaymentService _paymentService;

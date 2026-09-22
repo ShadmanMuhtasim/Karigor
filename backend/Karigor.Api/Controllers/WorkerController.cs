@@ -2,6 +2,7 @@ using Karigor.Application.Worker;
 using Karigor.Application.Worker.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 
 namespace Karigor.Api.Controllers;
@@ -15,6 +16,7 @@ namespace Karigor.Api.Controllers;
 [ApiController]
 [Route("api/worker")]
 [Authorize(Roles = "Worker")]
+[EnableRateLimiting("AuthenticatedLimiter")]
 public class WorkerController : ControllerBase
 {
     private readonly IWorkerService _workerService;

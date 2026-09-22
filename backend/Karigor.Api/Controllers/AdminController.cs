@@ -9,6 +9,7 @@ using Karigor.Application.Sos.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Karigor.Api.Controllers;
 
@@ -19,6 +20,7 @@ namespace Karigor.Api.Controllers;
 [ApiController]
 [Route("api/admin")]
 [Authorize(Roles = "Admin")]
+[EnableRateLimiting("AuthenticatedLimiter")]
 public class AdminController : ControllerBase
 {
     private readonly IAdminService _adminService;

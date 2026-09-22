@@ -5,6 +5,7 @@ using Karigor.Application.Customer;
 using Karigor.Application.Customer.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Karigor.Api.Controllers;
 
@@ -17,6 +18,7 @@ namespace Karigor.Api.Controllers;
 [ApiController]
 [Route("api/customer")]
 [Authorize(Roles = "Customer")]
+[EnableRateLimiting("AuthenticatedLimiter")]
 public class CustomerController : ControllerBase
 {
     private readonly ICustomerService _customerService;

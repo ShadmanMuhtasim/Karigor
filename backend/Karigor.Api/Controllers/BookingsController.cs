@@ -4,12 +4,14 @@ using Karigor.Application.Marketplace.DTOs;
 using Karigor.Application.Sos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Karigor.Api.Controllers;
 
 [ApiController]
 [Route("api/bookings")]
 [Authorize]
+[EnableRateLimiting("AuthenticatedLimiter")]
 public class BookingsController(IMarketplaceService marketplace, ISosService sosService) : ControllerBase
 {
     private string UserId() => User.FindFirstValue(ClaimTypes.NameIdentifier) ?? throw new InvalidOperationException("Authenticated user has no sub claim.");

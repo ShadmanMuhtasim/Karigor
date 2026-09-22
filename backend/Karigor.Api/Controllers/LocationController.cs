@@ -7,6 +7,7 @@ using Karigor.Application.Location.DTOs;
 using Karigor.Application.Worker.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Karigor.Api.Controllers;
 
@@ -29,6 +30,7 @@ public class LocationController : ControllerBase
     // =========================================================================
     [HttpGet("api/workers/nearby")]
     [HttpGet("api/location/workers/nearby")]
+    [EnableRateLimiting("PublicLimiter")]
     [ProducesResponseType(typeof(List<NearbyWorkerDto>), 200)]
     [ProducesResponseType(400)]
     public async Task<IActionResult> GetNearbyWorkers([FromQuery] NearbyWorkerParamsDto query)
@@ -46,6 +48,7 @@ public class LocationController : ControllerBase
     [HttpPut("api/worker/location")]
     [HttpPut("api/location/worker")]
     [Authorize(Roles = "Worker")]
+    [EnableRateLimiting("AuthenticatedLimiter")]
     [ProducesResponseType(typeof(WorkerProfileDto), 200)]
     [ProducesResponseType(400)]
     [ProducesResponseType(404)]
@@ -72,6 +75,7 @@ public class LocationController : ControllerBase
     [HttpGet("api/worker/requests/nearby")]
     [HttpGet("api/location/requests/nearby")]
     [Authorize(Roles = "Worker")]
+    [EnableRateLimiting("AuthenticatedLimiter")]
     [ProducesResponseType(typeof(List<NearbyRequestDto>), 200)]
     [ProducesResponseType(400)]
     [ProducesResponseType(404)]

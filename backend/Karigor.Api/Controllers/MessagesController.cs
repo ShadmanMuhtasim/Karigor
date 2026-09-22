@@ -6,12 +6,14 @@ using Karigor.Application.Messaging;
 using Karigor.Application.Messaging.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Karigor.Api.Controllers;
 
 [ApiController]
 [Route("api/messages")]
 [Authorize]
+[EnableRateLimiting("AuthenticatedLimiter")]
 public class MessagesController : ControllerBase
 {
     private readonly IMessagingService _messagingService;

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Karigor.Api.Controllers;
 
@@ -11,6 +12,7 @@ namespace Karigor.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/worker-only")]
+[EnableRateLimiting("AuthenticatedLimiter")]
 public class WorkerOnlyController : ControllerBase
 {
     [HttpGet]

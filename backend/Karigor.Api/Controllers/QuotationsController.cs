@@ -3,12 +3,14 @@ using Karigor.Application.Marketplace;
 using Karigor.Application.Marketplace.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Karigor.Api.Controllers;
 
 [ApiController]
 [Route("api/quotations")]
 [Authorize]
+[EnableRateLimiting("AuthenticatedLimiter")]
 public class QuotationsController(IMarketplaceService marketplace) : ControllerBase
 {
     private string UserId() => User.FindFirstValue(ClaimTypes.NameIdentifier) ?? throw new InvalidOperationException("Authenticated user has no sub claim.");

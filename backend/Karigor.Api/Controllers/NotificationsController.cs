@@ -6,12 +6,14 @@ using Karigor.Application.Notifications;
 using Karigor.Application.Notifications.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Karigor.Api.Controllers;
 
 [ApiController]
 [Route("api/notifications")]
 [Authorize]
+[EnableRateLimiting("AuthenticatedLimiter")]
 public class NotificationsController : ControllerBase
 {
     private readonly INotificationService _notificationService;

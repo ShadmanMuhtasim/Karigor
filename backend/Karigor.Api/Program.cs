@@ -6,6 +6,8 @@ using Karigor.Infrastructure.Models;
 using Karigor.Infrastructure.Upload;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
@@ -126,6 +128,132 @@ try
     });
 
     builder.Services.AddAuthorization();
+
+    // -------------------------------------------------------------------------
+    // Rate Limiting — three named sliding-window policies, all limits from config
+    //
+    // AuthLimiter            10 req/min   per client IP
+    // PublicLimiter          60 req/min   per client IP
+    // AuthenticatedLimiter  120 req/min   per user identity (sub claim),
+    //                                   falling back to IP when anonymous
+    //
+    // Rejections: HTTP 429 + Retry-After header + structured JSON body.
+    // -------------------------------------------------------------------------
+    builder.Services.AddRateLimiter(options =>
+    {
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+        // Global safety net: a generous default so any endpoint that does NOT
+        // opt into a named limiter is still protected (no magic 429s during demo).
+        options.GlobalLimiter = PartitionedRateLimiter
+            .Create<HttpContext, string>(
+                httpContext => RateLimitPartition.GetSlidingWindowLimiter<string>(
+                    "global",
+                    _ => new SlidingWindowRateLimiterOptions
+                    {
+                        Window            = TimeSpan.FromSeconds(
+                            builder.Configuration.GetValue("RateLimiting:WindowSeconds", 60)),
+                        SegmentsPerWindow = 60,
+                        AutoReplenishment = true,
+                        PermitLimit       = 1000,
+                        QueueLimit        = 0
+                    }));
+
+        options.OnRejected = async (context, cancellationToken) =>
+        {
+            // Read the configured window duration to build a conservative
+            // Retry-After value (seconds until the window rolls over).
+            var retryAfterSeconds = builder.Configuration
+                .GetValue("RateLimiting:WindowSeconds", 60);
+
+            // Standard HTTP header
+            context.HttpContext.Response.Headers
+                .Append("Retry-After", retryAfterSeconds.ToString());
+
+            // Structured JSON body (matches the format required by the task)
+            var body = new
+            {
+                statusCode        = 429,
+                message           = "Too many requests. Please try again later.",
+                retryAfterSeconds
+            };
+            context.HttpContext.Response.ContentType = "application/json";
+            context.HttpContext.Response.StatusCode  = StatusCodes.Status429TooManyRequests;
+            await context.HttpContext.Response.WriteAsync(
+                System.Text.Json.JsonSerializer.Serialize(body), cancellationToken);
+        };
+
+        // — AuthLimiter: 10 req / 60 s per IP —
+        options.AddPolicy<string>(
+            "AuthLimiter",
+            context =>
+            {
+                var section = builder.Configuration
+                    .GetSection("RateLimiting:Policies:AuthLimiter");
+                var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                return RateLimitPartition.GetSlidingWindowLimiter(
+                    ip,
+                    _ => new SlidingWindowRateLimiterOptions
+                    {
+                        Window            = TimeSpan.FromSeconds(
+                            section.GetValue("WindowSeconds", 60)),
+                        SegmentsPerWindow = 60,
+                        AutoReplenishment = true,
+                        PermitLimit       = section.GetValue("PermitLimit", 10),
+                        QueueLimit        = 0
+                    });
+            });
+
+        // — PublicLimiter: 60 req / 60 s per IP —
+        options.AddPolicy<string>(
+            "PublicLimiter",
+            context =>
+            {
+                var section = builder.Configuration
+                    .GetSection("RateLimiting:Policies:PublicLimiter");
+                var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                return RateLimitPartition.GetSlidingWindowLimiter(
+                    ip,
+                    _ => new SlidingWindowRateLimiterOptions
+                    {
+                        Window            = TimeSpan.FromSeconds(
+                            section.GetValue("WindowSeconds", 60)),
+                        SegmentsPerWindow = 60,
+                        AutoReplenishment = true,
+                        PermitLimit       = section.GetValue("PermitLimit", 60),
+                        QueueLimit        = 0
+                    });
+            });
+
+        // — AuthenticatedLimiter: 120 req / 60 s per user sub claim —
+        //   Falls back to IP address when the user is not authenticated.
+        options.AddPolicy<string>(
+            "AuthenticatedLimiter",
+            context =>
+            {
+                var section = builder.Configuration
+                    .GetSection("RateLimiting:Policies:AuthenticatedLimiter");
+                var windowSec = section.GetValue("WindowSeconds", 60);
+                var permit    = section.GetValue("PermitLimit", 120);
+
+                // Prefer the authenticated user's identity; fall back to IP.
+                var userId = context.User?.FindFirst(
+                    System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                var partitionKey = userId ??
+                    (context.Connection.RemoteIpAddress?.ToString() ?? "unknown");
+
+                return RateLimitPartition.GetSlidingWindowLimiter(
+                    partitionKey,
+                    _ => new SlidingWindowRateLimiterOptions
+                    {
+                        Window            = TimeSpan.FromSeconds(windowSec),
+                        SegmentsPerWindow = 60,
+                        AutoReplenishment = true,
+                        PermitLimit       = permit,
+                        QueueLimit        = 0
+                    });
+            });
+    });
 
     // DI: IUploadPathProvider using host web root with directory initialization
     var webRoot = builder.Environment.WebRootPath ?? Path.Combine(builder.Environment.ContentRootPath, "wwwroot");
@@ -372,6 +500,12 @@ try
     app.UseStaticFiles();   // serves wwwroot/assets, wwwroot/uploads, etc.
     app.UseCors(CorsPolicyName);
     app.UseAuthentication();
+
+    // Rate limiting runs AFTER authentication (so [EnableRateLimiting] can
+    // partition by the authenticated user's identity via the AuthenticatedLimiter)
+    // and BEFORE authorization / MapControllers.
+    app.UseRateLimiter();
+
     app.UseAuthorization();
     app.MapControllers();
     app.MapHub<Karigor.Api.Hubs.KarigorHub>("/hubs/chat");

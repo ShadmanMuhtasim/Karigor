@@ -1,5 +1,6 @@
 using Karigor.Infrastructure.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 namespace Karigor.Api.Controllers;
@@ -10,6 +11,7 @@ namespace Karigor.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/categories")]
+[EnableRateLimiting("PublicLimiter")]
 public class CategoriesController : ControllerBase
 {
     private readonly KarigorDbContext _db;

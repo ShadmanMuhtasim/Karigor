@@ -255,23 +255,27 @@ try
             });
     });
 
-    // DI: IUploadPathProvider using host web root with directory initialization
-    var webRoot = builder.Environment.WebRootPath ?? Path.Combine(builder.Environment.ContentRootPath, "wwwroot");
+    // DI: IUploadPathProvider — uploads live OUTSIDE the web root so they can
+    // never be served by the static-file middleware. The only way to read an
+    // uploaded file is through the authenticated streaming endpoint
+    // (WorkerDocumentFileController.GetDocumentFile).
+    var contentRoot = builder.Environment.ContentRootPath
+        ?? Path.Combine(AppContext.BaseDirectory, "..", "..", "..");
     var configuredUploadPath = builder.Configuration["Storage:UploadPath"];
-    var uploadRoot = !string.IsNullOrWhiteSpace(configuredUploadPath)
-        ? configuredUploadPath
-        : Path.Combine(webRoot, "uploads", "worker-documents");
+    var uploadRoot = string.IsNullOrWhiteSpace(configuredUploadPath)
+        ? Path.Combine(contentRoot, "App_Data", "Uploads", "WorkerDocuments")
+        : configuredUploadPath;
 
     if (!Directory.Exists(uploadRoot))
     {
         Directory.CreateDirectory(uploadRoot);
     }
 
+    // Register the private (content-root) provider — the web-root provider is
+    // intentionally NOT used so uploaded documents cannot leak to the public
+    // static-file pipeline.
     builder.Services.AddScoped<IUploadPathProvider>(sp =>
-        new HostWebRootUploadPathProvider(webRoot));
-
-    // Configuration overrides for Application layer
-    // Removed hard-coded path override; path will be provided via DI
+        new PrivateUploadPathProvider(contentRoot));
 
     builder.Services.AddSignalR();
 

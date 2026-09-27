@@ -24,12 +24,24 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- WebDeploy preservation: ensure deployments do not delete or overwrite persistent user uploads -->
+    <!-- WebDeploy preservation: ensure deployments do not delete or overwrite persistent user uploads.
+         The private upload root lives OUTSIDE the web root (App_Data/Uploads) so static-file
+         middleware can never serve it; only the authenticated streaming endpoint can. -->
     <MsDeploySkipRules Include="SkipUploads">
+      <ObjectName>dirPath</ObjectName>
+      <AbsolutePath>.*\\App_Data\\Uploads.*</AbsolutePath>
+    </MsDeploySkipRules>
+    <MsDeploySkipRules Include="SkipUploadFiles">
+      <ObjectName>filePath</ObjectName>
+      <AbsolutePath>.*\\App_Data\\Uploads\\.*</AbsolutePath>
+    </MsDeploySkipRules>
+    <!-- Legacy web-root uploads may still exist from prior deploys; keep the old
+         rule in place so we do not wipe them during in-place upgrades. -->
+    <MsDeploySkipRules Include="SkipLegacyWebRootUploads">
       <ObjectName>dirPath</ObjectName>
       <AbsolutePath>.*\\wwwroot\\uploads.*</AbsolutePath>
     </MsDeploySkipRules>
-    <MsDeploySkipRules Include="SkipUploadFiles">
+    <MsDeploySkipRules Include="SkipLegacyWebRootUploadFiles">
       <ObjectName>filePath</ObjectName>
       <AbsolutePath>.*\\wwwroot\\uploads\\.*</AbsolutePath>
     </MsDeploySkipRules>

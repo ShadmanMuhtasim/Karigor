@@ -20,7 +20,7 @@ public class WorkerService : IWorkerService
     private static readonly HashSet<string> AllowedExtensions =
         new(StringComparer.OrdinalIgnoreCase) { "pdf", "jpg", "jpeg", "png" };
 
-    private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
+    private const long MaxFileSizeBytes = 5 * 1024 * 1024; // 5 MB
 
     public WorkerService(KarigorDbContext db, IUploadPathProvider pathProvider)
     {
@@ -309,6 +309,15 @@ public class WorkerService : IWorkerService
         // Validate documentType string (basic length guard)
         if (string.IsNullOrWhiteSpace(documentType) || documentType.Length > 50)
             throw new InvalidOperationException("DocumentType must be 1-50 characters.");
+
+        // ── Magic-byte signature check ────────────────────────────────────────
+        // Reject extension-spoofing (e.g. a renamed .exe that declares .pdf).
+        // FileValidationService preserves the caller's original stream position
+        // so the subsequent CopyToAsync still reads the full file.
+        if (!FileValidationService.ValidateStream(fileStream, ext, out string detectedExt))
+            throw new InvalidOperationException(
+                $"File bytes do not match declared extension '{ext}'. " +
+                $"Detected signature: {detectedExt}.");
 
         // ── Secure storage ────────────────────────────────────────────────────
         // Store under <uploadRoot>/<workerId>/<guid>.<ext>

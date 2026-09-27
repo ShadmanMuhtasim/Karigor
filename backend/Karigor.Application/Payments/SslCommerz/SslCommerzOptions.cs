@@ -4,9 +4,9 @@ public class SslCommerzOptions
 {
     public const string SectionName = "SslCommerz";
 
-    public string StoreId { get; set; } = "ptkml6aa4a2bceea8b";
+    public string StoreId { get; set; } = string.Empty;
 
-    public string StorePassword { get; set; } = "qwerty1234@";
+    public string StorePassword { get; set; } = string.Empty;
 
     public bool IsSandbox { get; set; } = true;
 

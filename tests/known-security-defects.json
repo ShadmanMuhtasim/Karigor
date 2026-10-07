@@ -2,10 +2,6 @@
   "description": "Executed expected-fail regressions. Remove an entry when remediation makes its invariant pass; do not expand this list for new failures.",
   "tests": [
     {
-      "name": "Karigor.Security.Tests.ApiSecurityTests.OrdinaryProductionStartupDoesNotProvisionDefaultAdministrator",
-      "marker": "F2_DEFAULT_ADMIN"
-    },
-    {
       "name": "Karigor.Security.Tests.ApiSecurityTests.UnrelatedAuthenticatedUserCannotJoinBooking",
       "marker": "F3_BOOKING_MEMBERSHIP"
     },

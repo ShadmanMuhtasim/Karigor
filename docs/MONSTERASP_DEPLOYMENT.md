@@ -138,14 +138,23 @@ ORDER BY TABLE_NAME;
 
 ---
 
-## 8. Automatic Admin User Provisioning
+## 8. Explicit Initial Administrator Bootstrap
 
-On first startup in production, the ASP.NET Core runtime automatically seeds the initial administrator account:
-- **Email / Username:** `admin@karigor.com`
-- **Password:** `Admin123!`
-- **Role:** `Admin`
+Ordinary web startup seeds role definitions but never creates or promotes an administrator. Existing administrators are preserved.
 
-The user is generated through ASP.NET Core Identity's `UserManager.CreateAsync` with PBKDF2 cryptographic hashing. Immediately log in and change this password after initial verification.
+After provisioning the Identity tables, use a trusted interactive terminal with the published API and the intended database connection configured through the deployment's protected configuration:
+
+```text
+dotnet Karigor.Api.dll bootstrap-admin
+```
+
+Enter the intended email, then enter and confirm a unique password at the hidden prompts. The command accepts no additional arguments, refuses redirected input, creates the Identity account and Admin assignment in one SQL transaction, and exits without starting the web server. Do not put the password in arguments, environment variables, scripts or documentation.
+
+This is initial bootstrap only: it refuses existing accounts and refuses creation once an administrator exists. Exit codes are 0 for confirmed creation, 2 for usage/prompt errors, and 1 for unconfirmed bootstrap. Verify account/role state before retrying an unconfirmed database operation.
+
+If the hosting panel has no interactive terminal, use a trusted operator machine with the published API and authorized access to the intended database. Keep this command out of the automatic deployment workflow. See [F2_SECURE_ADMIN_BOOTSTRAP.md](security/implementation/F2_SECURE_ADMIN_BOOTSTRAP.md) for configuration and limitations.
+
+Removing startup seeding does not repair an exposed existing administrator. Review legacy accounts and credentials through an authorized operator process; this implementation preserves them and performs no credential rotation.
 
 ---
 
@@ -233,7 +242,7 @@ After the GitHub Actions workflow finishes:
 | 1 | Visit `https://<your-site>.monsterasp.net/` | React landing page loads with styles, images, and language selector |
 | 2 | Visit `https://<your-site>.monsterasp.net/swagger` | Swagger UI loads with API documentation |
 | 3 | Navigate directly in browser to `/login` | Login page loads directly without IIS 404 error |
-| 4 | Log in with `admin@karigor.com` / `Admin123!` | Successfully authenticates; redirects to Admin Dashboard |
+| 4 | Sign in using the explicitly bootstrapped administrator account | Successfully authenticates; redirects to Admin Dashboard |
 | 5 | Inspect cookie in browser DevTools | Cookie `karigor_rt` exists with flags: `HttpOnly = true`, `Secure = true`, `SameSite = Lax` |
 | 6 | Open DevTools Network tab | All API calls target `/api/...` on same HTTPS origin; 0 calls to localhost |
 | 7 | Check SignalR Chat | Status shows connected over same origin (`/hubs/chat`) |
@@ -314,5 +323,5 @@ To guarantee that continuous deployment runs do not delete uploaded user files:
 ## 20. Security Notes
 
 - **Never Commit Secrets:** Real database passwords, JWT signing keys, and WebDeploy credentials must **never** be placed in git, `appsettings.json`, or documentation.
-- **Secure Password Hashing:** The application uses ASP.NET Core Identity's PBKDF2 password hasher with SHA-256 for all stored user passwords.
+- **Secure Password Hashing:** Account creation uses ASP.NET Core Identity's configured password hasher; bootstrap does not generate hashes through custom code.
 - **Token Security:** JWT access tokens are stored strictly in frontend memory (module scope) and never in `localStorage` or `sessionStorage`. Refresh tokens are stored in `HttpOnly`, `SameSite=Lax`, `Secure` cookies.

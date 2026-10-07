@@ -695,3 +695,621 @@ flowchart TD
     Save --> Read[Authenticated participant status read]
     Read --> UI[Browser presents backend record]
 ```
+
+# F2 Secure Administrator Bootstrap
+
+Date: 2026-10-07 (Asia/Dhaka).
+
+Implemented and verified locally on base c43176d in J:/Karigor-F2-F4, branch fix/admin-bootstrap-and-xss-on-f1. This is a separate worktree: another checkout of the repository on its own branch. The original checkout and branch were left unchanged.
+
+## 1. What problem did we have?
+
+Starting the API also created a privileged user with a fixed email and known password. If someone already owned that email, startup gave the existing account the Admin role instead.
+
+A concrete failure was: a customer registers the fixed email, the application restarts, and that customer becomes an administrator without an operator approving the promotion. On a fresh database, someone who knew the published demo credentials could try the automatically created administrator instead. Customers, workers and their private data could be affected by misuse of that account.
+
+The login page also offered an Admin Demo button. Removing that button alone would not repair the startup behavior.
+
+We reproduced the original problem in an isolated SQL database before changing it. We did not inspect whether a real deployment already contained that account.
+
+## 2. Why was this fix necessary?
+
+A **trust boundary** is the point where information needs stronger authority before it can control an operation. Here, an ordinary application restart crossed the boundary into creating administrator privilege.
+
+**Authorization** means deciding who may perform an action. Possessing an email matching a constant is not authorization to become an administrator. The operator should explicitly choose a new initial account.
+
+**Bootstrap** means the first setup needed before a system can operate. Initial administrator setup belongs in an operator task, with a clear end, rather than in every web-server restart.
+
+## 3. What did we change?
+
+Normal startup now follows this sequence:
+
+Start API
+→ ensure the Customer, Worker and Admin role definitions exist
+→ check role-creation results
+→ leave user accounts and assignments alone
+→ continue existing initialization and start HTTP.
+
+A role definition is a label the application understands; creating the label Admin does not give it to anyone.
+
+Initial administrator setup now has a separate sequence:
+
+Run `dotnet Karigor.Api.dll bootstrap-admin`
+→ reject extra arguments or redirected input
+→ ask for email and two hidden password entries
+→ reject empty or mismatched input
+→ build services without starting the web server
+→ open a SQL transaction
+→ refuse existing email/username matches
+→ ensure the Admin role exists
+→ refuse setup if an administrator already exists
+→ create a new user and assign Admin using ASP.NET Core Identity
+→ commit both writes
+→ report a safe outcome and exit.
+
+**ASP.NET Core Identity** is the account library already used by Karigor. It validates users, hashes passwords and manages role assignments. We reused it; we did not create our own password hashing.
+
+A **transaction** groups database changes so they commit together or roll back together. User creation and role assignment share one scoped database context and one transaction. Every IdentityResult, the library's success/failure result, is checked.
+
+The transaction uses **serializable isolation**, which makes competing database operations behave as though they ran in a serial order. This protects the decision that no administrator exists. SQL's configured retry strategy retries certain temporary failures; each retry clears entities tracked by the failed attempt.
+
+The command runs before web startup, JWT configuration and startup schema work. It builds a non-web host but never starts it. Password characters are read without echo. No password is accepted in process arguments, printed in outcomes or recorded in these instructions.
+
+The UI's Admin Demo action was removed. Deployment/database instructions now describe the explicit command. The seed SQL change is a comment only.
+
+The detailed [F2 implementation guide](implementation/F2_SECURE_ADMIN_BOOTSTRAP.md) explains configuration, exit codes and each service.
+
+## 4. Before vs After
+
+| Before | After |
+|---|---|
+| Every startup could create a known-password administrator | Startup only ensures role definitions |
+| Matching the fixed email could promote a customer | Bootstrap refuses existing email or username matches |
+| Creation and role assignment could be treated separately | Both commit in one SQL transaction |
+| Failed Identity results could be ignored | Results are checked and failure stops setup |
+| Login UI advertised administrator demo credentials | That action is absent |
+| Restart and initial privileged setup were coupled | An explicit command performs initial setup and exits |
+
+## 5. Security invariant
+
+“Ordinary web startup must never create an administrator or promote a user by matching an email.”
+
+For the operator command: “A new initial account and its Admin assignment commit together; existing accounts are never promoted, and bootstrap closes once an administrator exists.”
+
+These rules matter because routine restarts should not change who controls the application. Preserving legitimate existing administrators is also part of the rule. This change does not revoke an old exposed account automatically.
+
+## 6. System-design concepts I learned
+
+**Concept: separate operator work from request serving.**
+
+Simple explanation: starting a website and granting its first privilege are different jobs.
+
+Karigor example: Program branches into bootstrap-admin before building the web server.
+
+Why engineers use it: routine availability work cannot accidentally grant privilege.
+
+Common mistake: leaving a one-time setup flag enabled in every deployment.
+
+**Concept: atomicity.**
+
+Simple explanation: either all related changes happen or none do.
+
+Karigor example: if SQL rejects the Admin assignment, the newly created user is rolled back too.
+
+Why engineers use it: partially completed setup is hard to reason about and recover safely.
+
+Common mistake: assuming two successful library calls automatically share a transaction.
+
+**Concept: concurrency and serialization.**
+
+Simple explanation: two operations may both read “none exists” before either writes.
+
+Karigor example: two initial administrator commands can compete. Serializable SQL plus retry makes one succeed and the other observe that setup is closed.
+
+Why engineers use it: a check performed before a write needs protection against another writer.
+
+Common mistake: using a process-only lock, which cannot coordinate two separately launched commands.
+
+**Concept: a test barrier.**
+
+Simple explanation: a barrier holds cooperating test operations at a chosen point until both arrive.
+
+Karigor example: the test releases both commands after they have checked the no-admin condition.
+
+Why engineers use it: it exercises the dangerous overlap deliberately.
+
+Common mistake: relying on Thread.Sleep, which changes timing without proving that overlap occurred.
+
+**Concept: safe diagnostics.**
+
+Simple explanation: explain failure without repeating confidential input.
+
+Karigor example: a rejecting Identity validator supplies a sensitive description; the command exposes only a generic outcome.
+
+Why engineers use it: error messages and logs are additional places credentials can escape.
+
+Common mistake: logging an entire exception or failed result without reviewing its contents.
+
+## 7. Failure scenarios
+
+If SQL rejects role assignment, the transaction rolls back the new account. The fixture-only CHECK constraint test proves this with real SQL, not an in-memory substitute.
+
+If two commands arrive together, the coordinated test produces one administrator. The other operation retries after the conflict and refuses setup. This is not a concurrency guarantee for unrelated registration, payment or session code.
+
+If input is malformed, weak or mismatched, setup fails. A customer matching the requested address is preserved rather than promoted. Extra arguments and redirected input stop before database/web startup.
+
+If the database connection or a commit response is lost, the command must not announce success. A lost response can be ambiguous: the complete transaction may already have committed. Exit 1 means success was not confirmed, not universal proof that no account exists. Inspect the intended database before retrying.
+
+If the operator retries after confirmed success, setup refuses another account and preserves the original. We tested both repeating the same identity and requesting another identity.
+
+If existing account/session state changes, this command does not repair it. Normal startup preserves legitimate administrators and the integration test verifies actual login. Session revocation and legacy credential rotation remain separate work.
+
+The password is hidden during entry but briefly exists in managed process memory. A compromised operator machine is outside what a hidden prompt can protect.
+
+## 8. Why this design was chosen
+
+| Alternative | Why considered | Why rejected or deferred |
+|---|---|---|
+| Development-only default administrator | Convenient demos | Keeps a shared privileged credential pattern without a requirement |
+| Startup environment flag | Easy to toggle | Still couples privilege to web startup; flag may remain enabled |
+| Password in arguments or piped input | Easy automation | Can expose secrets through histories, process inspection or scripts |
+| Direct SQL account insertion | Fewer application services | Bypasses Identity validation, normalization and password hashing |
+| Promote an existing email match | Convenient setup | An email match is not permission to elevate that account |
+| New console framework or identity service | More separation | Existing assembly and early command dispatch are enough here |
+| No transaction | Less code | Can leave a partial account or two initial winners |
+
+The cost is more setup code and deliberately limited failure messages. Serializable transactions can block or deadlock; the command is rare, short and uses the existing SQL retry strategy.
+
+No schema, migration, index or new infrastructure was introduced. The existing Identity tables and indexes remain. Test constraints exist only in generated databases.
+
+This follows the approved F2 design. ADR 0001 is empty in this base and was not rewritten; this task did not introduce a different architecture decision.
+
+## 9. Tests added
+
+The first row is the existing Phase 0 regression, promoted without changing its assertion. Other rows describe the new checks; theory rows include more than one executed case.
+
+| Test | Cases / what it does | Bug or invariant protected / why it matters |
+|---|---|---|
+| OrdinaryProductionStartupDoesNotProvisionDefaultAdministrator | 1; original promoted; Fresh Production-style WAF host → Start actual API → No fixed-email account created | No implicit privileged identity; startup + SQL |
+| RealCommandRejectsRedirectedInputOrExtraArgumentsWithoutStartingWebServer | 2: redirected input, extra argument; Actual API child process, redirected streams → Invoke bootstrap-admin → Exit 2; no web-start/listening output | Operator mode is explicit and non-web; process test |
+| MissingOrMismatchedPromptInputStopsBeforeDatabaseConfiguration | 3: email, password, confirmation; Synthetic prompt; no database supplied → Invoke command → Exit 2; no secret output | Invalid prompt cannot reach provisioning; unit |
+| ExplicitBootstrapCreatesExactlyOneRequestedAdministrator | 1; Fresh generated SQL Identity schema → Run actual command with test input/config → Exit 0; one hashed account/Admin assignment | Requested identity and privilege created together; SQL integration |
+| RepeatedBootstrapAndAdditionalAdministratorAreRejected | 1; One successfully bootstrapped account → Repeat same email, then try another email → Exit 1; one account/assignment, original password unchanged | Initial bootstrap closes and never overwrites; SQL integration |
+| BootstrapNeverPromotesAnExistingCustomer | 2: email match, username-only match; Existing customer and password → Request its address/name as bootstrap → Exit 1; customer preserved, no Admin | Matching an account is not promotion authority; SQL integration |
+| InvalidIdentityInputLeavesNoAccountOrRole | 2: bad email, weak password; Fresh generated database → Attempt bootstrap → Exit 1; zero users/assignments/roles | Input/Identity failure rolls back creation; SQL integration |
+| RoleAssignmentSqlFailureRollsBackAccountCreation | 1; Fixture-only CHECK rejects Admin assignment → Run bootstrap → Exit 1; no account or assignment | User creation cannot partially commit; real SQL fault |
+| RejectedRoleIdentityResultIsCheckedWithoutLeakingInput | 1; Real RoleManager with rejecting validator; sensitive description → Call bootstrap service → Throw safe error; no user/role; description absent | Failed Identity results are not ignored; SQL + Identity |
+| CoordinatedConcurrentBootstrapCreatesOnlyOneAdministrator | 1; Two scopes, distinct emails, validator barrier after no-admin reads → Run both bootstrap operations → One success; one closed-bootstrap rejection; one user/assignment | Serializable initial bootstrap prevents two winners; real SQL/barrier |
+| NormalStartupDoesNotPromoteDefaultEmailCustomer | 1; Create fixed-email customer, restart actual API on same fixture → Read roles/password after restart → Still Customer, not Admin; password works; three roles remain | Startup does not elevate by email; WAF/SQL |
+| ExistingAdministratorSurvivesStartupAndCanSignIn | 1; Existing hashed Admin; restart actual API → POST actual login → 200 with Admin role | Legitimate privileged identities survive; WAF/SQL/auth |
+| F2: login page offers no default administrator demo credentials | 1; Real LoginPage fixture with local mocked HTTP → Open login → Customer/Worker demos present; Admin Demo absent | Product UI no longer advertises default privilege; browser |
+
+The backend total is 17 passing cases. The login browser case also passes.
+
+Before the fix, the original Production-startup assertion failed. After the fix, the same assertion passed, its classification became GREEN BASELINE and only F2_DEFAULT_ADMIN was removed from the known-defect manifest. We did not weaken the assertion or change the classifier.
+
+**WebApplicationFactory** is the ASP.NET Core test host that runs the actual API entry point with test services and configuration. The startup/login tests combine that host with disposable SQL Server. The command tests use either an actual child process or a controlled prompt. Database correctness tests use real SQL because transactions and locks are the behavior being examined.
+
+A real interactive-terminal smoke test also created one synthetic administrator in a generated local database. Both password entries were hidden, the command exited 0, SQL showed one account and assignment, and the database was removed afterward. No production password was used.
+
+There were no skipped F2 cases. In the combined backend run, five expected failures remain for F3/F5/F7; those are not F2 successes.
+
+## 10. Files changed
+
+| File | What changed | Why |
+|---|---|---|
+| backend/Karigor.Api/Program.cs | Early explicit command dispatch; roles-only ordinary startup | Remove default creation/promotion |
+| backend/Karigor.Api/Administration/AdminBootstrapCommand.cs | Hidden prompt; no args/piping; non-web service host; safe exit messages | Separate operator provisioning from HTTP startup |
+| backend/Karigor.Api/Administration/AdminBootstrapper.cs | Initial-only Identity creation in retried serializable SQL transaction | Reject promotion/partial privilege/concurrent winners |
+| backend/Karigor.Api/Administration/IdentityRoleSeeder.cs | Idempotent role definitions and checked Identity results | Preserve roles without implicit users |
+| karigor-client/src/pages/auth/LoginPage.tsx | Remove Admin Demo handler/button | Retire unsafe credential shortcut |
+| tests/Karigor.Security.Tests/AdminBootstrapCommandTests.cs | Five command/input tests | Prove process exit and prompt rejection |
+| tests/Karigor.Security.Tests/AdminBootstrapSecurityTests.cs | Eleven actual SQL/startup/login/bootstrap cases | Verify authority, rollback and coordination |
+| tests/Karigor.Security.Tests/ApiSecurityTests.cs | Promote original F2 classification; assertion unchanged | Make verified startup rule blocking |
+| tests/known-security-defects.json | Remove only F2_DEFAULT_ADMIN entry | Keep unrelated failures explicit |
+| karigor-client/e2e/fixtures/payment.tsx | Test-only option mounts actual LoginPage | Reuse existing auth/query/router fixture; payment code unchanged |
+| karigor-client/e2e/admin-bootstrap.security.spec.ts | Actual login UI regression | Verify Admin Demo removal |
+| docs/MONSTERASP_DEPLOYMENT.md | Replace automatic/default admin setup with explicit prompt command | Correct operator instructions |
+| database/production/README.md | Replace automatic admin setup instructions | Correct provisioning sequence |
+| database/production/002_seed.sql | Admin-setup comment only; executable SQL identical | Remove misleading automatic-provisioning note |
+| docs/security/implementation/F2_SECURE_ADMIN_BOOTSTRAP.md | Final F2 architecture, commands/tests/limits | Technical implementation reference |
+| docs/security/SECURITY_WORKDONE.md | Append two dated study entries; preserve Order 0/F1 history | Explain why each task matters |
+| docs/testing/PHASE1_SECURITY_TEST_HARNESS.md | Update current F2/F4 status; preserve prior evidence | Keep current gates distinguishable from historical red tests |
+
+The shared study log and harness guide also record F4. Payment production code, authorization endpoints, session code and executable SQL were not changed for F2.
+
+## 11. Commands and verification
+
+Important commands actually executed from the separate worktree:
+
+```text
+python scripts/run-security-tests.py --strict --filter "Finding=F2"
+dotnet build Karigor.slnx --configuration Release --no-restore
+dotnet test tests/Karigor.Security.Tests/Karigor.Security.Tests.csproj --configuration Release --filter "Finding=F2" --logger "trx;LogFileName=f2-after.trx" --results-directory TestResults/f2
+python scripts/run-security-tests.py --no-build --strict --filter "Finding=F2"
+npm --prefix karigor-client run test:security -- --grep "^F2:"
+dotnet backend/Karigor.Api/bin/Release/net10.0/Karigor.Api.dll bootstrap-admin
+python scripts/run-security-tests.py --no-build
+python -m unittest discover -s scripts/tests -v
+npm --prefix karigor-client run typecheck:security
+npm --prefix karigor-client run test:security
+npm --prefix karigor-client run build
+npm --prefix karigor-client run lint
+```
+
+The first strict command was pre-fix: one known assertion failed, exit 1. Post-fix raw and strict F2 runs each passed 17 cases. The targeted login browser run passed one.
+
+The real command invocation above used a guarded generated SQL fixture, not production configuration. sqlcmd applied the existing schema, read the resulting counts and dropped the generated database.
+
+The final solution build passed with zero warnings/errors. Two early test-code build warnings were corrected before that build.
+
+Combined backend: 73 executed, 68 passed, five exact known F3/F5/F7 failures, zero skips. Raw dotnet exited 1; the existing accounting gate exited 0. All 47 F1 backend cases remain green. Classifier self-tests: six passes.
+
+Combined browser: 19 passed, zero expected failures/skips. Browser fixture typechecking and frontend build passed. Existing Vite configuration/bundle warnings remain. Lint exited 0 with 20 existing warnings.
+
+The browser used installed Chrome and blocked external origins. The test command required the actual Node/npm directory in PATH; locked packages were installed without changing the package or lock files. Nine existing npm advisories were reported and not repaired in this task.
+
+Detailed raw report paths are in the F2 guide. GitHub-hosted CI, the actual hosting console and production were not run. No commit, push, merge, deployment or production credential change was performed.
+
+Final inspection passed: git diff --check with the repository's Windows line-ending settings, exact 21-file scope, UTF-8/fence/link checks, both 15-section study entries, preserved previous history, report counters and unchanged executable seed SQL. The original F2 assertion/body is unchanged; its classification is the only edit in ApiSecurityTests. The original F4 safe assertion was also confirmed unchanged. A read-only sqlcmd query found zero generated fixture databases, and no test process referenced this worktree.
+
+Two inspection attempts needed correction: overriding Git's line-ending mode produced CRLF whitespace reports, and an ad hoc assertion check initially assumed the wrong browser probe name. Rechecking with the repository settings and the actual assertion passed. Neither required a production-code change or a weakened security test.
+
+## 12. Remaining risks / limitations
+
+**Actually implemented:** roles-only startup, explicit initial bootstrap, hidden input, checked Identity results, atomic account/role creation, local concurrency protection, and removal of the administrator demo shortcut.
+
+**Still requires operator work:** determine whether an old default account is exposed, rotate/revoke it if authorized, and review sessions. Existing production identities were preserved and not inspected.
+
+The command does not confirm ownership of the entered email or set EmailConfirmed. It is authorized through trusted executable/database access, not an HTTP permission check. Hidden entry does not protect against a compromised terminal, and diagnostic detail is intentionally limited.
+
+The current Identity policy is registered in both normal application setup and command setup; future policy changes must keep them aligned. Startup seeding can still have availability failures if the database cannot create a role. This task does not redesign concurrent normal web startup.
+
+F3 private realtime authorization, F5 quotation consent, F7 document handling and F6 session redesign remain unresolved. F1's later consistency/idempotency work remains separate.
+
+Educational scaling, without implementing a redesign:
+
+| Scale | What changes conceptually |
+|---|---|
+| 100 users | One trusted operator and the existing SQL setup are adequate to evaluate |
+| 10,000 users | Administrator lifecycle, reviews and safe recovery matter more than bootstrap throughput |
+| 1,000,000 users | Privilege approvals, audit evidence and separation of operator duties need stronger process; do not run bootstrap per user |
+
+Bootstrap frequency is not proportional to customer count. No IAM service, audit infrastructure or distributed lock was added for these examples.
+
+## 13. How I would explain this in an interview
+
+### 30-second explanation
+
+Karigor granted administrator privilege during ordinary startup using a fixed identity. I removed account creation and email-based promotion from startup and added an explicit initial setup command with hidden password entry. Identity creation and role assignment share a serializable SQL transaction. Tests prove no startup promotion, rollback on assignment failure and one winner under coordinated concurrency. Existing production accounts still need a separate review.
+
+### 2-minute explanation
+
+The original flaw mixed application availability with privileged setup. Starting the server could create a known-password administrator or elevate a customer who matched the configured email. Removing the UI demo was necessary but would not repair that trust boundary.
+
+I kept the current Identity and SQL stack. Normal startup now seeds role definitions only. A command mode branches before HTTP and JWT setup, requires an interactive protected prompt, rejects existing accounts and closes once an administrator exists.
+
+UserManager and RoleManager use the same scoped database context. Every result is checked, and account creation plus Admin assignment run in one serializable transaction. The existing SQL retry strategy handles temporary conflicts; a retry clears state from the rolled-back attempt.
+
+I tested real API startup, actual login, a real command subprocess, malformed prompts, a failed role validator and a SQL constraint fault. A barrier forces two initial commands into the dangerous overlap rather than relying on timing delays. Seventeen backend cases and the login browser case pass, including the original unchanged regression.
+
+The tradeoff is limited diagnostics and serializable locking for a rare operator operation. This is not automated recovery or credential revocation. An uncertain commit must be inspected, and old exposed production accounts were deliberately preserved until separately reviewed.
+
+## 14. Interview questions
+
+1. **Why seed Admin as a role but not a user?** The role defines a permission category; assignment grants that permission to a specific identity. Startup needs definitions, not new privileged people.
+2. **Why reject existing accounts?** A matching email or username is not operator approval to elevate its current owner.
+3. **What does the SQL fault test prove?** If role assignment fails, the newly created account does not remain. It tests an actual database transaction.
+4. **Why is a barrier better than a sleep?** It proves both operations reached the relevant decision before allowing the writes to compete.
+5. **Does removing default seeding revoke an old administrator?** No. Old accounts and sessions need separate authorized review; changing future startup cannot undo past exposure.
+
+## 15. What should I study next?
+
+1. ASP.NET Core Identity stores and IdentityResult: how validation, hashing and role assignments reach SQL.
+2. SQL serializable locks and deadlocks: why competing absence checks need coordination.
+3. Transaction retry and uncertain commit recovery: why an error can mean “unknown.”
+4. Operator credential handling and account lifecycle: how to separate initial setup from recovery and revocation.
+
+```mermaid
+flowchart TD
+    Start[Program entry] --> Mode{Explicit bootstrap-admin?}
+    Mode -->|No| Roles[Ensure roles only]
+    Roles --> Web[Existing web startup]
+    Mode -->|Yes| Prompt[Protected interactive prompt]
+    Prompt --> Tx[Serializable SQL transaction]
+    Tx --> Check{New identity and no Admin?}
+    Check -->|No| Refuse[Safe failure; rollback]
+    Check -->|Yes| Create[Identity create + Admin assignment]
+    Create --> Commit[Commit together; exit without HTTP]
+```
+
+# F4 Stored XSS Prevention
+
+Date: 2026-10-07 (Asia/Dhaka).
+
+Implemented and verified locally in the same J:/Karigor-F2-F4 worktree. This entry describes map rendering; it does not claim that unrelated authorization or upload problems were repaired.
+
+## 1. What problem did we have?
+
+Request descriptions and addresses entered Leaflet popup HTML strings. Other dynamic values, including categories, worker email/skills and translated labels, used similar HTML paths.
+
+**Stored cross-site scripting (stored XSS)** means an attacker saves text that later becomes executable content in another person's browser. For example, a customer could save an image tag with an error handler in a request description. A worker opening that request's map popup could execute the handler under Karigor's page origin.
+
+The browser test's harmless handler only flips a local boolean. Before the fix, the original test observed execution and failed its safe assertion. A real attacker could attempt actions available to that browser session. We did not perform a production attack or inspect stored production content.
+
+React did not automatically escape these strings because the map handed them directly to Leaflet's HTML APIs, outside React's normal text rendering.
+
+## 2. Why was this fix necessary?
+
+A **rendering sink** is the API that receives data for display. A dangerous sink interprets the data as markup or code; a safe text sink displays it literally.
+
+**Output context** means where and how the browser interprets a value. Text, HTML, URLs and JavaScript are different contexts. This task uses the plain-text context because map descriptions and labels do not require user-authored HTML.
+
+The trust boundary is between stored or translated data and the browser's parser. A database value is still untrusted when displayed. Storing the value successfully never made it safe HTML.
+
+## 3. What did we change?
+
+The rendering sequence is now:
+
+Receive nearby data or map translations
+→ create DOM elements
+→ assign dynamic values through textContent
+→ construct fixed visual icons separately
+→ give Leaflet completed nodes
+→ display literal text
+→ use direct listeners for profile/quote actions.
+
+**DOM** means the browser's document object model: the actual nodes that form the page. **textContent** assigns text to a node without asking the HTML parser to interpret it.
+
+The component's textElement helper creates elements, sets their fixed classes and assigns textContent. Request category, description, address, distance and button text all follow this path. Worker email, skill names, rate, rating/distance and translated labels do too.
+
+Picker badge/popup, user-location popup and worker-base coverage popup were included. We checked marker labels as well as the larger popups, because a small label can also be an HTML sink.
+
+Repository-owned SVG icons use a private helper with a closed set of fixed keys. Its remaining HTML parser input is only source-controlled SVG constants. Static attribution and two fixed marker shells remain static markup. Dynamic data does not enter them.
+
+Buttons are constructed directly, keep type=button and receive listeners on the actual node. Quote/profile/selection callbacks are preserved, including quote's request-selection fallback. Marker effects now include the relevant callbacks/translations so a redraw uses current values.
+
+No stored data was rewritten, no angle brackets were stripped and no sanitizer, framework or content-security-policy deployment was added. Bengali, quotes, ampersands and bracket characters remain visible as entered.
+
+The [F4 implementation guide](implementation/F4_STORED_XSS_PREVENTION.md) contains the complete sink inventory.
+
+## 4. Before vs After
+
+| Before | After |
+|---|---|
+| User description/address parsed as popup HTML | Literal DOM text |
+| Category could become markup in both badge and popup | Text in both locations |
+| Worker email/skills entered popup HTML | Text nodes |
+| Some translations entered HTML strings | Text in markers/location/picker popups |
+| Interpolated button markup needed later lookup | Direct button nodes and listeners |
+| Existing malicious rows could execute at these sinks | The same strings display literally |
+| Input stripping might damage legitimate text | Original Bengali and punctuation are preserved |
+
+## 5. Security invariant
+
+“Every dynamic value displayed by KarigorMap must remain text rather than executable markup.”
+
+Fixed repository icons are a separate boundary: they must stay fixed and never interpolate request, worker or translation values.
+
+The rule protects the browser viewing another person's stored content. It also makes future maintenance clearer: adding a new map field means passing text to a text API, not assembling another HTML template.
+
+## 6. System-design concepts I learned
+
+**Concept: stored XSS.**
+
+Simple explanation: someone else's saved text turns into code when you view it.
+
+Karigor example: a request description becomes an image handler in a worker's popup.
+
+Why engineers use the concept: it connects storage, later display and the victim's session.
+
+Common mistake: assuming that “came from our database” means “trusted.”
+
+**Concept: context-specific rendering.**
+
+Simple explanation: use the API that matches the intended meaning of the data.
+
+Karigor example: descriptions and category names go to textContent because they are text.
+
+Why engineers use it: escaping for one context does not automatically protect another.
+
+Common mistake: treating all output safety as one generic string replacement.
+
+**Concept: separating code from data.**
+
+Simple explanation: our fixed icons are markup; a customer's description is data.
+
+Karigor example: staticIcon accepts only keys into fixed source SVGs, while textElement accepts the labels.
+
+Why engineers use it: the parser boundary becomes easy to inspect.
+
+Common mistake: later adding user data to a supposedly static template.
+
+**Concept: resource lifetime.**
+
+Simple explanation: a marker's nodes and listeners should exist only as long as that marker.
+
+Karigor example: clearing layers on redraw and removing the map on unmount avoids retaining old quote listeners.
+
+Why engineers use it: callbacks should fire once and use current data.
+
+Common mistake: repeatedly attaching listeners to surviving elements without removing old ones.
+
+**Concept: browser component testing.**
+
+Simple explanation: exercise one real UI component in an actual browser with controlled inputs.
+
+Karigor example: the fixture mounts the real KarigorMap, opens Leaflet popups and observes DOM/events.
+
+Why engineers use it: HTML parsing and image/SVG events cannot be proved by a string-only assertion.
+
+Common mistake: checking that a payload string was escaped somewhere without proving how the final browser renders it.
+
+## 7. Failure scenarios
+
+If someone supplies hostile HTML-looking text, it is displayed literally. Tests verify the text, absence of injected handler elements and absence of execution. They cover image and SVG variants.
+
+If a database/API request fails, data loading behavior is unchanged. This component renders supplied props; it does not add recovery or database writes. Safe rendering works whenever data reaches it.
+
+If map data updates quickly or the component redraws, nodes are rebuilt through the same text path. Repeated redraw/remount tests verify one quote action per click and one map after remount. They are not a general backend concurrency proof.
+
+If external tiles or mocked services fail, tests still exercise local markers and popups. External browser origins are blocked. Google/SignalR console messages from controlled fixtures do not establish live integration behavior.
+
+If the client retries or remounts, rendering remains text. The test checks callback counts through several redraws and a remount.
+
+If authentication changes, this rendering rule still applies, but access control remains the responsibility of the existing API/session layers. XSS prevention does not prove that a user is authorized to read a booking.
+
+If the quote callback is absent, the original selection fallback remains available. Profile, picker and location behavior also have browser checks.
+
+## 8. Why this design was chosen
+
+| Alternative | Why considered | Why rejected or deferred |
+|---|---|---|
+| Escape every template interpolation | Small local changes | Easy to miss one field or use the wrong context |
+| Strip angle brackets on input | Simple validation rule | Damages legitimate text and does not protect old rows |
+| Clean all stored rows | Remove known examples | Changes data while leaving the unsafe rendering sink |
+| Add an HTML sanitizer | Useful for formatted user content | Map text has no requirement for user-authored HTML |
+| Create React roots inside every popup | Reuse JSX escaping | Adds root lifecycle/unmount work without needing it |
+| Rely only on CSP | Can reduce exploitability | Does not repair these sinks and needs separate compatibility review |
+
+**Content Security Policy (CSP)** is a browser policy restricting allowed sources and kinds of content. It can be defense in depth, meaning another protective layer, but it was not introduced here.
+
+DOM construction is more verbose than a string template. The benefit is a visible rule for every dynamic value while keeping Leaflet's existing lifecycle. No SQL constraints, indexes, migrations or transactions changed because this is a display-boundary fix.
+
+The approach follows the approved F4 design. ADR 0001 remains untouched; no different architecture decision was introduced.
+
+## 9. Tests added
+
+Every map case uses actual Chrome, Leaflet and the production component. The payloads only flip a local test boolean. The baseline and original regression are preserved; the fixture now covers additional fields and interactions.
+
+| Test | What it does / expected result | Bug or invariant protected / why it matters |
+|---|---|---|
+| GREEN BASELINE: plain request popup and quote callback work | Ordinary request DTO → Open popup and press quote → Description shown; callback request 123 | Preserve normal request interaction |
+| GREEN REGRESSION F4: stored map text cannot execute HTML | Original image-handler description → Open actual popup → Original execution assertion false; literal payload; no image | Promoted original XSS rule |
+| F4: request address image markup remains literal | Image-handler address → Open popup and quote → Literal text, no image/handler or execution; quote works | Address is text |
+| F4: request category image markup remains literal | Image-handler category → Inspect marker badge and popup → Literal category; no image/handler or execution | Marker HTML is also a trust boundary |
+| F4: request category svg markup remains literal | SVG-load category → Inspect marker badge and popup → Literal SVG text; no onload/execution | Different payload type stays inert |
+| F4: worker email markup remains literal and profile actions work | Image-handler email → Click marker then profile button → Literal email; no execution; callback counts 1 then 2 | Name/email label does not become code |
+| F4: worker skill markup remains literal and profile actions work | SVG-load skill/category → Click marker then profile button → Literal skill; no execution; callbacks once per action | Skill names are text |
+| F4: Bengali quotes ampersands and angle brackets are preserved | Bengali/special-character description and address → Open popup → Exact original strings retained | Safety must not destroy legitimate text |
+| F4: translated worker marker label remains literal | Hostile translated New label → Inspect worker icon and popup → Literal label; no image/execution | Translations do not enter HTML |
+| F4: user and worker-base location popup translations remain literal | Hostile location titles/coverage translation → Open both location popups, closing each between actions → Literal labels; no image/execution | All location popup text uses safe DOM |
+| F4: picker text remains literal and map selection works | Hostile drag/title/hint translations → Open picker popup and select map position → Literal text; no image/execution; coordinates emitted | Picker badge/popup and interactions survive |
+| F4: redraw and remount do not accumulate quotation handlers | Normal request with counters and controlled redraw/mount → Three redraw/quote cycles; unmount/remount; quote again → Counts 1,2,3,4; one map after remount | Listeners belong to the current marker |
+| F4: quotation button preserves request-selection fallback | No onRequestQuote callback → Select marker then press quote → Selection counts 1 then 2; zero quote callbacks | Existing fallback behavior remains |
+
+All 13 map cases passed, with zero skipped or expected-failure cases after promotion.
+
+The original safe execution assertion was not changed. Before remediation it failed and was accounted as an expected failure. After remediation it passed while the annotation still expected failure, so Playwright reported “Expected to fail, but passed” and exited 1. Only then did we remove test.fail and promote the case to GREEN REGRESSION. This is the **Red → Green workflow**: observe a real failing invariant, fix its cause, then make that same invariant a blocking check.
+
+One initial expanded run had 12 passes and one timeout: the first location popup covered the second marker. The test now closes the first popup using its real close button before opening the other. We did not use a forced click, arbitrary sleep or weaker assertion. The corrected map run passed 13, and the combined browser run passed 19.
+
+The fixture feeds DTO-shaped props directly into the real component. It is not an end-to-end proof of database persistence or a live customer-to-worker journey.
+
+## 10. Files changed
+
+| File | What changed | Why |
+|---|---|---|
+| karigor-client/src/components/map/KarigorMap.tsx | Safe DOM/text for all dynamic icons/popups; direct listeners; current callbacks/translations in effect dependencies | Render stored text inertly and preserve interactions |
+| karigor-client/e2e/fixtures/map.tsx | Worker/location/picker/text/redraw/remount scenarios and harmless probes | Exercise actual component boundaries |
+| karigor-client/e2e/map.security.spec.ts | Promote original safe assertion; twelve additional/baseline cases | Verify rendering and interactions in Chrome |
+| docs/security/implementation/F4_STORED_XSS_PREVENTION.md | Final sink inventory, flows, tests and limitations | Technical implementation reference |
+| docs/security/SECURITY_WORKDONE.md | Append two dated study entries; preserve Order 0/F1 history | Explain why each task matters |
+| docs/testing/PHASE1_SECURITY_TEST_HARNESS.md | Update current F2/F4 status; preserve prior evidence | Keep current gates distinguishable from historical red tests |
+
+Only KarigorMap changes production behavior for F4. The separate F2 entry describes the login fixture and administrator changes. Payment architecture, SignalR membership, negotiation, refresh and document code were preserved.
+
+## 11. Commands and verification
+
+Commands actually executed:
+
+```text
+npm --prefix karigor-client run test:security -- --grep "EXPECTED-FAIL REGRESSION F4"
+npm --prefix karigor-client run test:security -- --grep "stored map text cannot execute HTML"
+npm --prefix karigor-client run typecheck:security
+npm --prefix karigor-client run test:security -- map.security.spec.ts
+dotnet build Karigor.slnx --configuration Release --no-restore
+python scripts/run-security-tests.py --no-build
+python -m unittest discover -s scripts/tests -v
+npm --prefix karigor-client run test:security
+npm --prefix karigor-client run build
+npm --prefix karigor-client run lint
+```
+
+Pre-fix original F4: the safe assertion failed as expected; native expected-failure accounting returned process 0. Post-fix with that annotation still present: the safe assertion passed, and process 1 signaled the unexpected pass. Final promoted map suite: 13 passes.
+
+Combined browser suite: 19 actual passes, zero failures, expected failures or skips. This includes five existing F1 payment cases and the F2 login case. No external payment provider was contacted.
+
+Combined backend: 68 passes and five exact known F3/F5/F7 failures from 73 cases. The raw runner exited 1 and the unchanged accounting gate exited 0. Nothing is silently skipped. Classifier self-tests: six passes.
+
+Backend build passed with zero warnings/errors. Browser fixture typechecking and frontend build passed. Existing Vite configuration/bundle warnings remain. Lint exited 0 with 20 existing warnings; the map's relevant callback/translation dependency warning was removed.
+
+Final browser results are at karigor-client/test-results/security-browser/results.json. Detailed backend report paths and the sink inventory are in the implementation guides.
+
+Chrome was the only tested browser. Hosted CI, production stored rows and deployment were not exercised. No commit, push, merge or deployment was performed.
+
+Final git diff --check passed with the repository's Windows line-ending settings. File-scope, documentation and recorded-result checks passed; earlier study history is preserved. The original no-execution assertion is byte-for-byte the same text. A final read-only check found zero generated SQL fixture databases and no test processes referencing this worktree. The exact production scope is Program, the three new Administration classes, LoginPage and KarigorMap; all payment/SignalR/negotiation/session/document production surfaces remain unchanged from the selected base.
+
+## 12. Remaining risks / limitations
+
+**Actually implemented:** safe text rendering for all dynamic KarigorMap popups and marker labels, preserved actions, and browser regressions promoted to blocking checks.
+
+**Not established:** application-wide freedom from XSS, correct resource authorization, safe worker-document previews, or session revocation. Other rendering components were not comprehensively tested by this task.
+
+A future map change must preserve the fixed-icon boundary and use textContent for dynamic values. HTML-looking text is intentionally visible; there is no supported rich-HTML formatting feature.
+
+Tests use Chrome and controlled props/HTTP. They do not prove Firefox/Safari compatibility or production persistence. Existing map initialization/ref lint warnings and marker recreation costs remain. No performance redesign or CSP rollout was made.
+
+F3/F5/F7 known defects and F6/later payment consistency work remain. Both F2 and F4 can be locally correct while those separate risks still exist.
+
+Educational scaling:
+
+| Scale | What to examine if load requires it |
+|---|---|
+| 100 users | Correct literal rendering and normal interactions |
+| 10,000 users | Visible marker count, update frequency and client memory; measure before choosing clustering |
+| 1,000,000 users | Viewport-limited data and rendering budgets may matter; the text/code rule still applies |
+
+User count alone does not determine how many markers one browser renders. No million-user redesign or new infrastructure was implemented.
+
+## 13. How I would explain this in an interview
+
+### 30-second explanation
+
+Karigor passed stored request text into Leaflet HTML strings, so a malicious description could execute when someone opened a popup. I replaced every dynamic map label and popup with DOM nodes using textContent and kept fixed SVG icons separate. The original browser assertion is now green, with tests for image/SVG payloads, Bengali text and unchanged quote/profile/picker actions. Stored data needs no rewrite.
+
+### 2-minute explanation
+
+The vulnerability was at the output boundary. The backend could store a description normally, but the map later asked the browser to interpret that description as HTML. React's automatic escaping did not help because the values went directly to Leaflet divIcon and bindPopup APIs.
+
+I audited both marker labels and popups. The fix uses createElement and textContent for request fields, worker labels and translated location/picker text. Leaflet receives completed nodes. Only a closed set of fixed repository SVGs still crosses an HTML parser. Buttons use direct listeners, and redraw effects include current callbacks and translations.
+
+The original actual-browser test failed before the change. When it passed afterward, the expected-failure annotation deliberately caused an unexpected-pass signal; then I promoted the unchanged assertion. Thirteen map cases prove literal hostile text, no injected handler elements, special-character preservation, profile/quote/fallback actions, picker selection and redraw/remount behavior.
+
+The cost is more verbose DOM code. We avoided a sanitizer because user HTML formatting is not required, and avoided input stripping because it would damage legitimate text and leave old rows vulnerable. This is locally verified component safety, not an application-wide XSS or live production claim.
+
+## 14. Interview questions
+
+1. **Why did stored text remain untrusted?** The database stores values; it does not decide whether they are safe for the browser's HTML context.
+2. **Why didn't React escaping help?** These values bypassed JSX and entered Leaflet HTML APIs directly.
+3. **Why use textContent?** It displays characters literally without creating executable markup.
+4. **Why is a real browser test useful?** HTML parsing and image/SVG events determine execution; an isolated string assertion misses that behavior.
+5. **Why not sanitize or delete old payloads?** Text rendering meets the requirement without changing user data. Cleaning rows would leave the unsafe sink and future payloads.
+
+## 15. What should I study next?
+
+1. Browser output contexts and safe sinks: text, attributes, URLs and script contexts have different rules.
+2. Leaflet node/listener lifecycle: why redraw and unmount tests belong beside rendering security tests.
+3. Stored versus DOM XSS: how saved data and client-side transformations reach execution.
+4. CSP as defense in depth: how a separate policy can supplement correct rendering without replacing it.
+5. Browser component versus full E2E tests: what controlled props prove and what persistence/authorization journeys still require.
+
+```mermaid
+flowchart LR
+    Data[Stored DTO values + translations] --> Text[DOM textContent]
+    SVG[Fixed repository SVG constants] --> Icon[Closed staticIcon helper]
+    Text --> Nodes[Popup + marker nodes]
+    Icon --> Nodes
+    Nodes --> Map[Leaflet displays literal text]
+    Map --> Action[Direct profile / quote / picker actions]
+```

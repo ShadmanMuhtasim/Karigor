@@ -12,7 +12,14 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using Karigor.Abstractions.Worker;
+using Karigor.Api.Administration;
 
+// Explicit operator mode runs before web configuration, logging, startup seeding or listener creation.
+if (AdminBootstrapCommand.IsRequested(args))
+{
+    Environment.ExitCode = await AdminBootstrapCommand.RunAsync(args[1..]);
+    return;
+}
 
 // ---------------------------------------------------------------------------
 // Bootstrap Serilog early so all startup events are captured
@@ -360,43 +367,11 @@ try
     // -------------------------------------------------------------------------
     var app = builder.Build();
 
-    // Seed roles and initial admin on startup (idempotent)
+    // Seed ordinary roles only. Administrator accounts require explicit operator bootstrap.
     using (var scope = app.Services.CreateScope())
     {
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-        foreach (var roleName in new[] { "Customer", "Worker", "Admin" })
-        {
-            if (!roleManager.RoleExistsAsync(roleName).GetAwaiter().GetResult())
-            {
-                roleManager.CreateAsync(new IdentityRole(roleName)).GetAwaiter().GetResult();
-            }
-        }
-
-        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-        const string adminEmail = "admin@karigor.com";
-        var existingAdmin = userManager.FindByEmailAsync(adminEmail).GetAwaiter().GetResult();
-        if (existingAdmin == null)
-        {
-            var adminUser = new ApplicationUser
-            {
-                UserName = adminEmail,
-                Email = adminEmail,
-                EmailConfirmed = true
-            };
-            var createRes = userManager.CreateAsync(adminUser, "Admin123!").GetAwaiter().GetResult();
-            if (createRes.Succeeded)
-            {
-                userManager.AddToRoleAsync(adminUser, "Admin").GetAwaiter().GetResult();
-                Log.Information("Seeded default Administrator account: {AdminEmail}", adminEmail);
-            }
-        }
-        else
-        {
-            if (!userManager.IsInRoleAsync(existingAdmin, "Admin").GetAwaiter().GetResult())
-            {
-                userManager.AddToRoleAsync(existingAdmin, "Admin").GetAwaiter().GetResult();
-            }
-        }
+        IdentityRoleSeeder.EnsureAsync(roleManager, "Customer", "Worker", "Admin").GetAwaiter().GetResult();
 
         // Service categories are required during worker registration.  Seed them
         // here so a new developer database works without manually running SQL.

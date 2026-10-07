@@ -58,11 +58,6 @@ export function LoginPage() {
     setPassword('Password123!');
   };
 
-  const fillDemoAdmin = () => {
-    setEmail('admin@karigor.com');
-    setPassword('Admin123!');
-  };
-
   return (
     <div className="min-h-screen bg-white dark:bg-gray-950 text-gray-900 dark:text-white transition-colors duration-200 flex flex-col">
       <Navbar />
@@ -272,13 +267,6 @@ export function LoginPage() {
                   className="btn-press px-2.5 py-2 sm:py-1.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 rounded-xl text-xs font-bold border border-emerald-200 dark:border-emerald-800 cursor-pointer text-center"
                 >
                   {t('auth.demoWorker', 'Worker Demo')}
-                </button>
-                <button
-                  type="button"
-                  onClick={fillDemoAdmin}
-                  className="btn-press px-2.5 py-2 sm:py-1.5 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 hover:bg-purple-100 rounded-xl text-xs font-bold border border-purple-200 dark:border-purple-800 cursor-pointer text-center"
-                >
-                  {t('auth.demoAdmin', 'Admin Demo')}
                 </button>
               </div>
             </div>

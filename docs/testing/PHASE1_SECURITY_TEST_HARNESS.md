@@ -1,6 +1,8 @@
 # Phase 1 security test harness: Order 0
 
-**Current F1 state (2026-10-07):** immediate payment containment is locally verified. All 47 F1 backend cases and five payment-return browser cases pass. The four original F1 exceptions have been removed. The full backend gate has 51 passes and six unrelated expected failures; the browser suite has six passes and the unchanged expected F4 failure. The Order 0 results below are historical evidence, preserved as recorded. See the [F1 implementation guide](../security/implementation/F1_PAYMENT_TRUST_AND_VERIFICATION.md) for current architecture, test inventory and limitations.
+**Current F2/F4 state (2026-10-07):** F2 and F4 are locally verified in J:/Karigor-F2-F4 on fix/admin-bootstrap-and-xss-on-f1, based on c43176d. F2 has 17 passing backend cases and one login browser case; all 13 map cases pass. Combined backend: 68 passes and five unrelated expected F3/F5/F7 failures. Combined browser: 19 passes, zero failures/skips. The original F2 exception and F4 expected-failure annotation are removed. See [F2](../security/implementation/F2_SECURE_ADMIN_BOOTSTRAP.md) and [F4](../security/implementation/F4_STORED_XSS_PREVENTION.md).
+
+**Prior F1 completion record:** all 47 F1 backend cases and five payment-return browser cases remain green in the combined suite. The four F1 exceptions were removed in that earlier task. See the [F1 implementation guide](../security/implementation/F1_PAYMENT_TRUST_AND_VERIFICATION.md). Order 0 results below remain historical evidence.
 
 Date: 2026-10-07 (Asia/Dhaka).
 Implementation base: cda8059b77ceec591a3b6d1305c83749df95bcb1 on test/phase1-security-harness.

@@ -34,8 +34,12 @@ When setting up a new production database on MonsterASP:
    - Run in the same database context.
    - **What it does**: Seeds the core Identity roles (`Customer`, `Worker`, `Admin`) and standard `ServiceCategories` (10 categories with CDN icons).
 
-4. **Runtime First-Startup (Automatic)**:
-   - On the first startup of the ASP.NET Core API, the application will automatically create the initial administrator user (`admin@karigor.com` / `Admin123!`) using standard ASP.NET Core Identity password hashing (`UserManager.CreateAsync`).
+4. **Explicit Initial Administrator Bootstrap**:
+   - Ordinary API startup seeds roles but never creates/promotes an administrator.
+   - From a trusted interactive terminal with the published API and intended database configuration, run `dotnet Karigor.Api.dll bootstrap-admin`.
+   - Enter the operator-selected email and password at the prompts; password input is hidden and must not be placed in process arguments, scripts or documentation.
+   - The command atomically creates a new Identity account and Admin assignment, then exits without serving HTTP. Existing accounts are never promoted, and bootstrap refuses creation if an administrator already exists.
+   - Existing administrator credentials are preserved. See [the F2 setup guide](../../docs/security/implementation/F2_SECURE_ADMIN_BOOTSTRAP.md) for error handling and legacy-account review.
 
 ---
 

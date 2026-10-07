@@ -17,7 +17,7 @@ namespace Karigor.Security.Tests;
 [Collection("Security SQL"), Trait("Layer", "Integration")]
 public sealed class ApiSecurityTests(SecurityApplicationFixture fixture)
 {
-    [Fact, Trait("Finding", "F2"), Trait("Classification", "ExpectedFailRegression")]
+    [Fact, Trait("Finding", "F2"), Trait("Classification", "GreenBaseline")]
     public async Task OrdinaryProductionStartupDoesNotProvisionDefaultAdministrator()
     {
         using var scope = fixture.Factory.Services.CreateScope();

@@ -1875,3 +1875,325 @@ The upgrade defaults to a read-only report. Explicit application repeats checks 
 Executed: `dotnet build Karigor.slnx --configuration Release --no-restore`; `python scripts/run-security-tests.py --no-build --strict --filter "Finding=PaymentSchema"`; final `python scripts/run-security-tests.py --no-build --strict`; `npm --prefix karigor-client run test:security` with `KARIGOR_TEST_BROWSER_CHANNEL=chrome`; `git diff --check` and document/scope checks.
 
 Final backend report: ignored `TestResults/security/15083a5481824e4b8c3f613d9b5b13ae/security.trx`. The earlier focused schema run had 33 passes before adding actual startup and unsupported-booking-type cases; the final suite includes both. Browser report: ignored `karigor-client/test-results/security-browser/results.json`; logs: `TestResults/payment-schema-*.log`. No new known-defect exception was introduced. Production, hosted CI and an actual production upgrade remain unverified.
+
+# F1 Payment Concurrency, Idempotency and Settlement Allocation
+
+Date: 2026-10-07, Asia/Dhaka. **IMPLEMENTED:** payment rowversions, SQL invariants, one durable initiation intent, selected booking settlement, additional-settlement review and atomic recipient notification. **VERIFIED LOCALLY:** disposable real SQL tests and fake provider HTTP. **UNVERIFIED:** actual gateway operations, production data/schema and hosted deployment. All earlier study entries above are preserved as historical evidence. Read the [implemented flow and Mermaid diagrams](implementation/F1_PAYMENT_CONCURRENCY_AND_IDEMPOTENCY.md), [schema authority](../database/PAYMENT_SCHEMA_AUTHORITY.md) and [ADR 0005](../adr/0005-payment-intent-and-settlement-allocation.md).
+
+## 1. The race that verification alone could not stop
+
+Imagine two callback requests for the same payment. Both read Status=Initiated. Both independently obtain a valid provider receipt. Both see an unpaid booking, write Completed/Paid and send a notification. Their individual provider checks are correct, yet the business effect can happen twice. Another race occurs when two genuinely different attempts settle: the latest request could overwrite the booking summary and conceal the first receipt.
+
+Initiation had a related problem. Every click generated a fresh transaction and gateway POST. If the provider created a session but its response was lost, the browser's retry could create another payable session. A failed HTTP request cannot prove that the remote operation did not happen.
+
+## 2. Duplicate delivery is normal
+
+A sender may retry because an acknowledgement was lost, the receiver restarted, or a connection timed out after the receiver committed. The sender usually cannot observe the receiver's database directly. Browser returns and IPNs can also report the same transaction through different routes. Therefore duplication is an expected condition that the application must handle; rejecting all repeats would make legitimate recovery harder.
+
+Example: SQL commits payment at 10:00:00, but the callback's response is lost at 10:00:01. The provider retries at 10:00:10. The second request should confirm the same durable result without paying or notifying again.
+
+## 3. Idempotency, first simply and then technically
+
+Simple definition: repeating the same operation has the same final effect as doing it once.
+
+Technical definition: for operation f over relevant business state s, `f(f(s)) = f(s)`. Here the relevant effect is a selected settlement and its durable notification. The response need not be byte-identical: an initiation retry might first return Dispatching and later Ready, while referring to the same intent. A different real settlement is a different fact, so preserving a second receipt for review does not violate idempotency.
+
+## 4. Exactly-once network delivery versus business effect
+
+We cannot guarantee that a callback arrives exactly once. Nor can one SQL transaction atomically commit both our database and a remote payment provider. We can ensure that repeated processing of the same verified fact produces one allocation in our database.
+
+The guarantee is deliberately bounded: exactly one null-to-selected booking transition and one durable PaymentReceived record for that allocation. Realtime delivery remains best effort and can be omitted by a crash after commit. Unknown provider outcomes can delay progress. Those are different guarantees, and naming them precisely avoids claiming more than the code proves.
+
+## 5. Optimistic concurrency
+
+An optimistic writer reads a version, prepares its change, then asks the database to update only if that version is still current. It assumes conflicts are uncommon rather than taking a long lock while doing external work. If another writer changed the row, the first version is stale and the write must reload or return a conflict.
+
+In settlement, both callbacks can verify outside SQL. They then reload current SQL rows and compete on Booking's version. A loser rolls back and rereads the winner's state. Same transaction: return its committed result. Different transaction: retain the new successful fact for review without replacing the allocation.
+
+## 6. What SQL Server rowversion means
+
+`rowversion` is an automatically generated eight-byte binary version token. It is not a timestamp, clock time or business sequence number. An update advances it even when an assigned business value stays the same. EF's `[Timestamp]` attribute maps it as a concurrency token and generated value.
+
+EF updates effectively include `WHERE Id=@id AND RowVersion=@original`. Zero affected rows causes DbUpdateConcurrencyException. We expose Payment's token as base64 metadata; callbacks rely on versions loaded by the server rather than trusting a callback-supplied version.
+
+## 7. Unique database invariants
+
+The old global TransactionId unique constraint remains. SQL 007 adds a filtered unique BookingId index for non-null InitiationFingerprint: a booking has one initiation intent in this scope. A composite unique Payment(Id,BookingId) key supports a same-booking allocation FK. Verified merchant/environment/transaction identity is unique when present.
+
+Booking.SelectedPaymentId is one scalar, with a composite NO ACTION FK ensuring it points to a Payment for that same booking. Checks and triggers require a verified Completed receipt for a Paid selection and reject replacement or downgrade. Completed payment facts cannot be rewritten or deleted. We do not make Completed unique per booking, because another real financial fact must be recordable.
+
+## 8. Why checking in application code is insufficient
+
+Consider `if (!exists) insert`. Two requests can both observe no row before either insert commits. Their separate checks are both true. Without uniqueness, both inserts succeed. Likewise `if Status != Completed` does not reserve the right to allocate.
+
+The database is the shared authority across application processes. Its filtered uniqueness closes intent insert races; rowversion closes stale writes; the FK/guards enforce selection ownership and immutability. A process-local lock would protect only one process and would disappear on restart. No such lock, Redis or distributed-lock dependency was added.
+
+## 9. Why provider HTTP stays outside SQL transactions
+
+HTTP can take seconds, time out or finish remotely after we stop waiting. Holding database locks during that wait increases contention and still cannot make the two systems share one atomic commit.
+
+Initiation commits the dispatcher claim, then calls HTTP, then persists the observed result. Callback processing obtains provider proof before beginning the short settlement transaction. Tests assert no active EF SQL transaction at every fake HTTP call. A controlled pending initialization also allows another SQL context to update the booking before the provider response is released.
+
+## 10. Previous payment flow
+
+After the earlier trust fix, initiation still saved a new Initiated row per command and called the gateway without a stable persisted session. Callback processing loaded a Payment, returned early if already Completed, otherwise verified it, then saved Payment and Booking and created the notification separately. The early check handled sequential repeats but did not coordinate simultaneous requests. The summary selected the newest attempt by creation time.
+
+The trust fix was necessary and remains intact. This follow-up adds consistency around that existing proof boundary.
+
+## 11. New payment flow
+
+Initiation: authorize completed booking, fingerprint stored terms/scope, reserve or reuse one intent in SQL, claim Dispatching with Payment rowversion, call provider outside SQL, then save Ready metadata or Unknown. Retrying a dispatched intent never blindly POSTs again.
+
+Settlement: exact stored attempt, independent bound verification, short SQL transaction, current terms/versions, Booking CAS, receipt fact, first selection plus Paid or extra fact plus review, recipient notification, commit, private realtime pushes. The CAS touches the unchanged PaymentStatus to acquire common coordination before any receipt write. Only the null-to-selected change is the allocation effect.
+
+## 12. Provider fact and Karigor allocation are different
+
+`Payment.Status=Completed` means an authenticated provider result matched that stored attempt. `Booking.SelectedPaymentId` means Karigor allocated that successful Payment to satisfy the booking. PaymentDetails.IsAllocated states this explicitly. They are related facts but not interchangeable.
+
+For two verified payments P1 and P2 on booking B, both can be Completed. B selects exactly one. The other has RequiresReview=true. The booking-payment summary returns the selected Payment regardless of which attempt is newest; the extra settlement remains in Payments and a customer review notification identifies the booking. No refund or artisan payout is inferred.
+
+## 13. Initiation idempotency identity
+
+For the current product, one booking payment obligation is one intent. The server fingerprints booking/customer/worker IDs, price, platform fee, service charge, BDT, configured merchant and Live/Sandbox scope using SHA-256. SQL enforces one fingerprint-bearing Payment per booking. The random provider transaction is generated once, not regenerated by a retry.
+
+The fingerprint prevents reusing the original session after relevant terms/configuration change: that returns a stable conflict. It is not an authorization token; ownership checks still run. No client nonce is required for this one-intent-per-booking policy. A future policy permitting a reviewed replacement/expired session would need its own explicit decision.
+
+## 14. Lost response and unknown outcome
+
+Reserved means no durable dispatch claim exists, so one request may still claim it. Dispatching means a claim committed and a POST may have occurred. Ready means session metadata was observed and saved. Unknown means the POST result could not be established safely. These are initiation states, separate from verified settlement status.
+
+A lost API response after Ready is recoverable by returning the stored session URL. A lost provider response can leave Unknown with no session key, or Dispatching if SQL persistence failed. The transaction ID, initiation merchant/environment and dispatch time remain available. When received, the session key is also saved. SSLCommerz documents transaction/session query mechanisms in its [official documentation](https://developer.sslcommerz.com/doc/v4/); no reconciliation HTTP or background worker was implemented.
+
+A crash between claiming Dispatching and making HTTP is indistinguishable locally from a crash after remote session creation. Re-dispatching merely because an intent is old could create another payable session. We retain uncertainty instead. This sacrifices automatic availability to prevent blind duplication.
+
+## 15. Duplicate callback handling
+
+Sequential duplicates read the immutable committed receipt without another provider call. Simultaneous requests can both obtain provider proof, but only one Booking version wins. The other rolls back, reloads and returns the same completed fact without another notification or private push. Provider proof is reused during local conflict retries; it is rebound to freshly loaded terms before writing.
+
+Completed facts are read without EF tracking at the initial guard. This matters after rollback: EF may still contain attempted in-memory Completed values even though SQL is Initiated. The authoritative read must not return that phantom success. The fault/retry test exposed this problem and the final implementation corrects it.
+
+## 16. Success versus fail/cancel
+
+All route names are hints. A bound successful provider receipt arriving on fail/cancel is still processed as success. An INVALID, mismatched, missing or unavailable verification never writes a failure state. A stale fail/cancel arriving after success returns the existing completed record and cannot downgrade it.
+
+SQL also rejects direct downgrade/replacement, and a stale EF version cannot overwrite a newer row. Tests coordinate both verified-route races and valid-versus-invalid HTTP responses; final booking selection, receipt and notification remain coherent.
+
+## 17. A second real settlement
+
+Do not discard a real receipt simply because the booking is paid. The short transaction preserves the second Payment's provider receipt, scope, paid time and Completed status, sets RequiresReview, and inserts one customer PaymentReview record. The original selected Payment remains unchanged; no second worker PaymentReceived notification or allocation push occurs.
+
+Both sequential and simultaneous distinct-settlement cases are executed. The sequential case proves a later real payment is retained; the concurrent case proves both facts survive competition. A duplicate callback for the extra fact returns RequiresReview/IsAllocated=false without making another review notification.
+
+## 18. Before versus after
+
+| Situation | Before this follow-up | Implemented behavior |
+|---|---|---|
+| Same initiation repeated | New transaction/session per call | One SQL intent and dispatcher; Ready URL reused |
+| Provider initialization timeout | No durable session outcome policy | Unknown/Dispatching, same transaction, no new POST |
+| Simultaneous callbacks | Both could pass Completed check | SQL Booking CAS; loser reloads |
+| Receipt and notification | Separate persistence | Same settlement transaction |
+| Two genuine settlements | Summary could be replaced | Both facts retained, one selection, extra review |
+| Newest unsuccessful attempt | Could hide selected success | Summary follows selected PaymentId |
+| Stale writes | Last-write risk | Rowversions plus immutable SQL guards |
+| Rollback then context reuse | Tracked attempted success could linger | Untracked authoritative reads |
+
+## 19. Schema and deployment
+
+SQL 007 advances Payment's extended-property marker from 1 to 2. Payment gains twelve fields: RowVersion, InitiationFingerprint, InitiationState, InitiationDispatchedAt, InitiationMerchantId, InitiationEnvironment, ProviderSessionKey, ProviderGatewayUrl, VerifiedMerchantId, VerifiedEnvironment, VerifiedTransactionId and RequiresReview. Booking gains RowVersion and SelectedPaymentId. New field types, indexes, FK, checks/defaults and triggers are listed in the [implementation guide](implementation/F1_PAYMENT_CONCURRENCY_AND_IDEMPOTENCY.md#exact-schema-extension).
+
+006 remains the frozen base and 007 is the forward owner of the extension. Fresh fixture provisioning is 001 -> 005 -> 006 -> 007. No startup Payment DDL, EF migration, wallet table, allocation table or outbox was added. Existing cascade is retained as a base FK, but the new retention/allocation guards intentionally refuse deleting completed payment history or its selected booking.
+
+Preflight is read-only by default and reports entity IDs without credentials or receipt payloads. Every existing version-1 attempt is unknown historical scope and blocks automatic adoption. Paid/unknown booking payment states also require review. Apply explicitly opts in, locks Bookings/Payments and rolls back all DDL if blocked. It never invents a selected settlement. The earlier local nine unknown bookings were not inspected again or changed, and no production database was accessed.
+
+## 20. Failure scenarios
+
+| Failure | Durable result and recovery |
+|---|---|
+| DB failure saving receipt/selection/notification | Entire SQL transaction rolls back; no partial Paid/selected state; verified callback may retry |
+| Two simultaneous callbacks | One CAS commits; conflict reload finds duplicate or preserves extra real fact |
+| Initialization network timeout | Unknown if saved; no proof of no charge/session, no repeated POST |
+| Provider response received, SQL save fails | Dispatching remains; retry is unresolved |
+| API response lost after Ready | Retry returns same saved transaction/session URL |
+| Provider callback retry | Durable completed fact returned without duplicate effect |
+| Application retry / reconnect | Same booking intent reused; changed terms conflict |
+| Crash after settlement commit before push | Notification record exists; realtime hint may be absent |
+| Verifier config differs from known initiation scope | No settlement under mismatched scope |
+
+## 21. Alternatives and tradeoffs
+
+A unique Completed-per-booking constraint is attractive but rejects another real settlement. A separate allocation table is valid but unnecessary for one pointer. A local lock protects only one process; distributed locks introduce infrastructure while SQL still needs invariants. Holding SQL over HTTP increases lock time without solving distributed atomicity. Automatically taking over old Dispatching intents risks creating another session. A wallet/ledger/outbox or background reconciliation service is beyond this task.
+
+The chosen design favors financial safety during uncertainty. It blocks automatic new sessions and legacy adoption until reviewed, and it guarantees durable notification creation rather than guaranteed push delivery. Its scope and costs are explicit in ADR 0005.
+
+## 22. Important tests and the invariant each proves
+
+| Actual test/scenario | Invariant proved by final SQL assertions |
+|---|---|
+| SequentialDuplicatesAndLateFailCancelHaveOneDurableEffect | One selected Completed payment, one worker notification, one provider call; user/booking pushes once after commit |
+| SimultaneousVerifiedRoutesConvergeAfterRealRowversionConflict: success/fail/cancel | Two SQL contexts deliberately read the same version; an actual optimistic conflict occurs; one selection/notification |
+| UnverifiedFailCancelRacingSuccessCannotChangeFinancialTruth: fail/cancel | Simultaneous valid/invalid provider responses; invalid route cannot write financial truth |
+| TwoRealSettlementsRaceOneAllocationAndPreserveOtherReceiptForReview: concurrent/sequential | Two immutable Completed facts, one selection, one RequiresReview, one worker and one review notification; selected summary unchanged |
+| NotificationDatabaseFailureRollsBackReceiptAllocationAndSummaryThenRetrySucceeds | Actual SQL CHECK failure on notification insert rolls back receipt and booking; retry in same context succeeds |
+| RepeatedInitiationAndLostApiResponseReusePersistedSession | Fresh request/context reuses one transaction/URL/session; provider POST count one |
+| DoubleClickCreatesOneIntentAndOneProviderDispatch | Coordinated SQL reservation race; one intent, one provider dispatch, observed version conflict |
+| LostProviderResponseRemainsUnknownAndRetryNeverPostsAgain: timeout/malformed | Unknown is durable; repeat returns same transaction and no URL/new POST |
+| DatabaseFailureSavingProviderResponseLeavesDispatchingAndRetryCannotCreateSession | Actual SQL response-save failure; dispatched identity retained, retry does not POST |
+| RetryDuringProviderDispatchReturnsPendingAndDoesNotHoldBookingLocks | HTTP held at barrier; another request returns Dispatching and SQL remains writable |
+| ChangedTermsCannotReuseIntentOrOpenAnotherSession | Fingerprint conflict, one existing Payment and one provider call |
+| StalePaymentAndBookingVersionsCannotOverwriteCommittedSettlement | Both stale EF writes fail; direct SQL downgrade/removal is rejected; final Paid/selected receipt intact |
+| VersionTwoExactlyMatchesEfAndRepeatApplyChangesNoFinancialRows | 27 Payment columns, precise EF types/default/identity/version/index/FK; repeated 007 preserves snapshot |
+| LegacyFinancialAmbiguityReportsIdentitiesAndRefusesWithoutInventingHistory: attempt/Paid/Unknown | Review codes and full snapshots; refusal adds no versions/pointer |
+| StartupRejectsConcurrencyMetadataDriftAndDoesNotRepair: index/trigger/check/FK/column | Gate rejects each actual SQL drift twice without repair |
+| VersionOneBinariesContractIsFrozenAndCurrentStartupRequiresExplicit007 | 006 contract remains valid; new startup refuses v1 until explicit forward upgrade |
+| Existing 47 F1 and 35 version-006 PaymentSchema cases | Provider trust unchanged; old base/default/financial-preflight assertions retained |
+| New initiation browser cases | Real booking page displays 202 uncertainty and 409/503 guidance; repeat sends same booking intent and does not redirect on an Unknown URL |
+
+Barriers coordinate writes or provider responses; they are not sleeps. SQL is real, generated and guarded to loopback. The fake HTTP handler has no network fallback and asserts transactions are absent. Fault tests add a CHECK scoped to that test's generated booking, then remove it; they do not bypass application invariants.
+
+## 23. Commands and actual results
+
+Final commands/counts are recorded in the validation addendum below. Release build and the complete strict backend run executed successfully: **213 passed, zero failed/expected-failed/skipped**, raw/gate exit 0. This includes 17 payment-concurrency cases, 45 PaymentSchema cases (35 retained 006 + 10 new 007), and all 47 retained F1 provider cases. The full TRX is ignored `TestResults/security/04a8c38d854a4735872355bab67a87c6/security.trx`.
+
+The first backend checkpoint failed because new-column index/check DDL was compiled in the same batch as its ALTER, and EF disabled identity generation on Booking.Id after it became part of the composite FK. These implementation defects were corrected. A later new-test run found two fixture CHECKs accidentally included earlier test rows, conflict observation used the wrong EF interceptor event, and retry after rollback could read EF's attempted Completed state. The final code/test synchronization and scoped fault fixtures correct these; no known-defect exception was introduced.
+
+The first browser run had 35 passes/four failures: three new fixtures lacked Vite's React refresh preamble, and unchanged F4 remount testing encountered two transient popup nodes in a strict locator. After fixture correction, the focused run had 14 passes/two new failures: warning-icon text prevented an exact locator match. All 13 unchanged F4 cases passed that focused run. New locators now match the complete message within its warning element. These are recorded actual failed runs, not expected failures or skipped assertions; final browser evidence appears below.
+
+Frontend build/typecheck completed; lint exited successfully with repository warnings. The classifier's six self-tests passed. Its console example named EXPECTED-FAIL is a synthetic self-test fixture, not a reclassified application defect.
+
+## 24. Files changed and why
+
+| Files | Reason |
+|---|---|
+| database/production/007_payment_concurrency.sql | Canonical version-2 preflight/atomic DDL/guards |
+| Payment.cs, Booking.cs, KarigorDbContext.cs, PaymentSchemaGate.cs | Exact runtime fields, identity/rowversions, same-booking FK, indexes and fail-closed metadata gate |
+| PaymentService.cs, PaymentConflictException.cs | Durable initiation/dispatch and optimistic settlement transaction; safe conflict outcomes |
+| PaymentDtos.cs, PaymentsController.cs | Explicit initiation/allocation/version outcomes; 202/409/503 and private no-store responses |
+| SslCommerzClient.cs | Expose configured merchant/environment; avoid raw initialization response/secret logging |
+| paymentApi.ts, BookingDetailPage.tsx, CustomerBookingsTab.tsx | Show unresolved state and response guidance; only redirect for Ready |
+| PaymentConcurrencyTests.cs, PaymentConcurrencySchemaTests.cs | Actual SQL races, uncertainty, fault rollback, version-2/preflight checks |
+| DisposableSqlDatabase.cs, PaymentSchemaTests.cs | Explicit 007 provisioning; freeze 006 historical assertions separately |
+| payment-initiation.security.spec.ts, e2e/fixtures/payment.tsx | Real booking-page initiation browser assertions |
+| ADR 0005, implementation guide, schema authority, this notebook | Final implemented decisions, study material and evidence |
+| README/deployment/production/migration/harness guidance, ADR 0004 note, original F1 guide note | Compatible provisioning path and historical-versus-current status |
+
+The original 006 tests described 15 fields with no rowversions. Before changing those fixtures I explained that their contract is now explicitly versioned: they still provision/test 006 only and assert those original physical columns/defaults/keys/preflight semantics. The new tests compare all current EF fields to 007. No provider-trust test body, defect manifest or classifier rule was weakened/deleted/reclassified.
+
+## 25. Remaining risks and deferred work
+
+There is no automatic reconciliation/query worker, new-intent/expiry policy, legacy adoption, refund/payout decision or reliable asynchronous push delivery. A dispatch crash can leave an intent blocked even when HTTP never happened. Real provider behavior, production DB/schema and deployed/hosted CI remain unverified. Data retention now blocks deleting completed payments/selected bookings; business deletion policy should be reviewed before deployment.
+
+The first browser run exposed timing sensitivity in an unchanged F4 remount locator. Its focused rerun passed without source/assertion changes; this observation remains in the record. It is not an expected-failure annotation or permission to ignore an unsuccessful final suite.
+
+F6 refresh/session architecture, SignalR authorization, F5 negotiation semantics, unrelated document security, outbox, Redis and broker infrastructure were not modified. Narrow payment-recipient pushes preserve the existing authorized delivery interfaces. No commit, push, merge, deployment, production payment call or production financial read/write was performed.
+
+## 26. Thirty-second interview explanation
+
+I separated a verified provider payment from its allocation to a booking. SQL rowversions and a same-booking settlement pointer let duplicate callbacks converge to one allocation and durable notification. A second real payment stays recorded for review. Initiation now reserves one durable intent and commits a dispatcher claim before calling the gateway. Retries reuse a saved session or report uncertainty, so a lost response never blindly starts another payable session. Real SQL barrier tests prove the races and rollback behavior.
+
+## 27. Two-minute interview explanation
+
+The existing verifier already checked the authenticated provider receipt, transaction ID, BDT currency and exact amount. That protected the trust boundary, but two callbacks could both read Initiated, both pass verification, and both produce booking/payment notifications. Initiation retries also generated a new gateway session whenever the first response was lost.
+
+I kept provider verification outside SQL, then added a short transaction that reloads Payment and Booking, rechecks current terms and uses Booking rowversion as compare-and-swap. It records immutable provider facts, selects the first successful Payment and updates Paid with its durable notification in the same commit. A conflict reloads the winner's result. When a different real settlement arrives, the service records it as Completed and requiring review while preserving the original selection. That distinguishes financial observation from business allocation.
+
+For initiation, a server fingerprint and filtered unique index enforce one intent per booking. Payment rowversion elects one dispatcher before HTTP. Ready persists the session URL; Dispatching and Unknown prevent blind re-dispatch. The key tradeoff is availability: a crash can block an uncertain intent until later reconciliation, but it cannot silently create another payable session.
+
+Versioned SQL 007 owns the extension, EF matches it, and startup only verifies. Preflight refuses historical financial ambiguity. Independent SQL contexts meet at barriers; tests prove actual optimistic conflicts, two preserved settlements, notification rollback, stale writes and one provider dispatch. Exactly-once refers to local business effects, not network delivery or guaranteed realtime push.
+
+## 28. Interview questions and answers
+
+1. **Why can a valid provider receipt still cause a bug?** Authenticity does not serialize business writes. Two authentic callbacks can both act on the same stale Initiated state.
+2. **What is rowversion and why isn't it a timestamp?** It is SQL's generated binary change token. EF compares the original token in an UPDATE predicate; it does not represent wall-clock time.
+3. **Why not make Completed unique per booking?** That prevents recording another real settlement. Allocation is unique; provider facts can be multiple and need review.
+4. **How does a lost initialization response affect retry?** The provider may have created a session. Retain Dispatching/Unknown and the same transaction; do not assume failure means nothing happened.
+5. **Why is the durable dispatcher claim committed before HTTP?** It lets competing requests observe who may have dispatched without keeping a SQL transaction open during network latency.
+6. **Can exactly-once network delivery be guaranteed here?** No. The application accepts duplicates and uses database invariants to ensure one allocation effect.
+7. **What happens if the notification insert fails?** Receipt, allocation and Paid summary roll back with it. A retry must read SQL, not EF's attempted in-memory values.
+8. **Why is the allocation FK composite?** A scalar PaymentId FK proves existence; the composite additionally proves that Payment belongs to this Booking.
+9. **What can still be lost after commit?** A realtime push can fail or be omitted by a crash. The notification row and financial state remain durable.
+10. **Which guarantees did you actually test?** Deterministic local SQL races/rollback/uniqueness/version mappings and real-page browser guidance; production/provider operations were not tested.
+
+## 29. Study next
+
+1. Transaction isolation, SQL lock lifetimes and deadlock ordering.
+2. Compare-and-swap and optimistic concurrency in EF/SQL.
+3. Idempotent commands, acknowledgement loss and distributed failure models.
+4. Reconciliation/state recovery across external services without distributed transactions.
+5. Relational composite keys, referential integrity and financial fact retention.
+
+
+## Final validation addendum for this F1 follow-up
+
+All commands below were actually executed; counts include every selected test. Earlier failed checkpoints in section 23 were corrected, not hidden as expected failures. Following the final schema-gate/dependency cleanup, the complete backend run was repeated successfully.
+
+| Check | Final result |
+|---|---|
+| Release solution build | Passed, 0 warnings / 0 errors |
+| Complete strict backend security suite | **213 passed**, 0 failed / 0 expected failures / 0 skips; raw and classifier exit 0 |
+| Dedicated real-SQL F1 concurrency gate | **17 passed**, 0 failed / expected failures / skips |
+| Payment schema/preflight gate | **45 passed**, 0 failed / expected failures / skips; 35 frozen 006 + 10 forward 007 |
+| Retained provider trust cases in full backend | **47 passed**; test bodies unchanged |
+| Full Chrome browser security suite | **39 passed**, 0 unexpected / flaky / skipped; existing 36 retained plus 3 initiation cases |
+| Frontend build (tsc -b and Vite) | Passed; Vite emitted its existing config-loader notice |
+| Browser fixture typecheck | Passed |
+| Frontend lint | Exit 0; 20 warning lines, 0 error lines; no unrelated warning cleanup |
+| Classifier self-tests | **6 passed**, no skipped cases |
+| git diff --check | Passed |
+| Documentation links/fences | Passed |
+| Prior study preservation and scope | Entire prior notebook preserved; retained trust assertions, manifest and classifier unchanged |
+
+Executed from the repository root unless otherwise noted:
+
+```powershell
+dotnet build Karigor.slnx --configuration Release --no-restore
+python scripts/run-security-tests.py --no-build --strict --filter 'FullyQualifiedName~PaymentConcurrencyTests'
+python scripts/run-security-tests.py --no-build --strict --filter 'Finding=PaymentSchema'
+python scripts/run-security-tests.py --no-build --strict
+python -m unittest discover -s scripts/tests
+git diff --check
+# From karigor-client, with C:\Program Files\nodejs on PATH:
+npm run build
+npm run lint
+npm run typecheck:security
+$env:KARIGOR_TEST_BROWSER_CHANNEL='chrome'
+npm run test:security
+```
+
+Final full backend TRX: ignored `TestResults/security/0f28077f70944ed0a8a1ba3cbc99b6b5/security.trx`. Dedicated concurrency TRX: `TestResults/security/9ade71c2d59047bb82fc01d7f6c4cdef/security.trx`. Final schema TRX: `TestResults/security/562a1e3ca51e4a8fa017664cb0e9bb66/security.trx`. Browser JSON: `karigor-client/test-results/security-browser/results.json`, with expected=39, unexpected=0, flaky=0, skipped=0. Logs: `TestResults/payment-concurrency-full-final.log`, `payment-concurrency-release-build.log`, `payment-targeted-final.log`, `payment-schema-final.log`, `payment-browser-final.log`, `payment-frontend-build.log`, `payment-frontend-lint.log`, `payment-browser-typecheck.log`, `payment-classifier.log`. Earlier failures remain documented/logged in `payment-initial.log`, `payment-trust.log`, `payment-concurrency.log`, `payment-concurrency-v2.log`, `payment-concurrency-browser.log` and `payment-browser-focused.log`.
+
+Browser fixtures deliberately reject unconfigured external HTTP and fake the local SignalR API; their denied Google-script/SignalR console warnings are not successful production requests. The final browser result gate counts all test outcomes. The earlier unchanged F4 transient-popup failure remains a timing observation; its source/assertions were not changed and the final entire suite passed with no retries/flaky classifications.
+
+**Is F1 COMPLETE for the approved Phase 1 repository scope? YES.** The retained immediate provider trust boundary and this scoped concurrency/idempotency/allocation follow-up are implemented and locally verified. This answer does not mark production deployability, legacy-history adoption, actual gateway behavior, automatic reconciliation, reliable push, refunds or payouts as verified. Unknown provider outcomes remain intentionally unresolved rather than blindly retried. F6 and all prohibited unrelated architecture remain untouched. No commit, push, merge, deployment, production payment request or production financial database access occurred.
+
+Exact changed-file inventory at handoff:
+
+- `README.md`
+- `backend/Karigor.Api/Controllers/PaymentsController.cs`
+- `backend/Karigor.Application/Payments/DTOs/PaymentDtos.cs`
+- `backend/Karigor.Application/Payments/PaymentConflictException.cs`
+- `backend/Karigor.Application/Payments/PaymentService.cs`
+- `backend/Karigor.Application/Payments/SslCommerz/SslCommerzClient.cs`
+- `backend/Karigor.Infrastructure/Migrations/README.md`
+- `backend/Karigor.Infrastructure/Models/Booking.cs`
+- `backend/Karigor.Infrastructure/Models/KarigorDbContext.cs`
+- `backend/Karigor.Infrastructure/Models/Payment.cs`
+- `backend/Karigor.Infrastructure/Models/PaymentSchemaGate.cs`
+- `database/production/007_payment_concurrency.sql`
+- `database/production/README.md`
+- `docs/MONSTERASP_DEPLOYMENT.md`
+- `docs/adr/0004-payment-schema-authority.md`
+- `docs/adr/0005-payment-intent-and-settlement-allocation.md`
+- `docs/database/PAYMENT_SCHEMA_AUTHORITY.md`
+- `docs/security/SECURITY_WORKDONE.md`
+- `docs/security/implementation/F1_PAYMENT_CONCURRENCY_AND_IDEMPOTENCY.md`
+- `docs/security/implementation/F1_PAYMENT_TRUST_AND_VERIFICATION.md`
+- `docs/testing/PHASE1_SECURITY_TEST_HARNESS.md`
+- `karigor-client/e2e/fixtures/payment.tsx`
+- `karigor-client/e2e/payment-initiation.security.spec.ts`
+- `karigor-client/src/api/paymentApi.ts`
+- `karigor-client/src/pages/BookingDetailPage.tsx`
+- `karigor-client/src/pages/customer/CustomerBookingsTab.tsx`
+- `tests/Karigor.Security.Tests/Infrastructure/DisposableSqlDatabase.cs`
+- `tests/Karigor.Security.Tests/PaymentConcurrencySchemaTests.cs`
+- `tests/Karigor.Security.Tests/PaymentConcurrencyTests.cs`
+- `tests/Karigor.Security.Tests/PaymentSchemaTests.cs`

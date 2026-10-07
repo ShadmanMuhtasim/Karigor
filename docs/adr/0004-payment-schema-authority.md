@@ -2,7 +2,7 @@
 
 - Status: IMPLEMENTED and tested locally. NOT VERIFIED IN PRODUCTION.
 - Date: 2026-10-07 (Asia/Dhaka).
-- Scope: Current Payments structure and Booking.PaymentStatus only. Payment concurrency/idempotency is PROPOSED for a later task.
+- Scope: Historical version-1 Payments structure and Booking.PaymentStatus. Its forward version-2 extension is IMPLEMENTED in [ADR 0005](0005-payment-intent-and-settlement-allocation.md).
 - References: [ADR 0003](0003-f5-sql-authority-and-immutable-negotiation.md), [authority/audit/upgrade guide](../database/PAYMENT_SCHEMA_AUTHORITY.md).
 
 ## Context
@@ -13,7 +13,7 @@ F5 already adopted versioned SQL and froze the historical EF migration path. Ado
 
 ## Decision
 
-`database/production/006_payment_schema_authority.sql` is the only Payment definition/upgrade. Its default mode is persistent-data read-only preflight. Explicit apply mode locks affected existing tables, repeats validation and executes DDL/stamping atomically during an operator-controlled writer outage. The script targets the already-selected database and contains no USE/create/drop database directives.
+`database/production/006_payment_schema_authority.sql` owns the frozen Payment base. The SQL-only forward extension is now `007_payment_concurrency.sql` (version 2), documented by ADR 0005. At this decision's original version-1 stage, 006 was the only Payment definition/upgrade. Its default mode is persistent-data read-only preflight. Explicit apply mode locks affected existing tables, repeats validation and executes DDL/stamping atomically during an operator-controlled writer outage. The script targets the already-selected database and contains no USE/create/drop database directives.
 
 Fresh databases run baseline 001, F5 005 and Payment 006, plus ordinary seed 002 as needed, before startup. Valid audited current schemas are adopted without updating financial rows. Supported compatibility includes missing columns on empty tables, missing expected indexes/FK, normalizing defaults and converting a matching EF unique index into the existing SQL unique constraint. Unsupported column/key/FK definitions or unknown schema versions are refused.
 
@@ -34,3 +34,7 @@ Map named PK/TransactionId unique constraint, defaults, precision and existing b
 ## Alternatives
 
 Keeping startup DDL would retain another schema owner. Generating a Payment EF migration from the stale snapshot would implicitly re-own broader tables/history. Copying Payment into baseline 001 would duplicate the upgrade's definition. Auto-correcting financial rows would manufacture facts. None is necessary to establish this narrow authority.
+
+## Forward extension, 2026-10-07
+
+[ADR 0005](0005-payment-intent-and-settlement-allocation.md) implements the anticipated SQL-owned concurrency metadata. Current fresh provisioning adds 007 after 006; startup requires marker 2. Historical mappings/migrations remain frozen; no additional EF/startup DDL owner was introduced. Completed financial deletion is now blocked by the extension's retention/allocation guards despite preserving the original base cascade FK. The version-1 consequences above describe that earlier stage.

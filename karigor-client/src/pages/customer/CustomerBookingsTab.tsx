@@ -86,13 +86,13 @@ export function CustomerBookingsTab() {
       setIsInitiatingPayment(true);
       setPaymentError(null);
       const res = await paymentApi.initiatePayment(payingBooking.id);
-      if (res.gatewayUrl) {
+      if (res.initiationState === 'Ready' && res.gatewayUrl) {
         window.location.href = res.gatewayUrl;
       } else {
-        setPaymentError('Could not retrieve payment gateway URL.');
+        setPaymentError(res.message || 'Payment initiation is unresolved. Check this booking before paying again; retrying reuses this intent.');
       }
     } catch (err: any) {
-      setPaymentError(err.response?.data?.error || 'Failed to initiate payment.');
+      setPaymentError(err.response?.data?.message || err.response?.data?.error || 'Payment initiation is unresolved. Check booking payment status before retrying.');
     } finally {
       setIsInitiatingPayment(false);
     }

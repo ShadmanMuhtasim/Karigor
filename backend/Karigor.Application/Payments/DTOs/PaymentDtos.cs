@@ -10,6 +10,8 @@ public class InitiatePaymentRequestDto
 
 public class InitiatePaymentResponseDto
 {
+    public string InitiationState { get; set; } = "Unknown";
+    public string? Message { get; set; }
     public string GatewayUrl { get; set; } = string.Empty;
     public string TransactionId { get; set; } = string.Empty;
     public decimal TotalAmount { get; set; }
@@ -21,6 +23,10 @@ public class InitiatePaymentResponseDto
 
 public class PaymentDetailsDto
 {
+    public string Version { get; set; } = string.Empty;
+    public string? InitiationState { get; set; }
+    public bool IsAllocated { get; set; }
+    public bool RequiresReview { get; set; }
     public int Id { get; set; }
     public int BookingId { get; set; }
     public string TransactionId { get; set; } = string.Empty;

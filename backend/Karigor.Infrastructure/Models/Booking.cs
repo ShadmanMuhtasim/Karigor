@@ -55,6 +55,10 @@ public partial class Booking
     [StringLength(50)]
     public string PaymentStatus { get; set; } = "Unpaid";
 
+    [Timestamp] public byte[] RowVersion { get; set; } = [];
+    public int? SelectedPaymentId { get; set; }
+    public virtual Payment? SelectedPayment { get; set; }
+
     [InverseProperty("Booking")]
     public virtual ICollection<SosAlert> SosAlerts { get; set; } = new List<SosAlert>();
 

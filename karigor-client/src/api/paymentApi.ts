@@ -1,6 +1,8 @@
 import { apiClient } from './client';
 
 export interface InitiatePaymentResponseDto {
+  initiationState: 'Reserved' | 'Dispatching' | 'Ready' | 'Unknown';
+  message?: string;
   gatewayUrl: string;
   transactionId: string;
   totalAmount: number;
@@ -11,6 +13,10 @@ export interface InitiatePaymentResponseDto {
 }
 
 export interface PaymentDetailsDto {
+  version: string;
+  initiationState?: string;
+  isAllocated: boolean;
+  requiresReview: boolean;
   id: number;
   bookingId: number;
   transactionId: string;

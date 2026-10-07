@@ -296,7 +296,7 @@ These are **normal** for ASP.NET Core Identity tables and do not affect Karigor 
 
 ### 3.2 Seed the service categories
 
-Before starting the current API, also preflight and explicitly apply `database/production/005_f5_negotiation_integrity.sql` and `006_payment_schema_authority.sql` against the intended local database. Both are required even on a fresh baseline. Follow [F5 schema authority](docs/database/F5_SCHEMA_AUTHORITY_AND_MIGRATION.md) and [Payment schema authority](docs/database/PAYMENT_SCHEMA_AUTHORITY.md) for apply mode and legacy review. Startup only verifies these prerequisites; retired `database/004_add_payments.sql` no longer owns Payment DDL.
+Before starting the current API, also preflight and explicitly apply `database/production/005_f5_negotiation_integrity.sql`, `006_payment_schema_authority.sql`, and `007_payment_concurrency.sql` in order against the intended local database. All three are required on a fresh baseline; current Payment schema marker is 2. Do not rerun frozen 006 on an already upgraded marker-2 database. Follow [F5 schema authority](docs/database/F5_SCHEMA_AUTHORITY_AND_MIGRATION.md) and [Payment schema authority](docs/database/PAYMENT_SCHEMA_AUTHORITY.md) for apply mode and legacy review. Startup only verifies these prerequisites; retired `database/004_add_payments.sql` no longer owns Payment DDL.
 
 ```bash
 sqlcmd -S .\SQLEXPRESS -E -d KarigorDev -i database\002_seed_categories.sql

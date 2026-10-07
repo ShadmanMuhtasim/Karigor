@@ -52,6 +52,11 @@ public partial class KarigorDbContext : IdentityDbContext<ApplicationUser>
 
         modelBuilder.Entity<Booking>(entity =>
         {
+            entity.Property(e => e.Id).UseIdentityColumn();
+            entity.ToTable(t => t.UseSqlOutputClause(false));
+            entity.HasOne(e => e.SelectedPayment).WithMany().HasForeignKey(e => new { e.SelectedPaymentId, e.Id })
+                .HasPrincipalKey(e => new { e.Id, e.BookingId }).OnDelete(DeleteBehavior.NoAction)
+                .HasConstraintName("FK_PaymentAllocation_Booking");
             entity.Property(e => e.PaymentStatus).HasDefaultValue("Unpaid");
             entity.HasIndex(e => e.ServiceRequestId).IsUnique().HasDatabaseName("UX_F5_Bookings_Request");
             entity.Property(e => e.Status).HasDefaultValue("Scheduled");
@@ -77,6 +82,14 @@ public partial class KarigorDbContext : IdentityDbContext<ApplicationUser>
 
         modelBuilder.Entity<Payment>(entity =>
         {
+            entity.Property(e => e.Id).UseIdentityColumn();
+            entity.ToTable(t => t.UseSqlOutputClause(false));
+            entity.HasAlternateKey(e => new { e.Id, e.BookingId }).HasName("UQ_Payments_Id_BookingId");
+            entity.Property(e => e.RequiresReview).HasDefaultValue(false);
+            entity.HasIndex(e => e.BookingId, "UX_Payment_InitiationIntent").IsUnique().HasFilter("[InitiationFingerprint] IS NOT NULL")
+                .HasDatabaseName("UX_Payment_InitiationIntent");
+            entity.HasIndex(e => new { e.VerifiedMerchantId, e.VerifiedEnvironment, e.VerifiedTransactionId })
+                .IsUnique().HasFilter("[VerifiedTransactionId] IS NOT NULL").HasDatabaseName("UX_Payment_VerifiedIdentity");
             entity.HasKey(e => e.Id).HasName("PK_Payments");
             entity.HasAlternateKey(e => e.TransactionId).HasName("UQ_Payments_TransactionId");
             entity.Property(e => e.Currency).HasDefaultValue("BDT");

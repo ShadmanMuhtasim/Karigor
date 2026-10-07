@@ -1,6 +1,6 @@
 # Payment schema authority
 
-Date: 2026-10-07 (Asia/Dhaka). **IMPLEMENTED:** SQL ownership, exact runtime mappings, preflight, controlled upgrade and startup verification. **PROPOSED:** payment concurrency/idempotency and its metadata. **NOT VERIFIED IN PRODUCTION:** schema/data quality, upgrade, deployment and provider operations. No production database was inspected or modified.
+Date: 2026-10-07 (Asia/Dhaka). **Current marker: 2. IMPLEMENTED:** SQL ownership, exact runtime mappings, preflight, controlled upgrade, startup verification and payment concurrency/idempotency/allocation. SQL 006 owns the frozen version-1 base; SQL 007 is its canonical forward extension. The audit/version-1 evidence below describes the earlier schema-authority stage; the version-2 section records current behavior. **NOT VERIFIED IN PRODUCTION:** schema/data quality, upgrade, deployment and provider operations. No production database was inspected or modified.
 
 ## Audit comparison
 
@@ -27,7 +27,7 @@ Read-only metadata on local `.\SQLEXPRESS/KarigorDev` found no Payments table or
 
 ## Sole owner and exact changes
 
-**006_payment_schema_authority.sql owns current Payment DDL.** Baseline 001 remains a baseline; it does not gain a second Payment definition. Development 004 is retired and raises a clear error pointing to 006 without changing database context or schema. Program's CREATE Payments / ADD PaymentStatus / ADD ServiceCharge branches are removed. Startup calls read-only PaymentSchemaGate before ordinary role/category seeding.
+**006_payment_schema_authority.sql owns the frozen base; 007_payment_concurrency.sql owns the version-2 extension.** Baseline 001 remains a baseline; it does not gain a second Payment definition. Development 004 is retired and raises a clear error pointing to 006 without changing database context or schema. Program's CREATE Payments / ADD PaymentStatus / ADD ServiceCharge branches are removed. Startup calls read-only PaymentSchemaGate before ordinary role/category seeding.
 
 The canonical table has **15 columns**: Id, BookingId, TransactionId, ValId, BankTranId, CardType, Currency, TotalAmount, PlatformFee, ServiceCharge, WorkerAmount, Status, CreatedAt, PaidAt, GatewayResponse. Types/nullability are in the table above. No Payment/Booking rowversion, initiation key, provider session/environment, allocation state or other feature metadata was added.
 
@@ -50,15 +50,15 @@ Data checks cover:
 - Missing/unsupported currency (current F1 is BDT only), orphan payments, suspicious payment/booking-payment statuses, incomplete completion receipt/time and missing creation time.
 - Existing rows without ServiceCharge or PaymentStatus: refuse assigning zero/Unpaid. Unknown timestamps/authors/provider identity are never filled.
 
-Column types/default/index/FK metadata are also inspected. Unsupported numeric scale is refused rather than rounded/truncated. Unrecognized future version stamps are refused rather than downgraded. There is no unique ValId/BankTranId or unique Completed-per-booking constraint yet: a real extra settlement must eventually be preserved/reviewed, not made impossible to record by this task.
+Column types/default/index/FK metadata are also inspected. Unsupported numeric scale is refused rather than rounded/truncated. Unrecognized future version stamps are refused rather than downgraded. Version 1 adds no unique ValId/BankTranId or Completed-per-booking constraint. Version 2 retains that choice, scopes verified transaction identity and preserves additional real settlements for review.
 
 ## Fresh database flow
 
 1. Operator selects/provisions the target database; run host-neutral production 001 baseline and ordinary 002 seed as needed.
-2. Default preflight then explicit application of F5 005 and Payment 006. Fresh Bookings/Payments are empty, so missing financial columns contain no history to invent.
+2. Default preflight then explicit application of F5 005, Payment 006 and Payment concurrency 007 in order. Fresh Bookings/Payments are empty, so missing financial columns contain no history to invent.
 3. Start compatible binaries. F5/Payment gates must pass before serving requests.
 
-Development may use its existing base SQL/verification setup, then the **same** host-neutral 005/006 path. A test fixture always uses the production baseline plus explicit upgrades in a generated loopback database. It no longer relies on startup to invent payment storage.
+Development may use its existing base SQL/verification setup, then the **same** host-neutral 005/006/007 path. A test fixture always uses the production baseline plus explicit upgrades in a generated loopback database. It no longer relies on startup to invent payment storage.
 
 ## Existing database upgrade flow
 
@@ -76,7 +76,7 @@ Resolve review findings through separately authorized evidence/business confirma
 
 Forward changes belong in a new reviewed SQL version with matching EF mappings and tests. A failed transaction rolls back its DDL. After a successful production migration, rollback is not an automatic inverse: deleting payment structures/history is unsafe, and old binaries can reintroduce startup ownership. Keep compatible binaries/schema or use a reviewed corrective forward version. No rollback script or production application was executed.
 
-## Actual local/test evidence
+## Historical version-1 local/test evidence
 
 Read-only local development preflight found **no Payments table**, **no Booking.PaymentStatus**, and **nine existing bookings (IDs 1–9) with unknown payment-status history**. No local attempt/receipt/amount data exists in a Payments table to audit, so duplicate/currency/provider findings are **not evaluable there**, not declared clean. The upgrade would refuse inventing Unpaid for these bookings. Local development was not modified. Previous F5 active-legacy findings are separate.
 
@@ -93,8 +93,45 @@ git diff --check
 
 Only loopback generated databases are automatically applied/dropped. Local metadata/preflight logs are ignored `TestResults/payment-schema-audit-local.txt` and `payment-schema-local-preflight.txt`. No production financial data, merchant gateway or production schema was accessed.
 
-## Readiness and limitations
+## Historical version-1 readiness and limitations
+
+The following records the completed version-1 stage. Current version-2 behavior and validation follow below.
 
 **YES: schema authority is sufficiently canonical to begin the next F1 concurrency/idempotency implementation in this repository and disposable databases.** There is one tested forward path, explicit mappings and a runtime verifier; financial ambiguity is surfaced rather than silently repaired. Next metadata must extend this SQL path, not restart independent EF/startup ownership.
 
 This is not a concurrency fix or approval to deploy. No rowversion/idempotency/session/allocation/outbox/deduplication/worker was added. Current Cascade deletion semantics remain, legacy review and deployment outage/permissions are operator work, broader historical EF/schema drift is not modernized, and production is unverified. Existing unknown local bookings prevent automatic application until their history is explicitly reviewed.
+
+
+## Current version 2: F1 concurrency and allocation
+
+**IMPLEMENTED and locally verified:** [007_payment_concurrency.sql](../../database/production/007_payment_concurrency.sql) advances KarigorPaymentSchemaVersion to 2, extending rather than redefining 006. Current application startup requires version 2. [ADR 0005](../adr/0005-payment-intent-and-settlement-allocation.md) and [implemented flow](../security/implementation/F1_PAYMENT_CONCURRENCY_AND_IDEMPOTENCY.md) document behavior and tradeoffs.
+
+Payment adds rowversion; nullable InitiationFingerprint nvarchar(64), InitiationState nvarchar(20), InitiationDispatchedAt datetime2(7), InitiationMerchantId nvarchar(100), InitiationEnvironment nvarchar(10), ProviderSessionKey nvarchar(100), ProviderGatewayUrl nvarchar(2048), VerifiedMerchantId nvarchar(100), VerifiedEnvironment nvarchar(10), VerifiedTransactionId nvarchar(100); and RequiresReview bit NOT NULL with DF_Payments_RequiresReview default 0. Booking adds rowversion and nullable SelectedPaymentId int. All original 15 Payment columns/defaults/precision/indexes remain; total Payment columns are 27.
+
+Add UQ_Payments_Id_BookingId UNIQUE(Id,BookingId), filtered unique UX_Payment_InitiationIntent(BookingId) WHERE InitiationFingerprint IS NOT NULL, and filtered unique UX_Payment_VerifiedIdentity(VerifiedMerchantId,VerifiedEnvironment,VerifiedTransactionId) WHERE VerifiedTransactionId IS NOT NULL. FK_PaymentAllocation_Booking references Payment(Id,BookingId) from Booking(SelectedPaymentId,Id), with NO ACTION. Checks require coherent initiation/verified metadata. Triggers preserve completed facts/intent terms and prevent selection replacement/downgrade. The original Payment.Booking cascade FK remains, but the financial retention/allocation guards intentionally block deletion of completed facts/selected bookings.
+
+EF maps both rowversions as generated concurrency tokens and explicitly retains identity generation for Booking.Id/Payment.Id. Composite allocation FK and filtered indexes match SQL. Trigger-bearing tables disable SQL OUTPUT. PaymentSchemaGate verifies the base plus new columns/indexes/default/FK/enabled checks/triggers; its historical VerifyVersionOne method is used only by frozen 006 tests. Ordinary startup calls current Verify and has no Payment DDL authority.
+
+### Preflight and explicit apply
+
+For a version-1 database, run all of 007 with no opt-in on the explicitly selected connection. It requires the exact stamped 006 metadata, reports every existing Payment by ID as legacy-payment-outcome, and reports non-Unpaid bookings as legacy-booking-payment-provenance. These rows lack enough historical provider/allocation provenance for automatic adoption. Unexpected partial new schema also blocks apply. The report contains codes/IDs, not provider credentials/receipt payloads.
+
+Version-1 legacy review cannot be completed by this script. No automatic provider identity backfill, receipt reconstruction, selected-winner inference, financial UPDATE/DELETE or provenance fabrication occurs. Existing local unknown records remain unchanged; production was not read or written. Separately review a historical adoption path before deployment where these blockers exist.
+
+For a clear preflight, the operator-controlled writer outage uses the same selected connection:
+
+```sql
+EXEC sys.sp_set_session_context @key=N'KarigorPaymentConcurrencyApply', @value=1;
+-- Execute the entire database/production/007_payment_concurrency.sql file here.
+EXEC sys.sp_set_session_context @key=N'KarigorPaymentConcurrencyApply', @value=NULL;
+```
+
+Apply starts a short XACT_ABORT transaction, takes Bookings/Payments table locks, repeats financial checks, adds all DDL/guards and stamps version 2 atomically. Review/Blocker throws 51070 and rolls back. Repeating 007 on version 2 performs no DDL or data writes; its Info report directs the operator to the metadata gate for drift. There is no automatic drift repair or downgrade. **Do not rerun 006 on a version-2 database:** that frozen earlier owner correctly refuses the future stamp.
+
+Fresh databases provision 001 -> 005 -> 006 -> 007 before startup (ordinary 002 seeding as appropriate). Existing marker-1 databases preflight 007; existing marker-2 databases verify current metadata and use future reviewed forward versions for corrections. Deploy compatible binaries only after prerequisites are satisfied. No actual deployment was performed here.
+
+### Current evidence and limits
+
+Release build: zero warnings/errors. Full strict backend: **213 passed**, including **17 payment-concurrency**, **45 PaymentSchema** (35 frozen 006 + 10 version-2 cases), and **47 retained F1 provider-trust** cases. Dedicated concurrency/schema gates: **17/45 passed**. Full browser suite: **39 passed**. Zero final failures/expected failures/skips. [Study validation](../security/SECURITY_WORKDONE.md#f1-payment-concurrency-idempotency-and-settlement-allocation) records commands, reports and intermediate failures; prior 186/36 evidence above remains historical.
+
+Unknown initiation retains transaction, merchant/environment, dispatch time and session key when received; retry never blindly POSTs again. A second verified settlement is Completed/RequiresReview, while Booking keeps its first selection. No reconciliation worker, reliable push/outbox, wallet, ledger, payout or expiry/new-intent policy is implemented. Production/gateway behavior and financial-history adoption remain unverified.

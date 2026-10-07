@@ -58,8 +58,21 @@ public class PaymentsController : ControllerBase
             appBaseUrl = $"{Request.Scheme}://{Request.Host}";
         }
 
-        var result = await _paymentService.InitiatePaymentAsync(CurrentUserId, dto.BookingId, appBaseUrl);
-        return Ok(result);
+        Response.Headers.CacheControl = "no-store";
+        try
+        {
+            var result = await _paymentService.InitiatePaymentAsync(CurrentUserId, dto.BookingId, appBaseUrl);
+            return result.InitiationState == "Ready" && result.GatewayUrl.Length > 0
+                ? Ok(result) : Accepted(result);
+        }
+        catch (UnauthorizedAccessException) { return Forbid(); }
+        catch (KeyNotFoundException) { return NotFound(new { message = "Booking not found." }); }
+        catch (PaymentConflictException ex) { return Conflict(new { message = ex.Message }); }
+        catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
+        catch (Exception ex) when (ex is Microsoft.EntityFrameworkCore.DbUpdateException or Microsoft.Data.SqlClient.SqlException)
+        {
+            return StatusCode(503, new { message = "Payment initiation is unresolved. Check booking payment status before retrying." });
+        }
     }
 
     // Route names are hints. Every route uses the same independent verification boundary.

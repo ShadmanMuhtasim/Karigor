@@ -15,6 +15,32 @@ const SVG_STAR_ICON = `<svg class="w-2.5 h-2.5 inline text-amber-400 fill-amber-
 const SVG_CLIPBOARD_ICON = `<svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="M9 12h6"/><path d="M9 16h6"/></svg>`;
 const SVG_POPUP_PIN_ICON = `<svg class="w-3 h-3 inline text-gray-400 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`;
 
+
+function textElement<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text?: string) {
+  const node = document.createElement(tag);
+  node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+// Only these repository-owned constants enter an HTML parser. No caller text is accepted.
+const STATIC_ICONS = {
+  pin: SVG_PIN_ICON, target: SVG_TARGET_ICON, star: SVG_STAR_ICON,
+  worker: SVG_HARDHAT_ICON, request: SVG_CLIPBOARD_ICON, popupPin: SVG_POPUP_PIN_ICON,
+};
+function staticIcon(name: keyof typeof STATIC_ICONS) {
+  const template = document.createElement('template');
+  template.innerHTML = STATIC_ICONS[name];
+  return template.content.firstElementChild!;
+}
+function locationPopup(title: string, titleClass: string, detail: string, hint?: string) {
+  const popup = textElement('div', 'text-xs p-1');
+  popup.append(textElement('strong', titleClass, title));
+  popup.append(textElement('p', 'text-gray-500 text-[10px] mt-0.5', detail));
+  if (hint !== undefined) popup.append(textElement('p', 'text-gray-400 text-[10px] mt-1', hint));
+  return popup;
+}
+
 export interface KarigorMapProps {
   center?: [number, number];
   zoom?: number;
@@ -206,25 +232,16 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
       const pickerLatLng = effectivePickerCoords;
       bounds.extend(pickerLatLng);
 
+      const pickerContent = textElement('div', 'relative flex flex-col items-center select-none cursor-grab active:cursor-grabbing group');
+      const dragBadge = textElement('div', 'absolute -top-7 whitespace-nowrap px-2.5 py-0.5 bg-rose-600 text-white text-[10px] font-bold rounded-full shadow-md border-2 border-white dark:border-gray-900 uppercase tracking-wide flex items-center gap-1');
+      dragBadge.append(staticIcon('pin'), textElement('span', '', t('common.map.dragMe', 'DRAG ME')));
+      const pinBadge = textElement('div', 'relative w-10 h-10 bg-rose-600 rounded-full border-2 border-white dark:border-gray-900 shadow-xl flex items-center justify-center text-white text-base font-black group-hover:scale-105 transition-transform');
+      pinBadge.append(staticIcon('target'));
+      pickerContent.append(dragBadge, pinBadge,
+        textElement('div', 'w-3 h-3 bg-rose-600 rotate-45 -mt-1.5 border-r-2 border-b-2 border-white dark:border-gray-900'));
       const pickerIcon = L.divIcon({
-        className: 'custom-draggable-picker-pin',
-        html: `
-          <div class="relative flex flex-col items-center select-none cursor-grab active:cursor-grabbing group">
-            <!-- Floating Drag Me Badge -->
-            <div class="absolute -top-7 whitespace-nowrap px-2.5 py-0.5 bg-rose-600 text-white text-[10px] font-bold rounded-full shadow-md border-2 border-white dark:border-gray-900 uppercase tracking-wide flex items-center gap-1">
-              ${SVG_PIN_ICON}
-              <span>${t('common.map.dragMe', 'DRAG ME')}</span>
-            </div>
-            <!-- Main Pin Badge -->
-            <div class="relative w-10 h-10 bg-rose-600 rounded-full border-2 border-white dark:border-gray-900 shadow-xl flex items-center justify-center text-white text-base font-black group-hover:scale-105 transition-transform">
-              ${SVG_TARGET_ICON}
-            </div>
-            <!-- Pin Pointer / Arrow Tip -->
-            <div class="w-3 h-3 bg-rose-600 rotate-45 -mt-1.5 border-r-2 border-b-2 border-white dark:border-gray-900"></div>
-          </div>
-        `,
-        iconSize: [40, 56],
-        iconAnchor: [20, 52],
+        className: 'custom-draggable-picker-pin', html: pickerContent,
+        iconSize: [40, 56], iconAnchor: [20, 52],
       });
 
       const pickerMarker = L.marker(pickerLatLng, {
@@ -265,13 +282,13 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
         }
       });
 
-      pickerMarker.bindPopup(`
-        <div class="text-xs p-1">
-          <strong class="text-rose-600 font-bold block mb-1">${t('common.map.selectedLocation', 'Selected Location')}</strong>
-          <span class="text-gray-600 dark:text-gray-300 text-[11px]">Lat: ${pickerLatLng[0].toFixed(5)}, Lng: ${pickerLatLng[1].toFixed(5)}</span>
-          <p class="text-gray-400 text-[10px] mt-1">${t('common.map.dragMarkerHint', 'Drag marker or click anywhere on the map to change.')}</p>
-        </div>
-      `);
+      const pickerPopup = textElement('div', 'text-xs p-1');
+      pickerPopup.append(
+        textElement('strong', 'text-rose-600 font-bold block mb-1', t('common.map.selectedLocation', 'Selected Location')),
+        textElement('span', 'text-gray-600 dark:text-gray-300 text-[11px]', `Lat: ${pickerLatLng[0].toFixed(5)}, Lng: ${pickerLatLng[1].toFixed(5)}`),
+        textElement('p', 'text-gray-400 text-[10px] mt-1', t('common.map.dragMarkerHint', 'Drag marker or click anywhere on the map to change.')),
+      );
+      pickerMarker.bindPopup(pickerPopup);
 
       markersLayer.addLayer(pickerMarker);
     }
@@ -296,12 +313,10 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
       });
 
       const userMarker = L.marker(userLatLng, { icon: userIcon })
-        .bindPopup(`
-          <div class="text-xs p-1">
-            <strong class="text-sky-600 dark:text-sky-400">${t('common.map.yourLocation', 'Your Location')}</strong>
-            <p class="text-gray-500 text-[10px] mt-0.5">Lat: ${userLocation.lat.toFixed(4)}, Lng: ${userLocation.lng.toFixed(4)}</p>
-          </div>
-        `);
+        .bindPopup(locationPopup(
+          t('common.map.yourLocation', 'Your Location'), 'text-sky-600 dark:text-sky-400',
+          `Lat: ${userLocation.lat.toFixed(4)}, Lng: ${userLocation.lng.toFixed(4)}`,
+        ));
       markersLayer.addLayer(userMarker);
 
       if (userRadiusKm && userRadiusKm > 0) {
@@ -337,12 +352,10 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
       });
 
       const baseMarker = L.marker(workerLatLng, { icon: workerBaseIcon })
-        .bindPopup(`
-          <div class="text-xs p-1">
-            <strong class="text-emerald-600 font-bold">${t('common.map.baseLocation', 'Your Base Location')}</strong>
-            <p class="text-gray-500 text-[10px] mt-0.5">${t('common.map.coverage', 'Coverage: {{radius}} km radius', { radius: workerCoverageRadiusKm || 10 })}</p>
-          </div>
-        `);
+        .bindPopup(locationPopup(
+          t('common.map.baseLocation', 'Your Base Location'), 'text-emerald-600 font-bold',
+          t('common.map.coverage', 'Coverage: {{radius}} km radius', { radius: workerCoverageRadiusKm || 10 }),
+        ));
       markersLayer.addLayer(baseMarker);
 
       if (workerCoverageRadiusKm && workerCoverageRadiusKm > 0) {
@@ -365,47 +378,38 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
         bounds.extend(workerPos);
 
         const isSelected = selectedWorkerId === worker.id;
-        const skillsHtml = worker.skills.slice(0, 2).map((s) => s.categoryName).join(', ');
-
+        const skillsText = worker.skills.slice(0, 2).map((skill) => skill.categoryName).join(', ');
+        const ratingText = worker.averageRating > 0 ? worker.averageRating.toFixed(1) : t('common.map.newBadge', 'New');
+        const iconContent = textElement('div', `relative flex items-center justify-center transition-transform hover:scale-125 ${isSelected ? 'scale-125 z-50' : ''}`);
+        const badge = textElement('div', 'w-9 h-9 bg-emerald-600 text-white rounded-full border-2 border-white dark:border-gray-900 shadow-xl flex flex-col items-center justify-center');
+        badge.append(staticIcon('worker'));
+        const ratingBadge = textElement('div', 'absolute -bottom-1 px-1.5 py-0.2 bg-gray-900 text-amber-400 text-[9px] font-black rounded-full shadow-md flex items-center gap-0.5');
+        ratingBadge.append(staticIcon('star'), textElement('span', '', ratingText));
+        iconContent.append(badge, ratingBadge);
         const workerIcon = L.divIcon({
-          className: `custom-marker-worker-${worker.id}`,
-          html: `
-            <div class="relative flex items-center justify-center transition-transform hover:scale-125 ${isSelected ? 'scale-125 z-50' : ''}">
-              <div class="w-9 h-9 bg-emerald-600 text-white rounded-full border-2 border-white dark:border-gray-900 shadow-xl flex flex-col items-center justify-center">
-                ${SVG_HARDHAT_ICON}
-              </div>
-              <div class="absolute -bottom-1 px-1.5 py-0.2 bg-gray-900 text-amber-400 text-[9px] font-black rounded-full shadow-md flex items-center gap-0.5">
-                ${SVG_STAR_ICON}
-                <span>${worker.averageRating > 0 ? worker.averageRating.toFixed(1) : t('common.map.newBadge', 'New')}</span>
-              </div>
-            </div>
-          `,
-          iconSize: [36, 40],
-          iconAnchor: [18, 20],
+          className: `custom-marker-worker-${worker.id}`, html: iconContent,
+          iconSize: [36, 40], iconAnchor: [18, 20],
         });
-
         const marker = L.marker(workerPos, { icon: workerIcon });
 
-        const popupContent = document.createElement('div');
-        popupContent.className = 'p-1.5 max-w-[200px] space-y-1.5';
-        popupContent.innerHTML = `
-          <div class="flex items-center gap-2">
-            <span class="font-bold text-xs text-gray-900 dark:text-white">${worker.email || t('common.map.skilledArtisan', 'Skilled Artisan')}</span>
-            <span class="text-[10px] text-amber-500 font-bold flex items-center gap-0.5">${SVG_STAR_ICON} <span>${worker.averageRating > 0 ? worker.averageRating.toFixed(1) : t('common.map.newBadge', 'New')}</span></span>
-          </div>
-          <p class="text-[11px] text-gray-600 dark:text-gray-300 line-clamp-1">${skillsHtml || t('common.map.generalArtisan', 'General Artisan')}</p>
-          <div class="flex items-center justify-between text-[11px] pt-1 border-t border-gray-200 dark:border-gray-700">
-            <span class="font-bold text-emerald-600">৳ ${worker.hourlyRate}/hr</span>
-            <span class="text-gray-400">${worker.distanceKm != null ? `${worker.distanceKm.toFixed(1)} km` : ''}</span>
-          </div>
-          <button id="view-worker-${worker.id}" class="w-full mt-1 px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold rounded-lg transition cursor-pointer text-center">
-            ${t('common.map.viewProfile', 'View Profile')}
-          </button>
-        `;
-
-        popupContent.querySelector(`#view-worker-${worker.id}`)?.addEventListener('click', () => {
-          if (onSelectWorker) onSelectWorker(worker);
-        });
+        const popupContent = textElement('div', 'p-1.5 max-w-[200px] space-y-1.5');
+        const heading = textElement('div', 'flex items-center gap-2');
+        heading.append(textElement('span', 'font-bold text-xs text-gray-900 dark:text-white',
+          worker.email || t('common.map.skilledArtisan', 'Skilled Artisan')));
+        const rating = textElement('span', 'text-[10px] text-amber-500 font-bold flex items-center gap-0.5');
+        rating.append(staticIcon('star'), textElement('span', '', ratingText));
+        heading.append(rating);
+        const details = textElement('div', 'flex items-center justify-between text-[11px] pt-1 border-t border-gray-200 dark:border-gray-700');
+        details.append(textElement('span', 'font-bold text-emerald-600', `৳ ${worker.hourlyRate}/hr`),
+          textElement('span', 'text-gray-400', worker.distanceKm != null ? `${worker.distanceKm.toFixed(1)} km` : ''));
+        const profileButton = textElement('button', 'w-full mt-1 px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold rounded-lg transition cursor-pointer text-center',
+          t('common.map.viewProfile', 'View Profile'));
+        profileButton.type = 'button';
+        profileButton.id = `view-worker-${worker.id}`;
+        profileButton.addEventListener('click', () => { if (onSelectWorker) onSelectWorker(worker); });
+        popupContent.append(heading,
+          textElement('p', 'text-[11px] text-gray-600 dark:text-gray-300 line-clamp-1', skillsText || t('common.map.generalArtisan', 'General Artisan')),
+          details, profileButton);
 
         marker.bindPopup(popupContent);
 
@@ -426,45 +430,34 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
 
         const isSelected = selectedRequestId === req.id;
 
+        const iconContent = textElement('div', `relative flex items-center justify-center transition-transform hover:scale-125 ${isSelected ? 'scale-125 z-50' : ''}`);
+        const badge = textElement('div', 'w-9 h-9 bg-amber-500 text-white rounded-full border-2 border-white dark:border-gray-900 shadow-xl flex flex-col items-center justify-center');
+        badge.append(staticIcon('request'));
+        iconContent.append(badge,
+          textElement('div', 'absolute -bottom-1 px-1.5 py-0.2 bg-gray-900 text-white text-[9px] font-black rounded-full shadow-md truncate max-w-[60px]', req.categoryName));
         const reqIcon = L.divIcon({
-          className: `custom-marker-req-${req.id}`,
-          html: `
-            <div class="relative flex items-center justify-center transition-transform hover:scale-125 ${isSelected ? 'scale-125 z-50' : ''}">
-              <div class="w-9 h-9 bg-amber-500 text-white rounded-full border-2 border-white dark:border-gray-900 shadow-xl flex flex-col items-center justify-center">
-                ${SVG_CLIPBOARD_ICON}
-              </div>
-              <div class="absolute -bottom-1 px-1.5 py-0.2 bg-gray-900 text-white text-[9px] font-black rounded-full shadow-md truncate max-w-[60px]">
-                ${req.categoryName}
-              </div>
-            </div>
-          `,
-          iconSize: [36, 40],
-          iconAnchor: [18, 20],
+          className: `custom-marker-req-${req.id}`, html: iconContent,
+          iconSize: [36, 40], iconAnchor: [18, 20],
         });
-
         const marker = L.marker(reqPos, { icon: reqIcon });
 
-        const popupContent = document.createElement('div');
-        popupContent.className = 'p-1.5 max-w-[220px] space-y-1.5';
-        popupContent.innerHTML = `
-          <div class="flex items-center justify-between gap-2">
-            <span class="font-bold text-xs text-amber-600 dark:text-amber-400 uppercase">${req.categoryName}</span>
-            <span class="text-[10px] text-gray-500 font-bold">${req.distanceKm} ${t('common.map.kmAway', 'km away')}</span>
-          </div>
-          <p class="text-[11px] text-gray-700 dark:text-gray-300 font-medium line-clamp-2">${req.description}</p>
-          <div class="text-[10px] text-gray-400 flex items-center">
-            ${SVG_POPUP_PIN_ICON}
-            <span>${req.address}</span>
-          </div>
-          <button id="quote-btn-${req.id}" class="w-full mt-1 px-2 py-1 bg-amber-500 hover:bg-amber-400 text-white text-[11px] font-bold rounded-lg transition cursor-pointer text-center">
-            ${t('common.map.sendQuotation', 'Send Quotation')}
-          </button>
-        `;
-
-        popupContent.querySelector(`#quote-btn-${req.id}`)?.addEventListener('click', () => {
+        const popupContent = textElement('div', 'p-1.5 max-w-[220px] space-y-1.5');
+        const heading = textElement('div', 'flex items-center justify-between gap-2');
+        heading.append(textElement('span', 'font-bold text-xs text-amber-600 dark:text-amber-400 uppercase', req.categoryName),
+          textElement('span', 'text-[10px] text-gray-500 font-bold', `${req.distanceKm} ${t('common.map.kmAway', 'km away')}`));
+        const address = textElement('div', 'text-[10px] text-gray-400 flex items-center');
+        address.append(staticIcon('popupPin'), textElement('span', '', req.address));
+        const quoteButton = textElement('button', 'w-full mt-1 px-2 py-1 bg-amber-500 hover:bg-amber-400 text-white text-[11px] font-bold rounded-lg transition cursor-pointer text-center',
+          t('common.map.sendQuotation', 'Send Quotation'));
+        quoteButton.type = 'button';
+        quoteButton.id = `quote-btn-${req.id}`;
+        quoteButton.addEventListener('click', () => {
           if (onRequestQuote) onRequestQuote(req.id);
           else if (onSelectRequest) onSelectRequest(req);
         });
+        popupContent.append(heading,
+          textElement('p', 'text-[11px] text-gray-700 dark:text-gray-300 font-medium line-clamp-2', req.description),
+          address, quoteButton);
 
         marker.bindPopup(popupContent);
 
@@ -491,6 +484,10 @@ export const KarigorMap: React.FC<KarigorMapProps> = ({
     selectedRequestId,
     isPickerMode,
     effectivePickerCoords,
+    onSelectWorker,
+    onSelectRequest,
+    onRequestQuote,
+    t,
   ]);
 
   // ───────────────────────────────────────────────────────────────────────────

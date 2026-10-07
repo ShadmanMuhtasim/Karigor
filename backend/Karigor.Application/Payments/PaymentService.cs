@@ -1,7 +1,9 @@
 using System;
 using System.Globalization;
 using System.Linq;
+using System.Net.Http;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Karigor.Application.Notifications;
 using Karigor.Application.Notifications.DTOs;
@@ -118,10 +120,21 @@ public class PaymentService : IPaymentService
         };
     }
 
-    public async Task<PaymentDetailsDto> ProcessSuccessCallbackAsync(SslCommerzCallbackDto callback)
+    public Task<PaymentDetailsDto> ProcessSuccessCallbackAsync(SslCommerzCallbackDto callback)
+        => ProcessVerifiedCallbackAsync(callback);
+
+    public Task<PaymentDetailsDto> ProcessFailCallbackAsync(SslCommerzCallbackDto callback)
+        => ProcessVerifiedCallbackAsync(callback);
+
+    public Task<PaymentDetailsDto> ProcessCancelCallbackAsync(SslCommerzCallbackDto callback)
+        => ProcessVerifiedCallbackAsync(callback);
+
+    public Task<PaymentDetailsDto> ProcessIpnAsync(SslCommerzCallbackDto callback)
+        => ProcessVerifiedCallbackAsync(callback);
+
+    private async Task<PaymentDetailsDto> ProcessVerifiedCallbackAsync(SslCommerzCallbackDto callback)
     {
-        _logger.LogInformation("Processing SSLCommerz success callback for TranId: {TranId}, ValId: {ValId}",
-            callback.TranId, callback.ValId);
+        _logger.LogInformation("Verifying SSLCommerz callback for TranId: {TranId}", callback.TranId);
 
         if (string.IsNullOrWhiteSpace(callback.TranId))
             throw new ArgumentException("Transaction ID is missing from callback.");
@@ -130,95 +143,65 @@ public class PaymentService : IPaymentService
             .Include(p => p.Booking)
             .FirstOrDefaultAsync(p => p.TransactionId == callback.TranId);
 
-        if (payment == null && int.TryParse(callback.ValueA, out var bookingId))
-        {
-            payment = await _db.Payments
-                .Include(p => p.Booking)
-                .Where(p => p.BookingId == bookingId)
-                .OrderByDescending(p => p.CreatedAt)
-                .FirstOrDefaultAsync();
-        }
+        // SQL collation can ignore case/trailing spaces; the attempt identifier must be exact.
+        if (payment == null || !string.Equals(payment.TransactionId, callback.TranId, StringComparison.Ordinal))
+            throw new KeyNotFoundException("Payment transaction not found.");
 
-        if (payment == null)
-            throw new KeyNotFoundException($"Payment with transaction ID '{callback.TranId}' not found.");
-
-        // Idempotency: if already completed, return immediately
+        // Preserve completion. This sequential guard is not concurrency/idempotency architecture.
         if (string.Equals(payment.Status, "Completed", StringComparison.OrdinalIgnoreCase))
-        {
-            _logger.LogInformation("Payment {TransactionId} is already marked Completed.", payment.TransactionId);
             return ToDto(payment);
-        }
 
-        // Server-side validation with SSLCommerz Order Validation API
-        bool isValid = false;
-        if (!string.IsNullOrWhiteSpace(callback.ValId))
+        if (string.IsNullOrWhiteSpace(callback.ValId))
+            throw new PaymentVerificationException(payment.BookingId, "Provider verification identifier is missing.");
+
+        SslCommerzValidationResponse validation;
+        try
         {
-            try
-            {
-                var validation = await _sslCommerzClient.ValidateTransactionAsync(callback.ValId);
-                if (validation != null &&
-                    (string.Equals(validation.Status, "VALID", StringComparison.OrdinalIgnoreCase) ||
-                     string.Equals(validation.Status, "VALIDATED", StringComparison.OrdinalIgnoreCase)))
-                {
-                    // Validate amount integrity if present
-                    if (!string.IsNullOrWhiteSpace(validation.Amount) &&
-                        decimal.TryParse(validation.Amount, NumberStyles.Any, CultureInfo.InvariantCulture, out var validatedAmount))
-                    {
-                        if (Math.Abs(validatedAmount - payment.TotalAmount) < 1.00m)
-                        {
-                            isValid = true;
-                        }
-                        else
-                        {
-                            _logger.LogWarning("Validation amount mismatch: expected {Expected}, received {Received}",
-                                payment.TotalAmount, validatedAmount);
-                        }
-                    }
-                    else
-                    {
-                        isValid = true;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "SSLCommerz validation API check failed for val_id: {ValId}. Falling back to callback status.", callback.ValId);
-            }
+            validation = await _sslCommerzClient.ValidateTransactionAsync(callback.ValId);
         }
-
-        // Also accept if sandbox/callback explicitly reported VALID
-        if (!isValid && string.Equals(callback.Status, "VALID", StringComparison.OrdinalIgnoreCase))
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidOperationException)
         {
-            isValid = true;
+            // Transport/parse uncertainty is not a financial failure, and never grants success.
+            _logger.LogWarning("Provider verification unavailable for transaction {TransactionId}; state unchanged.", payment.TransactionId);
+            throw new PaymentVerificationException(payment.BookingId,
+                "Provider verification is unavailable. Payment remains unresolved.", retryable: true, innerException: ex);
         }
 
-        if (!isValid)
+        var validStatus = string.Equals(validation.Status, "VALID", StringComparison.Ordinal) ||
+                          string.Equals(validation.Status, "VALIDATED", StringComparison.Ordinal);
+        // Provider amounts have at most two fractional digits: no rounding, tolerance, signs or grouping.
+        var validAmount = validation.Amount is { Length: > 0 and <= 32 } &&
+                          Regex.IsMatch(validation.Amount, @"\A[0-9]+(?:\.[0-9]{1,2})?\z", RegexOptions.CultureInvariant) &&
+                          decimal.TryParse(validation.Amount, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var amount) &&
+                          amount > 0 && amount == payment.TotalAmount;
+        var validReceipt = !string.IsNullOrWhiteSpace(validation.ValId) && validation.ValId.Length <= 100 &&
+                           string.Equals(validation.ValId, callback.ValId, StringComparison.Ordinal) &&
+                           validation.BankTranId?.Length is not > 100 && validation.CardType?.Length is not > 100;
+        if (!validStatus || !validAmount || !validReceipt ||
+            !string.Equals(validation.TranId, payment.TransactionId, StringComparison.Ordinal) ||
+            !string.Equals(payment.Currency, "BDT", StringComparison.Ordinal) ||
+            !string.Equals(validation.Currency, payment.Currency, StringComparison.Ordinal))
         {
-            payment.Status = "Failed";
-            payment.GatewayResponse = JsonSerializer.Serialize(callback);
-            await _db.SaveChangesAsync();
-            throw new InvalidOperationException("Payment could not be verified by the gateway.");
+            _logger.LogWarning("Provider result did not bind to payment {TransactionId}; state unchanged.", payment.TransactionId);
+            throw new PaymentVerificationException(payment.BookingId, "Provider result did not verify the stored payment attempt.");
         }
 
-        // Record successful payment
+        // Receipt facts come only from the bound provider response, never callback fields.
         payment.Status          = "Completed";
-        payment.ValId           = callback.ValId;
-        payment.BankTranId      = callback.BankTranId;
-        payment.CardType        = callback.CardType;
+        payment.ValId           = validation.ValId;
+        payment.BankTranId      = validation.BankTranId;
+        payment.CardType        = validation.CardType;
         payment.PaidAt          = DateTime.UtcNow;
-        payment.GatewayResponse = JsonSerializer.Serialize(callback);
+        payment.GatewayResponse = JsonSerializer.Serialize(validation);
 
-        // Update booking payment status
         var booking = await _db.Bookings
             .Include(b => b.Worker).ThenInclude(w => w.User)
             .Include(b => b.Customer)
-            .FirstOrDefaultAsync(b => b.Id == payment.BookingId);
+            .FirstOrDefaultAsync(b => b.Id == payment.BookingId)
+            ?? throw new KeyNotFoundException("Payment booking not found.");
 
-        if (booking != null)
-        {
-            booking.PaymentStatus = "Paid";
-        }
-
+        booking.PaymentStatus = "Paid";
+        // EF commits payment and booking together; provider HTTP has already finished.
         await _db.SaveChangesAsync();
 
         // Dispatch in-app notification & SignalR alert to the artisan
@@ -231,7 +214,7 @@ public class PaymentService : IPaymentService
                 {
                     UserId          = booking.Worker.UserId,
                     Type            = "PaymentReceived",
-                    Message         = $"💰 Payment Received! {customerName} paid ৳{payment.TotalAmount:N0} for Booking #{booking.Id}. Your payout of ৳{payment.WorkerAmount:N0} (94%) has been credited after platform fee and service charges (6%).",
+                    Message         = $"💰 Payment Received! {customerName} paid ৳{payment.TotalAmount:N0} for Booking #{booking.Id}. Artisan share: ৳{payment.WorkerAmount:N0} after platform fee and service charges. This confirmation does not record a payout.",
                     RelatedEntityId = booking.Id
                 });
             }
@@ -262,59 +245,6 @@ public class PaymentService : IPaymentService
         }
 
         return ToDto(payment);
-    }
-
-    public async Task<PaymentDetailsDto> ProcessFailCallbackAsync(SslCommerzCallbackDto callback)
-    {
-        _logger.LogWarning("Processing SSLCommerz fail callback for TranId: {TranId}", callback.TranId);
-
-        var payment = await _db.Payments.FirstOrDefaultAsync(p => p.TransactionId == callback.TranId);
-        if (payment == null && int.TryParse(callback.ValueA, out var bookingId))
-        {
-            payment = await _db.Payments
-                .Where(p => p.BookingId == bookingId)
-                .OrderByDescending(p => p.CreatedAt)
-                .FirstOrDefaultAsync();
-        }
-
-        if (payment != null && !string.Equals(payment.Status, "Completed", StringComparison.OrdinalIgnoreCase))
-        {
-            payment.Status = "Failed";
-            payment.GatewayResponse = JsonSerializer.Serialize(callback);
-            await _db.SaveChangesAsync();
-            return ToDto(payment);
-        }
-
-        return payment != null ? ToDto(payment) : new PaymentDetailsDto { Status = "Failed" };
-    }
-
-    public async Task<PaymentDetailsDto> ProcessCancelCallbackAsync(SslCommerzCallbackDto callback)
-    {
-        _logger.LogInformation("Processing SSLCommerz cancel callback for TranId: {TranId}", callback.TranId);
-
-        var payment = await _db.Payments.FirstOrDefaultAsync(p => p.TransactionId == callback.TranId);
-        if (payment == null && int.TryParse(callback.ValueA, out var bookingId))
-        {
-            payment = await _db.Payments
-                .Where(p => p.BookingId == bookingId)
-                .OrderByDescending(p => p.CreatedAt)
-                .FirstOrDefaultAsync();
-        }
-
-        if (payment != null && !string.Equals(payment.Status, "Completed", StringComparison.OrdinalIgnoreCase))
-        {
-            payment.Status = "Cancelled";
-            payment.GatewayResponse = JsonSerializer.Serialize(callback);
-            await _db.SaveChangesAsync();
-            return ToDto(payment);
-        }
-
-        return payment != null ? ToDto(payment) : new PaymentDetailsDto { Status = "Cancelled" };
-    }
-
-    public async Task<PaymentDetailsDto> ProcessIpnAsync(SslCommerzCallbackDto callback)
-    {
-        return await ProcessSuccessCallbackAsync(callback);
     }
 
     public async Task<PaymentDetailsDto?> GetBookingPaymentAsync(string userId, int bookingId)

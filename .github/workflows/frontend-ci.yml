@@ -46,6 +46,26 @@ jobs:
           cd karigor-client
           npx tsc --noEmit
 
+      - name: Install security-test Chromium
+        working-directory: karigor-client
+        run: npx playwright install --with-deps chromium
+
+      - name: Typecheck security browser fixtures
+        working-directory: karigor-client
+        run: npm run typecheck:security
+
+      - name: Run isolated browser security regressions
+        working-directory: karigor-client
+        run: npm run test:security
+
+      - name: Upload browser security results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-security-results
+          path: karigor-client/test-results/security-browser/
+          if-no-files-found: warn
+
       - name: ✅ Verify build output
         run: |
           echo "✅ Frontend build completed successfully!"

@@ -6,4 +6,7 @@
     <Project Path="backend/Karigor.Domain/Karigor.Domain.csproj" />
     <Project Path="backend/Karigor.Infrastructure/Karigor.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Karigor.Security.Tests/Karigor.Security.Tests.csproj" />
+  </Folder>
 </Solution>

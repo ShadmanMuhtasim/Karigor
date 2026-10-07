@@ -44,7 +44,9 @@ jobs:
         run: dotnet build Karigor.slnx --no-restore --configuration Release
 
       - name: 🧪 Run backend tests
-        run: dotnet test Karigor.slnx --no-build --configuration Release --verbosity normal
+        # Full SQL integration suite belongs to Backend CI. This Windows deployment
+        # runner has no SQL fixture; still execute (never skip) the unit regressions.
+        run: python scripts/run-security-tests.py --no-build --filter "Layer=Unit"
 
       # -----------------------------------------------------------------------
       # Frontend Verification & Build

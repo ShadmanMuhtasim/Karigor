@@ -6,6 +6,9 @@ on:
     paths:
       - 'backend/**'
       - 'database/**'
+      - 'tests/**'
+      - 'scripts/run-security-tests.py'
+      - 'scripts/tests/**'
       - 'Karigor.slnx'
       - '.github/workflows/backend-ci.yml'
   pull_request:
@@ -13,6 +16,9 @@ on:
     paths:
       - 'backend/**'
       - 'database/**'
+      - 'tests/**'
+      - 'scripts/run-security-tests.py'
+      - 'scripts/tests/**'
       - 'Karigor.slnx'
       - '.github/workflows/backend-ci.yml'
 
@@ -23,6 +29,18 @@ jobs:
   build-and-test:
     name: Build & Test Backend
     runs-on: ubuntu-latest
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: 'Y'
+          MSSQL_PID: Developer
+          MSSQL_SA_PASSWORD: 'FixtureOnly_Karigor2026!'
+        ports:
+          - 1433:1433
+    env:
+      # Public fixture credential for this disposable CI service only.
+      KARIGOR_TEST_SQLSERVER: 'Server=127.0.0.1,1433;Initial Catalog=master;User ID=sa;Password=FixtureOnly_Karigor2026!;TrustServerCertificate=true;Connect Timeout=5'
 
     steps:
       - name: 📥 Checkout repository
@@ -39,9 +57,19 @@ jobs:
       - name: 🏗️ Build solution
         run: dotnet build Karigor.slnx --no-restore --configuration Release
 
-      - name: 🧪 Run tests (if any)
-        run: dotnet test Karigor.slnx --no-build --configuration Release --verbosity normal
-        continue-on-error: true  # Remove this once you have tests
+      - name: Verify security result classifier
+        run: python -m unittest discover -s scripts/tests -v
+
+      - name: Run security baseline and executed known-defect regressions
+        run: python scripts/run-security-tests.py --no-build
+
+      - name: Upload raw security results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-security-results
+          path: TestResults/security/
+          if-no-files-found: warn
 
       - name: 📊 Check for warnings
         run: |

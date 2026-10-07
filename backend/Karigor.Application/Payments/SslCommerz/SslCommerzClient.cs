@@ -77,7 +77,8 @@ public class SslCommerzClient
         _logger.LogInformation("Initiating SSLCommerz transaction {TransactionId} at {Url}", transactionId, initUrl);
 
         using var requestContent = new FormUrlEncodedContent(postData);
-        var response = await _httpClient.PostAsync(initUrl, requestContent);
+        using var response = await _httpClient.PostAsync(initUrl, requestContent);
+        response.EnsureSuccessStatusCode();
         var responseString = await response.Content.ReadAsStringAsync();
 
         try
@@ -86,29 +87,6 @@ public class SslCommerzClient
             {
                 PropertyNameCaseInsensitive = true
             });
-
-            // Sandbox failover: if configured store credentials return "Store Credential Error Or Store is De-active",
-            // retry with official SSLCommerz sandbox test store "testbox" / "qwerty" for local testing
-            if (_options.IsSandbox && (initResponse == null || !string.Equals(initResponse.Status, "SUCCESS", StringComparison.OrdinalIgnoreCase))
-                && (initResponse?.FailedReason?.Contains("Store Credential", StringComparison.OrdinalIgnoreCase) == true
-                    || initResponse?.FailedReason?.Contains("De-active", StringComparison.OrdinalIgnoreCase) == true))
-            {
-                _logger.LogWarning("SSLCommerz credentials ({StoreId}) returned '{Reason}'. Retrying with sandbox test store 'testbox'...",
-                    _options.StoreId, initResponse?.FailedReason);
-
-                postData["store_id"] = "testbox";
-                postData["store_passwd"] = "qwerty";
-
-                using var retryContent = new FormUrlEncodedContent(postData);
-                var retryResponse = await _httpClient.PostAsync(initUrl, retryContent);
-                var retryResponseString = await retryResponse.Content.ReadAsStringAsync();
-
-                initResponse = JsonSerializer.Deserialize<SslCommerzInitResponse>(retryResponseString, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
-                responseString = retryResponseString;
-            }
 
             if (initResponse == null || !string.Equals(initResponse.Status, "SUCCESS", StringComparison.OrdinalIgnoreCase))
             {
@@ -131,17 +109,9 @@ public class SslCommerzClient
         var validationUrl = $"{_options.BaseUrl}/validator/api/validationserverAPI.php?val_id={Uri.EscapeDataString(valId)}&store_id={Uri.EscapeDataString(_options.StoreId)}&store_passwd={Uri.EscapeDataString(_options.StorePassword)}&v=1&format=json";
         _logger.LogInformation("Validating SSLCommerz payment for val_id: {ValId}", valId);
 
-        var response = await _httpClient.GetAsync(validationUrl);
+        using var response = await _httpClient.GetAsync(validationUrl);
+        response.EnsureSuccessStatusCode();
         var responseString = await response.Content.ReadAsStringAsync();
-
-        // If credentials failed in sandbox, retry with testbox
-        if (_options.IsSandbox && (responseString.Contains("Store Credential Error", StringComparison.OrdinalIgnoreCase)
-                                   || responseString.Contains("Store is De-active", StringComparison.OrdinalIgnoreCase)))
-        {
-            validationUrl = $"{_options.BaseUrl}/validator/api/validationserverAPI.php?val_id={Uri.EscapeDataString(valId)}&store_id=testbox&store_passwd=qwerty&v=1&format=json";
-            response = await _httpClient.GetAsync(validationUrl);
-            responseString = await response.Content.ReadAsStringAsync();
-        }
 
         try
         {
@@ -158,9 +128,9 @@ public class SslCommerzClient
 
             return validation;
         }
-        catch (JsonException ex)
+        catch (JsonException)
         {
-            _logger.LogError(ex, "Failed to parse SSLCommerz validation for {ValId}. Raw: {Raw}", valId, responseString);
+            _logger.LogWarning("Malformed SSLCommerz verification response; payment remains unresolved.");
             throw new InvalidOperationException("Failed to validate payment with gateway.");
         }
     }

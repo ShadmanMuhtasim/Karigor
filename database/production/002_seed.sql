@@ -11,9 +11,10 @@
 --    - Seeds standard ServiceCategories (10 core trade categories with CDN icons).
 --
 -- Note on Admin Account:
--- The default administrator account (admin@karigor.com) is provisioned automatically
--- by the ASP.NET Core application runtime on first startup using ASP.NET Core Identity
--- (RoleManager/UserManager) to ensure proper cryptographic password hashing.
+-- This script seeds role definitions, never administrator accounts.
+-- Initial administrator creation is an explicit operator command:
+-- dotnet Karigor.Api.dll bootstrap-admin (protected interactive password prompt).
+-- Ordinary web startup never creates or promotes an administrator.
 -- =============================================================================
 
 SET ANSI_NULLS ON;

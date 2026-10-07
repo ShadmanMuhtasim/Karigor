@@ -16,6 +16,25 @@ class SignalRService {
   private sosAlertListeners: Array<(alert: SosAlertDto) => void> = [];
   private joinedBookings = new Set<number>();
   private connectionPromise: Promise<void> | null = null;
+  private accountId: string | null = null;
+  private generation = 0;
+
+  public async setAccount(accountId: string | null): Promise<void> {
+    if (accountId === this.accountId) {
+      if (accountId) await this.startConnection();
+      return;
+    }
+    this.accountId = accountId;
+    const generation = ++this.generation;
+    const previous = this.connection;
+    this.connection = null;
+    this.connectionPromise = null;
+    this.joinedBookings.clear();
+    if (previous) {
+      try { await previous.stop(); } catch {}
+    }
+    if (generation === this.generation && accountId) await this.startConnection();
+  }
 
   public async startConnection(): Promise<void> {
     if (this.connection && this.connection.state === signalR.HubConnectionState.Connected) {
@@ -27,7 +46,8 @@ class SignalRService {
     }
 
     const token = getAccessToken();
-    if (!token) return;
+    if (!token || !this.accountId) return;
+    const generation = this.generation;
 
     this.connectionPromise = (async () => {
       try {
@@ -49,6 +69,7 @@ class SignalRService {
           .build();
 
         conn.on('ReceiveMessage', (msg: MessageDto) => {
+          if (generation !== this.generation) return;
           this.messageListeners.forEach((listener) => {
             try {
               listener(msg);
@@ -59,6 +80,7 @@ class SignalRService {
         });
 
         conn.on('ReceiveNotification', (notif: NotificationDto) => {
+          if (generation !== this.generation) return;
           this.notificationListeners.forEach((listener) => {
             try {
               listener(notif);
@@ -69,6 +91,7 @@ class SignalRService {
         });
 
         conn.on('UserTyping', (data: { bookingId: number; userId: string; isTyping: boolean }) => {
+          if (generation !== this.generation) return;
           this.typingListeners.forEach((listener) => {
             try {
               listener(data);
@@ -79,6 +102,7 @@ class SignalRService {
         });
 
         conn.on('ServiceRequestCreated', (data: any) => {
+          if (generation !== this.generation) return;
           this.serviceRequestListeners.forEach((listener) => {
             try {
               listener(data);
@@ -89,6 +113,7 @@ class SignalRService {
         });
 
         conn.on('QuotationUpdated', (data: any) => {
+          if (generation !== this.generation) return;
           this.quotationListeners.forEach((listener) => {
             try {
               listener(data);
@@ -99,6 +124,7 @@ class SignalRService {
         });
 
         conn.on('ReviewCreated', (data: any) => {
+          if (generation !== this.generation) return;
           this.reviewCreatedListeners.forEach((listener) => {
             try {
               listener(data);
@@ -109,6 +135,7 @@ class SignalRService {
         });
 
         conn.on('ReviewUpdated', (data: any) => {
+          if (generation !== this.generation) return;
           this.reviewUpdatedListeners.forEach((listener) => {
             try {
               listener(data);
@@ -119,6 +146,7 @@ class SignalRService {
         });
 
         conn.on('SosAlertTriggered', (alert: SosAlertDto) => {
+          if (generation !== this.generation) return;
           this.sosAlertListeners.forEach((listener) => {
             try {
               listener(alert);
@@ -129,14 +157,22 @@ class SignalRService {
         });
 
         conn.onreconnected(async () => {
+          if (generation !== this.generation) return;
           for (const bId of this.joinedBookings) {
             try {
               await conn.invoke('JoinBooking', bId);
-            } catch {}
+            } catch (err) {
+              this.joinedBookings.delete(bId);
+              console.warn(`Could not rejoin booking #${bId}:`, err);
+            }
           }
         });
 
         await conn.start();
+        if (generation !== this.generation) {
+          await conn.stop();
+          return;
+        }
         this.connection = conn;
 
         // Rejoin any active bookings
@@ -144,13 +180,14 @@ class SignalRService {
           try {
             await conn.invoke('JoinBooking', bId);
           } catch (err) {
+            this.joinedBookings.delete(bId);
             console.warn(`Could not join room for booking #${bId}:`, err);
           }
         }
       } catch (err) {
         console.warn('SignalR connection failed:', err);
       } finally {
-        this.connectionPromise = null;
+        if (generation === this.generation) this.connectionPromise = null;
       }
     })();
 
@@ -158,13 +195,7 @@ class SignalRService {
   }
 
   public async stopConnection(): Promise<void> {
-    if (this.connection) {
-      try {
-        await this.connection.stop();
-      } catch {}
-      this.connection = null;
-    }
-    this.joinedBookings.clear();
+    await this.setAccount(null);
   }
 
   public async joinBooking(bookingId: number): Promise<void> {
@@ -178,7 +209,9 @@ class SignalRService {
       try {
         await this.connection.invoke('JoinBooking', bookingId);
       } catch (err) {
+        this.joinedBookings.delete(bookingId);
         console.warn('Error joining booking chat group:', err);
+        throw err;
       }
     }
   }

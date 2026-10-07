@@ -227,10 +227,9 @@ public class PaymentService : IPaymentService
         // Broadcast real-time payment event to update customer and worker screens
         try
         {
-            await _realtimeNotifier.BroadcastAsync("PaymentReceived", new
+            await _realtimeNotifier.NotifyBookingGroupAsync(payment.BookingId, "PaymentReceived", new
             {
                 bookingId     = payment.BookingId,
-                transactionId = payment.TransactionId,
                 totalAmount   = payment.TotalAmount,
                 platformFee   = payment.PlatformFee,
                 serviceCharge = payment.ServiceCharge,

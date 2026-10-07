@@ -188,7 +188,12 @@ public class AdminService : IAdminService
                 RelatedEntityId = worker.Id
             });
 
-            await _realtimeNotifier.BroadcastAsync("WorkerVerificationUpdated", resultDto);
+            await _realtimeNotifier.NotifyAdminsAsync("WorkerVerificationUpdated", resultDto);
+            await _realtimeNotifier.NotifyUserAsync(worker.UserId, "WorkerVerificationUpdated", new
+            {
+                verificationStatus = normalizedStatus,
+                note = dto.Note
+            });
         }
         catch { }
 

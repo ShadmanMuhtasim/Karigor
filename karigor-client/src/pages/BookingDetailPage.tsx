@@ -35,16 +35,12 @@ export function BookingDetailPage() {
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsubRevCreated = signalRService.onReviewCreated((data) => {
-      if (data.bookingId === id) {
-        queryClient.invalidateQueries({ queryKey: ['booking', id] });
-      }
+    const unsubRevCreated = signalRService.onReviewCreated(() => {
+      queryClient.invalidateQueries({ queryKey: ['booking', id] });
     });
 
-    const unsubRevUpdated = signalRService.onReviewUpdated((data) => {
-      if (data.bookingId === id) {
-        queryClient.invalidateQueries({ queryKey: ['booking', id] });
-      }
+    const unsubRevUpdated = signalRService.onReviewUpdated(() => {
+      queryClient.invalidateQueries({ queryKey: ['booking', id] });
     });
 
     const unsubNotif = signalRService.onNotification((notif) => {

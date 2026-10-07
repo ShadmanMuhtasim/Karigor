@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { getPendingWorkers, verifyWorker } from '../../api/adminApi';
 import type { PendingWorkerDto, WorkerVerificationDocumentDto } from '../../api/adminApi';
 import { extractErrorMessage } from '../../lib/errorUtils';
-import { getFileUrl } from '../../api/client';
+import { useAuth } from '../../context/AuthContext';
+import { PrivateDocumentViewer } from '../../components/PrivateDocumentViewer';
 import { Modal } from '../../components/ui/Modal';
 import {
   CloseIcon,
@@ -18,6 +19,11 @@ import {
 } from '../../components/icons/Icons';
 
 export const AdminVerificationsTab: React.FC = () => {
+  const { user } = useAuth();
+  return user ? <AdminVerificationsForAccount key={user.userId} account={user.userId} /> : null;
+};
+
+const AdminVerificationsForAccount: React.FC<{ account: string }> = ({ account }) => {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<string>('Pending');
@@ -29,7 +35,7 @@ export const AdminVerificationsTab: React.FC = () => {
   const [successMsg, setSuccessMsg] = useState('');
 
   const { data: workers, isLoading } = useQuery({
-    queryKey: ['adminWorkers', statusFilter, searchTerm],
+    queryKey: ['adminWorkers', account, statusFilter, searchTerm],
     queryFn: () => getPendingWorkers(statusFilter, searchTerm),
   });
 
@@ -263,80 +269,8 @@ export const AdminVerificationsTab: React.FC = () => {
         </div>
       )}
 
-      {/* Document Preview Modal */}
-      {selectedDoc && (
-        <Modal
-          isOpen={!!selectedDoc}
-          onClose={() => setSelectedDoc(null)}
-          backdropClassName="bg-black/70 backdrop-blur-sm"
-        >
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl sm:rounded-3xl max-w-2xl w-full p-4 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto animate-modal-pop">
-            <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
-              <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                <FileTextIcon className="w-4 h-4 text-sky-500" />
-                <span>{selectedDoc.documentType}</span>
-              </h4>
-              <button
-                onClick={() => setSelectedDoc(null)}
-                className="text-gray-400 hover:text-gray-600 text-lg cursor-pointer p-1"
-              >
-                <CloseIcon className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="p-3 sm:p-4 bg-gray-50 dark:bg-gray-950 rounded-2xl border border-gray-200 dark:border-gray-800 text-center">
-              {selectedDoc.fileUrl.endsWith('.pdf') ? (
-                <div className="flex flex-col items-center w-full">
-                  <iframe 
-                    src={getFileUrl(selectedDoc.fileUrl)}
-                    className="w-full h-[50vh] sm:h-[60vh] rounded-xl border border-gray-200 dark:border-gray-700 bg-white"
-                    title={selectedDoc.documentType}
-                  />
-                  <div className="mt-4">
-                    <a
-                      href={getFileUrl(selectedDoc.fileUrl)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-xl text-xs btn-press"
-                    >
-                      <span>{t('admin.verifications.openPdf', 'Open PDF in New Tab')}</span>
-                      <ArrowRightIcon className="w-3.5 h-3.5" />
-                    </a>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center w-full">
-                  <img
-                    src={getFileUrl(selectedDoc.fileUrl)}
-                    alt={selectedDoc.documentType}
-                    className="max-h-[50vh] sm:max-h-[60vh] max-w-full mx-auto rounded-xl object-contain shadow-sm"
-                  />
-                  <div className="mt-4">
-                    <a
-                      href={getFileUrl(selectedDoc.fileUrl)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-xl text-xs btn-press"
-                    >
-                      <span>{t('admin.verifications.openImage', 'Open Image in New Tab')}</span>
-                      <ArrowRightIcon className="w-3.5 h-3.5" />
-                    </a>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-end">
-              <button
-                onClick={() => setSelectedDoc(null)}
-                className="w-full sm:w-auto px-4 py-2 bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 text-gray-800 dark:text-gray-200 font-bold rounded-xl text-xs btn-press cursor-pointer text-center"
-              >
-                {t('common.close')}
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
+      {selectedDoc && <PrivateDocumentViewer fileUrl={selectedDoc.fileUrl}
+        label={selectedDoc.documentType} onClose={() => setSelectedDoc(null)} />}
 
       {/* Confirmation Modal */}
       {actionWorker && (

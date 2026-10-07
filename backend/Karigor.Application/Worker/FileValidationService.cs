@@ -6,8 +6,7 @@ namespace Karigor.Application.Worker
     /// <summary>
     /// Magic-byte ("signature") validation for uploaded worker documents.
     /// Rejects files whose bytes do not match their declared extension.
-    /// This blocks the "rename .exe → .pdf" attack where an attacker spoofs
-    /// a dangerous file's extension.
+    /// Signatures identify a format; they do not prove content is free of malware.
     /// </summary>
     public static class FileValidationService
     {
@@ -47,9 +46,9 @@ namespace Karigor.Application.Worker
                 {
                     case "pdf":
                         detectedExt = "pdf";
-                        return read >= 4
-                            && sig[0] == 0x25 && sig[1] == 0x46 // '%F'
-                            && sig[2] == 0x44 && sig[3] == 0x50; // 'DP'   → %PDF
+                        return read >= 5
+                            && sig[0] == 0x25 && sig[1] == 0x50 // '%P'
+                            && sig[2] == 0x44 && sig[3] == 0x46 && sig[4] == 0x2D; // 'DF-'
 
                     case "jpg":
                     case "jpeg":

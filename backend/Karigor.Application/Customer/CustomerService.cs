@@ -105,15 +105,7 @@ public class CustomerService : ICustomerService
         // Broadcast real-time event to all connected workers so their map updates immediately
         try
         {
-            await _realtimeNotifier.BroadcastAsync("ServiceRequestCreated", new
-            {
-                id = request.Id,
-                categoryId = request.CategoryId,
-                categoryName = category.Name,
-                latitude = request.Latitude,
-                longitude = request.Longitude,
-                preferredDate = request.PreferredDate
-            });
+            await _realtimeNotifier.NotifyWorkersRefreshAsync("ServiceRequestCreated");
         }
         catch { /* Non-blocking */ }
 

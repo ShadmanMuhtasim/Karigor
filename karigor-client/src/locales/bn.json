@@ -412,13 +412,13 @@
       "upload": "আপলোড করুন",
       "uploading": "আপলোড হচ্ছে...",
       "docType": "ডকুমেন্টের ধরন",
-      "fileLabel": "ফাইল (PDF/JPG/PNG, সর্বোচ্চ ১০ মেগাবাইট)",
+      "fileLabel": "ফাইল (PDF/JPG/PNG, সর্বোচ্চ ৫ MiB)",
       "status": "যাচাইয়ের অবস্থা",
       "yourDocuments": "আপনার জমাকৃত কাগজপত্র",
       "noDocuments": "এখনও কোনো কাগজপত্র আপলোড করা হয়নি।",
       "fileColumn": "ফাইল",
       "viewFile": "ফাইল দেখুন",
-      "fileExceedsLimit": "ফাইলের সাইজ ১০ মেগাবাইটের বেশি।",
+      "fileExceedsLimit": "ফাইলের সাইজ ৫ MiB-এর বেশি।",
       "types": {
         "nationalId": "জাতীয় পরিচয়পত্র (NID)",
         "passport": "পাসপোর্ট",
@@ -777,5 +777,10 @@
     "location": "ঢাকা, বাংলাদেশ",
     "privacyPolicy": "গোপনীয়তা নীতি",
     "termsOfService": "শর্তাবলী"
+  },
+  "privateDocuments": {
+    "error": "ব্যক্তিগত নথি পাওয়া যায়নি। বন্ধ করে আবার চেষ্টা করুন অথবা পুনরায় সাইন ইন করুন।",
+    "pdfReady": "PDF প্রস্তুত। দেখতে নথিটি ডাউনলোড করুন।",
+    "download": "নথি ডাউনলোড করুন"
   }
 }

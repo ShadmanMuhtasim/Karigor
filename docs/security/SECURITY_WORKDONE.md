@@ -1313,3 +1313,314 @@ flowchart LR
     Nodes --> Map[Leaflet displays literal text]
     Map --> Action[Direct profile / quote / picker actions]
 ```
+
+
+# F3 SignalR Resource Authorization and Private Event Delivery
+
+Date: 2026-10-07 (Asia/Dhaka). Implemented and verified locally.
+Technical reference: [F3 implementation guide](implementation/F3_SIGNALR_AUTHORIZATION.md).
+
+## 1. Original problem
+
+Karigor authenticated the SignalR connection but did not authorize its booking ID. `JoinBooking` added any authenticated caller to any room, and `SendTyping` independently lacked a participant check. Payment, worker-verification, quotation, discovery and review events also used broad delivery with private fields.
+
+Authentication answers who the caller is. Authorization answers what that caller may access. A valid Worker or Customer JWT does not make its owner a participant in every booking.
+
+## 2. Concrete exploit and why this mattered
+
+An unrelated customer connects with a legitimate JWT and guesses booking 73. The old hub lets them join `booking_73`, then receive private chat when the actual customer sends a message. They can also inject typing into another booking without joining first. Global payment or verification listeners reveal amounts or document metadata without any room join.
+
+This is BOLA/IDOR: broken object-level authorization, also called insecure direct object reference. The problem is a missing access decision for the selected record, not the predictability of the numeric ID. Workers/customers and their private conversations/verification information are affected. The original hosted regression reproduced the unauthorized join inside an isolated fixture; no production attack occurred.
+
+## 3. Security invariant
+
+Only currently authorized resource participants receive its private realtime information. Admin role alone does not grant chat membership. Recipients come from authoritative SQL relationships; caller-supplied recipient IDs and old SignalR groups are not authorization.
+
+The checks establish current access at their read point. They do not make permission changes and network delivery one atomic transaction or introduce F6 session-family revocation.
+
+## 4. Previous flow
+
+JWT → arbitrary booking ID → add connection to room → REST-created message fans out to that room and receiver group.
+
+Separately: a service saves a private business result → broadcasts the DTO to every authenticated connection. Frontend subscriptions hiding an event do not stop a custom client listening to it.
+
+## 5. New flow
+
+JWT → current identity/suspension check → current booking customer/worker lookup → authorize each join and each typing call. Reconnect repeats the same query.
+
+Private business event → derive participants/admin/quotation thread from SQL → filter active recipients → deliver through their caller-derived user groups. Broad discovery/review updates carry only a fixed refresh hint; screens re-fetch through their existing APIs.
+
+```mermaid
+flowchart LR
+    Identity[JWT identity] --> Policy[Current resource policy]
+    SQL[(Booking / quotation / admin state)] --> Policy
+    Policy -->|Denied or unavailable| Stop[No access / private send]
+    Policy -->|Allowed| Users[Server-derived user groups]
+    Users --> Event[Private event]
+    Hint[Fixed public or worker refresh hint] --> Fetch[Existing authorized REST fetch]
+```
+
+## 6. Exact implementation
+
+`BookingAccess` provides no-tracking current participant queries, caller activity checks through Identity LockoutEnd, and current admin-recipient queries. Hub and REST messaging use its participant rule. Every `JoinBooking` and `SendTyping` checks it; lookup exceptions fail the invocation before adding a room or sending typing. Leave only removes the caller's connection.
+
+`NotifyBookingGroupAsync` retains its interface name but delivers to current participant user groups. Old room membership cannot receive chat/payment DTOs, and booking messages no longer arrive twice through two routes. The REST booking message ignores a supplied ReceiverId and derives the other party from the booking.
+
+All private global broadcasts were reviewed: payment goes to booking participants without provider transaction ID; verification operational detail goes to current active admins while the worker gets only status/note; create/counter/accept quotation events go to the request owner and that worker. Competing workers get only a Closed hint for their known request, never winning terms. Discovery goes to a Worker refresh group without coordinates/address/ID. Review events are fixed public refresh hints. SOS retains its admin-only policy, using current SQL admin recipients.
+
+The notifier's broad API no longer accepts an arbitrary object. It constructs `{ refresh: true }` internally. Missing/suspended users are excluded from private user delivery. `CloseOnAuthenticationExpiration` is enabled for the hub.
+
+The client retries authorized joins on reconnect and removes denied rooms from its set. Initial denied join is surfaced by ChatBox. `setAccount` stops/resets realtime state when user identity changes; generation checks ignore callbacks from an old or pending connection. AuthContext binds this to user ID, without changing refresh-token architecture. Review consumers now invalidate on the minimized hint rather than requiring a leaked booking ID.
+
+## 7. Before vs After
+
+| Before | After |
+|---|---|
+| JWT alone admitted arbitrary booking joins | Current booking participation required |
+| Typing assumed no separate resource check | Typing independently checks current participation |
+| Old room could remain a private delivery route | Current SQL recipients control private delivery |
+| Private payment/verification/quote DTOs went to all | Explicit booking/admin/thread recipients |
+| Discovery broadcast exact coordinates | Worker refresh hint only |
+| Review DTO disclosed internal IDs globally | Public refresh hint only |
+| Account switch could retain old connection | Identity change resets state and ignores stale callbacks |
+| Red F3 assertion accounted as a known failure | Same body passes and is a blocking baseline |
+
+## 8. Important concepts
+
+| Concept | Plain explanation and Karigor example | Common mistake |
+|---|---|---|
+| Authentication vs authorization | JWT identifies the caller; SQL booking relationships authorize this booking. | Treat a valid login as access to every record. |
+| RBAC vs resource authorization | Role-based access control says Worker/Customer; resource policy says this customer/worker owns this booking. | Add a role attribute and assume ownership follows. |
+| BOLA/IDOR | Selecting a record ID bypasses its missing ownership check. | Replace numeric IDs with GUIDs instead of checking access. |
+| SignalR groups | Transient delivery routing for connected clients; no durable permission authority. | Treat a group name or prior join as proof. |
+| Server-derived recipients | SQL foreign keys choose the actual customer/worker/admin/thread. | Trust a payload's user ID for private event delivery. |
+| Data minimization | Send only what the audience needs: refresh hint, own verification result, own thread terms. | Broadcast a complete service DTO because it is already available. |
+| Reconnect authorization | A new connection/rejoin repeats the current permission query; identity change resets local room intent. | Restore yesterday's room list without checking today's state. |
+
+These concepts keep identity, authority and transport separate. [Microsoft documents that groups themselves are not a security feature](https://learn.microsoft.com/en-us/aspnet/core/signalr/groups?view=aspnetcore-10.0).
+
+## 9. Failure scenarios
+
+If SQL cannot read participation, join/typing fail; no fallback room or cached allow is used. A hosted interceptor test exercises that path and recovery. If a worker is reassigned or suspended, old membership no longer receives private booking events; current queries deny later typing/rejoin.
+
+If the client reconnects, it repeats authorized joins. If a join is denied, it stops retaining that room intent. If the user switches accounts while a connection is starting, its generation becomes stale and its callbacks are ignored; it stops after the start completes.
+
+If SignalR fails after SQL commits, live delivery can be lost while persisted business truth remains. REST re-fetch is still needed; there is no durable outbox or exactly-once claim. A simultaneous permission change between a read and send is not an atomic cutoff guarantee.
+
+JWT expiry closes connections under the configured option. Immediate logout/refresh-family revocation is F6, not a guarantee added here. We did not claim an expired/suspended session-family test that does not exist.
+
+## 10. Alternatives and tradeoffs
+
+Role-only authorization and opaque room IDs do not repair object authorization. Signed room tokens would add expiry/revocation work while still needing a current access policy. Checking only JoinBooking would leave SendTyping and stale membership as separate problems.
+
+Current user delivery is the approved alternative to room-based private fan-out. It costs extra participant lookups and per-user sends, and sends authorized events to all of a participant's connections. The existing client filters messages by booking. This is a modest modular-monolith change: no schema, group-membership table, Redis, broker, microservice or outbox was added. F5 offer mutation and payment concurrency were intentionally preserved.
+
+## 11. Tests and results
+
+Before F3: original hosted suite had one pass and one actual membership assertion failure. After remediation: **13 hosted F3 cases passed**, with **zero failures/skips**, including the strict security gate. The original join and participant baseline bodies are unchanged.
+
+Cases cover anonymous/unrelated customer/unrelated worker/admin denial; both participants and spoofed message recipient; independently denied typing; no unrelated message/payment/quotation/verification event; worker/admin verification split; competing-worker closure without price; actual discovery/review create/respond refresh payloads; admin-only SOS; changed participation across reconnect and stale room; suspension; and failed SQL lookup.
+
+Multiple real .NET SignalR clients run against the actual API and disposable SQL through Long Polling. An awaited per-connection fence observes absence after sent events instead of sleeping. This is stronger evidence than a mock notifier inventory alone.
+
+Combined results after F7: **117 backend cases, 116 passes, one exact unchanged F5 failure**; gate exit 0, raw dotnet exit 1. **30 browser passes**, zero failures/expected failures/skips. Solution build has zero warnings/errors; frontend typechecking/build/lint pass, retaining 20 existing lint warnings and existing Vite warnings. Six classifier tests pass; final diff check passes.
+
+Executed commands and exact reports are in the [implementation guide](implementation/F3_SIGNALR_AUTHORIZATION.md). No existing Phase 0 assertion was corrected or weakened. The F3 manifest exception was removed only after its body passed. One new admin fixture initially reused a synthetic email; giving each test a unique email fixed setup rather than suppressing the failure.
+
+## 12. Files changed
+
+- Backend policy/routing: `Realtime/BookingAccess.cs`, `IRealtimeNotifier.cs`, `KarigorHub.cs`, `SignalRRealtimeNotifier.cs`, and shared `Program.cs`.
+- Backend event sites: MessagingService, PaymentService, AdminService, CustomerService, MarketplaceService and ReviewService. Changes in payment/marketplace concern delivery, not settlement or negotiation rules. SOS's notifier intent remains admin-only.
+- Frontend: `signalrService.ts`, `AuthContext.tsx`, `ChatBox.tsx` and `BookingDetailPage.tsx` for identity/rejoin/refresh compatibility.
+- Tests: new `SignalRSecurityTests.cs`, original `ApiSecurityTests.cs` classification, and the F3 entry in `known-security-defects.json`.
+- Documentation: this appended section, the F3 implementation guide and current harness status. The guide contains every full file path and its specific change.
+
+## 13. Remaining risks
+
+F6 session families and stronger immediate logout revocation remain. Current recipient reads and delivery are not serialized against reassignment. REST discovery/detail eligibility and public review DTO privacy need separate review; a minimized event does not secure an overly broad subsequent REST read.
+
+Delivery remains best effort. Tests establish Long Polling/TestServer behavior, not WebSockets/IIS, multiple nodes, live browser-to-hub traffic or hosted CI. Expiry closure is configured but was not timed over a live WebSocket. Production credentials, roles, documents and sessions were not inspected. Deployment needs coordinated restart/reconnect to discard old code's rooms.
+
+F3 is locally verified within those boundaries. The repository is ready to start local schema-authority reconciliation and F5 consent/domain work, while retaining its real red regression. This is not approval to deploy or apply constraints blindly to production.
+
+## 14. Interview explanations and five Q&As
+
+**30-second explanation:** Karigor checked SignalR login but trusted arbitrary booking IDs and broadcast private business DTOs globally. I made joins and typing query current participants, and routed private events to server-derived current users. Broad updates are fixed refresh hints. Thirteen hosted multi-client tests pass, including the original unchanged unauthorized-join regression; session-family revocation remains a separate task.
+
+**Longer explanation:** Authentication, resource permission and event routing are different boundaries. I reused existing SQL relationships and added a small shared booking policy. Every sensitive hub invocation reads current participation and suspension; errors fail closed. I also removed room membership as private delivery authority, so reassignment cannot leave an old room receiving messages. Services derive booking/thread/admin recipients from SQL and minimize each audience's payload. The client preserves reconnects by repeating authorization, resets on identity change and consumes refresh hints through existing API reads. Hosted clients prove actual delivery and absence, while the original red assertion becomes a normal blocking gate. The cost is extra reads and best-effort invalidation; this does not claim a distributed atomic revocation or durable delivery system.
+
+1. **Why is a valid Worker JWT insufficient?** It identifies a worker and role, not participation in the selected booking.
+2. **Why authorize typing separately?** A caller can invoke it without joining, and participation may have changed since a join.
+3. **Why stop using rooms as delivery authority?** They are transient cached routing state; SQL relationships can change while membership survives.
+4. **Why send refresh hints?** The broad audience needs to know to re-fetch, not learn private coordinates, prices or internal identifiers.
+5. **Does this implement logout revocation?** No. JWT expiry/current resource and suspension checks are implemented; F6 supplies stronger session-family authority later.
+
+## 15. Study-next topics
+
+1. ASP.NET resource policies and BOLA/IDOR: how ownership differs from role membership.
+2. SignalR connection identity, expiry and reconnect lifecycle; when user groups are useful routing.
+3. Permission changes during in-flight operations and the limits of point-in-time checks.
+4. Minimal event contracts and REST listing/detail eligibility.
+5. Best-effort invalidation versus durable outbox delivery, and why the latter is separate work.
+
+# F7 Secure Private Document Handling
+
+Date: 2026-10-07 (Asia/Dhaka). Implemented and verified locally.
+Technical reference: [F7 implementation guide](implementation/F7_PRIVATE_DOCUMENT_SECURITY.md).
+
+## 1. Original problem
+
+The validator spelled the PDF signature `%FDP` instead of `%PDF-`. The file controller opened its stream in an await-using scope, returned a FileStreamResult and disposed the stream before MVC read it. Frontend img/iframe/links used bare protected URLs, so they did not carry Axios's Bearer header.
+
+The actual storage provider also ignored configured UploadPath, the client advertised 10 MB against a 5 MiB server limit, and SQL insertion failure could leave an untracked file. Unknown legacy public copies could potentially bypass the protected route through static serving; their production existence was not assumed.
+
+## 2. Concrete exploit/failure scenario
+
+A worker uploads an ordinary PDF and is rejected, while incorrect `%FDP` passes the old prefix check. Even an owner with a valid JWT cannot receive complete bytes through MVC because the stream is already closed. An admin's preview lacks Authorization despite being signed in.
+
+If a previous public document copy exists, a bare URL could reach static serving before authorization. If SQL rejects a newly created document row, the old flow leaves its file behind. These are separate format, lifetime, browser authentication, storage and consistency failures affecting worker identity documents and the admins who verify them.
+
+The baseline run reproduced three original assertion failures in isolated storage/SQL. No production file or user was examined or migrated.
+
+## 3. Security invariant
+
+Only the authorized owner/admin receives validated private document bytes. Supported bytes remain private in storage and browser delivery. Validation is a format rule, not proof of harmless content. Names/rows/canonical paths, response headers, authentication and resource lifetime each protect a different part of that rule.
+
+## 4. Previous flow
+
+Multipart → incorrect signature check → write file → insert SQL row → bare browser URL → JWT-required controller → return disposed stream.
+
+Configured storage was created at startup but ignored by the provider used for actual uploads/downloads. SQL could not undo a filesystem write, and the frontend limit did not match the real file limit.
+
+## 5. New flow
+
+Owner multipart → bounded private staging copy → actual length/format check → same-directory finalization → insert metadata → return authorized route. Confirmed failed insertion removes the new file; an unknown SQL outcome keeps it private for reconciliation without returning success.
+
+Admin/owner UI → Axios Bearer blob retrieval at the rooted document route → server owner/admin, row, name, path, stored-size/signature checks → MVC consumes/disposes live stream → authorized Blob URL → image preview or PDF download fallback → abort/revoke on cleanup.
+
+```mermaid
+sequenceDiagram
+    participant UI as Account-bound document viewer
+    participant API as Authorized MVC endpoint
+    participant Store as Validated private storage
+    UI->>API: Axios Bearer GET, responseType blob
+    API->>API: Owner/admin, exact metadata, name/path checks
+    API->>Store: Open and validate stored bytes
+    Store-->>API: Live validated stream
+    API-->>UI: Byte-exact response; MVC disposes afterward
+    UI->>UI: Create object URL for this account/path
+    UI->>UI: Image preview / PDF download
+    UI->>UI: Close/unmount/account change: abort, ignore late bytes, revoke URL
+```
+
+## 6. Exact implementation
+
+PDF validation requires all five `%PDF-` bytes. Existing JPEG/PNG signature support and seekable stream-position restoration remain. WebP was not enabled for uploads; delivery matches the supported PDF/JPEG/PNG set.
+
+`WorkerDocumentLimits` fixes the file limit at 5,242,880 bytes and request limit at 5,308,416 bytes, allowing 64 KiB bounded multipart overhead. Controller form limits bound file section, headers, values and count; IIS uses the request cap. Client constant and English/Bengali messages use 5 MiB.
+
+`PrivateUploadPathProvider` resolves the configured absolute root or relative root against ContentRoot, with the original private App_Data default when unset. Program and both consumers share this one validated provider. Canonical roots inside/default/effective wwwroot and linked ancestors are rejected. Worker directories and delivered files are checked for links; trusted operator ownership of the filesystem remains necessary.
+
+Upload writes a generated `.uploading` file with CreateNew, counts actual bytes, rejects size/declared-length mismatch, validates the staged signature and moves within the same private directory. This supports non-seekable input without consuming its signature before copying. Cleanup only targets paths this attempt created.
+
+On SQL failure, the exact worker/FileUrl outcome is queried. Confirmed absence deletes the final file; a found row retains its bytes; unavailable outcome checking retains a private file and logs safe reconciliation identifiers. No success is reported. Ordinary partial-write failures delete staging. Process crashes/deletion failures still require an operator process; there is no filesystem/SQL distributed transaction.
+
+The controller retains owner/admin and exact metadata checks, GUID/extension validation, canonical path guard, no-store/nosniff and allowlisted MIME. It checks the open file's actual size/signature and transfers that stream to MVC. Invalid/error paths dispose it locally; success is disposed by MVC after delivery. The private document namespace is excluded from static middleware, including old copies.
+
+`fetchPrivateDocument` permits only rooted GUID document paths, overrides Axios's `/api` base with `/`, requests blobs with a cancellation signal, reuses existing refresh and checks supported MIME/size before URL creation. Tokens never enter document URLs.
+
+`PrivateDocumentViewer` matches state to account and path, aborts/ignores late responses and revokes object URLs on close/unmount/account change. Panels and metadata query keys are account-bound. JPEG/PNG preview from authorized blobs; PDFs have an authenticated download-only fallback because embedded cross-browser isolation was not verified. Blob bytes are never persisted in localStorage or a query cache.
+
+## 7. Before vs After
+
+| Before | After |
+|---|---|
+| Valid `%PDF-` rejected; incorrect `%FDP` accepted | Exact five-byte PDF prefix |
+| Stream disposed before MVC delivery | MVC owns/disposes after sending |
+| Browser elements requested protected URL without Bearer | Authenticated Axios bytes, then Blob URL |
+| Old preview could outlive account/request | Account/path render guard and abort/revoke lifecycle |
+| Client 10 MB vs backend 5 MiB | Same 5 MiB rule and bounded request overhead |
+| Configured root ignored | One validated effective private root |
+| Static pipeline could serve a legacy public copy | Protected namespace bypasses static middleware |
+| Failed SQL insert left its file unconditionally | Compensate confirmed absence; retain unknown outcome privately for reconciliation |
+
+## 8. Important concepts
+
+| Concept | Plain explanation and Karigor example | Common mistake |
+|---|---|---|
+| File signature validation | Leading bytes match an expected format: `%PDF-`, JPEG or PNG. | Call a prefix match malware-proofing or a complete parser. |
+| Authorization | Match JWT owner/admin and the exact worker/document row before bytes. | Assume an image extension or hard-to-guess name grants privacy. |
+| Stream/resource lifetime | The consumer owns the resource until it finishes. MVC reads after the action returns. | Use await using around a returned FileStreamResult stream. |
+| Browser Bearer authentication | Axios adds Authorization to its requests; raw img/iframe/a requests do not inherit that interceptor. | Assume the refresh cookie authenticates a Bearer document endpoint. |
+| Blob/Object URLs | Authorized bytes become an opaque browser resource reference. Revoke it when the viewer stops owning it. | Treat a Blob URL as a lasting authenticated server URL. |
+| Private storage | Files live outside serving roots; only the checked controller supplies them. | Restore previews by making uploads public. |
+| Filesystem vs SQL consistency | SQL commits metadata, while disk writes are separate effects. | Say SQL rollback deletes a file. |
+| Compensation | Explicitly undo a confirmed failed operation's new file; preserve uncertain outcomes for reconciliation. | Delete bytes after any exception without checking whether the row committed. |
+
+[ASP.NET upload guidance distinguishes signature checks from content scanning](https://learn.microsoft.com/en-us/aspnet/core/mvc/models/file-uploads?view=aspnetcore-10.0). [MDN describes object URL lifetime management](https://developer.mozilla.org/en-US/docs/Web/URI/Reference/Schemes/blob).
+
+## 9. Failure scenarios
+
+Invalid/truncated/mismatched signatures or unsupported extensions produce no successful row/file. The copy also rejects actual oversize and forged declared length. Interrupted writes remove staging. A real SQL CHECK rejection removes the finalized new file after confirming no row exists.
+
+If SQL insertion/outcome checking is unavailable, the operation reports failure and retains the private bytes for reconciliation. No matching row means the controller cannot serve them. A process crash can also leave staging/orphans or a row/file ambiguity. Operators must compare exact rows, names and hashes in a quiescent window, never indiscriminately delete all uploads.
+
+If retrieval is denied or refresh fails, no successful document URL is created and an error is shown. If a request finishes after close/account change, cancellation and the active/render guards prevent old bytes appearing. URLs are revoked on close, unmount, switch and sign-out. Downloaded files remain under the user's control; logging out cannot delete their disk copy.
+
+If root configuration is public or linked, startup refuses it rather than silently choosing another location. Existing production files are not relocated. Legacy migration needs inventory/backup/copy/hash/row mapping/cutover/denial checks and explicit removal of public copies, as the separate controlled procedure in the guide describes.
+
+## 10. Alternatives and tradeoffs
+
+PhysicalFile after authorization is valid but reopens a path after validation; transferring the validated stream keeps the byte check and response on one handle. Cookie authentication and signed URLs would change another boundary; the existing Bearer client is sufficient. Re-publicizing files is rejected.
+
+PDF download fallback avoids an unverified embedded rendering boundary but changes the previous inline experience. Blobs use bounded browser memory and require lifecycle management. Antivirus/remote object storage can be separately justified enhancements, not invented infrastructure in this scope.
+
+Staging plus compensation handles ordinary failures and recognizes uncertain commits. It does not promise crash-atomic filesystem/SQL effects or automatic orphan cleanup. Retrying a lost successful upload response can create another document; idempotency is separate work.
+
+## 11. Tests and results
+
+Before F7: **five original cases, two passes and three exact PDF/FDP/MVC failures**. After: **38 backend F7 passes, zero failures/skips**, including the strict gate. Thirteen new unit cases cover signatures/root rejection/request-cap metadata; 20 new hosted cases cover HTTP authorization/bytes/paths/limits/storage/faults. Five original cases remain, with three classifications promoted.
+
+Evidence includes owner/admin exact bytes and released MVC handle; anonymous/unrelated user denial; invalid GUIDs/encoded traversal/trailing newline; wrong worker/file pair/missing/invalid stored file; 5 MiB exact boundary plus overhead; real configured/default/relative roots; interrupted/non-seekable input; actual SQL rejection cleanup; unavailable SQL retained private orphan; and synthetic legacy static-copy blocking across a host restart.
+
+**Eleven Chrome document cases pass:** real worker/admin image bytes and downloads, PDF fallback, denied response, 401 refresh/retry, pending close, ready/pending account switch, unmount/sign-out, arbitrary-origin rejection and matching client size boundary. Their HTTP is controlled; backend JWT/MVC/SQL is proven separately, not as a full live E2E journey.
+
+The initial new browser fixtures used the wrong admin mock route and an unrealistic token expiry, causing four failures. Those setup assumptions were corrected without changing safe assertions. A new fault test was corrected to assert EF's DbUpdateException plus its inner failure. No original Phase 0 test was invalidated, weakened or removed.
+
+Combined: **116 backend passes and one unchanged F5 failure from 117**, gate exit 0/raw exit 1; **30 actual browser passes**, no failures/expected failures/skips. Final build/typecheck/lint/classifier/diff checks pass; .NET has zero warnings/errors, frontend keeps 20 existing lint warnings and Vite warnings. Commands/raw reports are in the [guide](implementation/F7_PRIVATE_DOCUMENT_SECURITY.md).
+
+## 12. Files changed
+
+- Backend upload/validation/storage: `WorkerService.cs`, `FileValidationService.cs`, new `WorkerDocumentLimits.cs`, `PrivateUploadPathProvider.cs`, shared Program, WorkerController, WorkerDocumentFileController and web.config.
+- Frontend: new `privateDocumentApi.ts` and `PrivateDocumentViewer.tsx`, AdminVerificationsTab, WorkerDocumentsTab, and English/Bengali locale messages.
+- Tests: new `PrivateDocumentSecurityTests.cs`, original UnitSecurityTests/ApiSecurityTests classifications, removal of three verified manifest entries, and removal of the fake root provider from SecurityApplicationFixture so the real configured provider is exercised.
+- Browser: `documents.security.spec.ts`, `fixtures/documents.html` and `fixtures/documents.tsx`.
+- Documentation: this appended section, the F7 guide and current harness note. The guide lists every full path and the separately controlled future migration/recovery procedure.
+
+## 13. Remaining risks
+
+Signatures do not prove harmless content. No malware scanner, embedded PDF isolation, upload idempotency, distributed transaction or automated orphan reconciler was introduced. Crash/uncertain commit/deletion failures need the documented operator process. Filesystem ACLs and backup/redeploy persistence are deployment responsibilities; a privileged actor swapping a directory between checks is outside this trust model.
+
+Production legacy files and alternate static mappings are unknown. Configuration now matters and may reveal a previously ignored incompatible root; no production relocation was performed. The generated-host legacy test is not an actual deployment migration. IIS/Kestrel transport enforcement, real redeploy persistence, hosted CI and Firefox/Safari were not run.
+
+F6 stronger session revocation, F5 domain/schema work and payment concurrency remain separate. F7 is locally verified for the implemented boundary. The repository can proceed to schema-authority reconciliation and F5 work while keeping the consent regression red. Nothing was committed, pushed, merged, deployed, or changed in production data/files.
+
+## 14. Interview explanations and five Q&As
+
+**30-second explanation:** Karigor's PDF prefix was wrong, MVC returned a disposed stream and private previews skipped Bearer authentication. I repaired format/lifetime rules, shared one validated private root, staged bounded uploads with explicit compensation, and fetched authorized blobs with account-bound cleanup. Thirty-eight backend and eleven browser cases pass; original assertions remain intact. Crash recovery and unknown legacy migration stay controlled operator procedures.
+
+**Longer explanation:** Document security spans several owners. The server first validates actual supported bytes and keeps them outside public storage. Metadata authorization binds the requesting owner/admin to the exact GUID file; MVC must retain the stream until result execution finishes. The browser's ordinary elements do not inherit Axios headers, so the UI retrieves authenticated blobs, creates object URLs only after success, and cancels/revokes them when their account/view lifetime ends. Upload staging and same-directory finalization avoid presenting partial files. SQL and disk do not share a transaction: confirmed absent metadata permits deletion, while an uncertain outcome preserves private bytes for reconciliation. Actual SQL/MVC tests and real browser panels verify the boundaries without making production or malware-proof claims.
+
+1. **Why check `%PDF-` rather than the extension?** The name can be forged; the five-byte prefix identifies the expected format, though not safe content.
+2. **Why did await using break FileStreamResult?** The action disposed the stream on return before MVC executed the result and read it.
+3. **Why fetch a blob before displaying an image?** Axios attaches the Bearer token; the image element cannot inherit that interceptor.
+4. **Why revoke object URLs and cancel requests?** They retain private browser bytes and late responses can otherwise restore data after close or an account switch.
+5. **Why retain a file after an unknown SQL outcome?** The row may have committed. Deleting blindly could break a real document; keep it private and reconcile exact state first.
+
+## 15. Study-next topics
+
+1. File format detection versus complete parsing, malware scanning and content-disposition policy.
+2. ASP.NET MVC result execution, FileStreamResult disposal and response cancellation.
+3. Browser Bearer transport, Blob URL memory/lifetime and identity-scoped UI state.
+4. Filesystem/SQL compensation, uncertain commits, crash-gap recovery and upload idempotency.
+5. Controlled legacy migration, ACLs, alternate static mappings and actual redeploy persistence tests.

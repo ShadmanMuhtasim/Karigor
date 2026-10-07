@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Karigor.Application.Worker;
 
 namespace Karigor.Api.Controllers;
 
@@ -31,7 +32,7 @@ public class WorkerDocumentFileController : ControllerBase
 {
     // <32-char lowercase hex GUID>.<1-8 lowercase alphanumeric extension>
     private static readonly Regex FileIdPattern =
-        new(@"^[0-9a-f]{32}\.[a-z0-9]{1,8}$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        new(@"\A[0-9a-f]{32}\.[a-z0-9]{1,8}\z", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private static readonly System.Collections.Generic.Dictionary<string, (string ContentType, string Disposition)> ExtToMeta =
         new(StringComparer.OrdinalIgnoreCase)
@@ -40,7 +41,6 @@ public class WorkerDocumentFileController : ControllerBase
             [".jpg"]  = ("image/jpeg",      "inline"),
             [".jpeg"] = ("image/jpeg",      "inline"),
             [".png"]  = ("image/png",       "inline"),
-            [".webp"] = ("image/webp",      "inline"),
         };
 
     private readonly KarigorDbContext _db;
@@ -95,7 +95,7 @@ public class WorkerDocumentFileController : ControllerBase
             return NotFound();
 
         // 4. Resolve physical path with traversal guard
-        var uploadRoot = Path.GetFullPath(_pathProvider.GetUploadRoot());
+        var uploadRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(_pathProvider.GetUploadRoot()));
         var filePath   = Path.GetFullPath(
             Path.Combine(uploadRoot, workerId.ToString(), Path.GetFileName(fileId)));
 
@@ -114,20 +114,41 @@ public class WorkerDocumentFileController : ControllerBase
             return NotFound();
 
         // 6. Stream back with secure headers
-        await using var stream = new System.IO.FileStream(
-            filePath, System.IO.FileMode.Open, System.IO.FileAccess.Read,
-            System.IO.FileShare.Read, bufferSize: 81920, useAsync: true);
+        // MVC owns the stream after return; do not dispose it in the action's scope.
+        System.IO.FileStream stream;
+        try
+        {
+            var workerDirectory = new DirectoryInfo(Path.GetDirectoryName(filePath)!);
+            if ((workerDirectory.Attributes & FileAttributes.ReparsePoint) != 0 ||
+                (System.IO.File.GetAttributes(filePath) & FileAttributes.ReparsePoint) != 0) return NotFound();
+            stream = new System.IO.FileStream(filePath, System.IO.FileMode.Open, System.IO.FileAccess.Read,
+                System.IO.FileShare.Read, bufferSize: 81920, useAsync: true);
+        }
+        catch (IOException) { return NotFound(); }
+        catch (UnauthorizedAccessException) { return NotFound(); }
 
-        // We set Content-Disposition manually below (inline vs attachment)
-        // so we do NOT touch FileStreamResult.FileDownloadName — that property
-        // would force "attachment" and break inline image previews.
-        var result = new FileStreamResult(stream, meta.ContentType);
+        try
+        {
+            if (stream.Length == 0 || stream.Length > WorkerDocumentLimits.MaxFileSizeBytes ||
+                !FileValidationService.ValidateStream(stream, ext.TrimStart('.'), out _))
+            {
+                await stream.DisposeAsync();
+                return NotFound();
+            }
 
-        Response.Headers["X-Content-Type-Options"] = "nosniff";
-        Response.Headers["Cache-Control"]          = "no-store";
-        Response.Headers["Content-Disposition"]    =
-            $"{meta.Disposition}; filename=\"{Uri.EscapeDataString(Path.GetFileName(fileId))}\"";
+            // MVC disposes the transferred stream after result execution.
+            var result = new FileStreamResult(stream, meta.ContentType);
+            Response.Headers["X-Content-Type-Options"] = "nosniff";
+            Response.Headers["Cache-Control"] = "no-store";
+            Response.Headers["Content-Disposition"] =
+                $"{meta.Disposition}; filename=\"{Uri.EscapeDataString(Path.GetFileName(fileId))}\"";
 
-        return result;
+            return result;
+        }
+        catch
+        {
+            await stream.DisposeAsync();
+            throw;
+        }
     }
 }

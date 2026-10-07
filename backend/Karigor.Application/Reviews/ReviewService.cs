@@ -113,7 +113,7 @@ public class ReviewService : IReviewService
             });
 
             // Dispatches live WebSocket event
-            await _realtimeNotifier.BroadcastAsync("ReviewCreated", resultDto);
+            await _realtimeNotifier.BroadcastPublicRefreshAsync("ReviewCreated");
         }
         catch
         {
@@ -275,7 +275,7 @@ public class ReviewService : IReviewService
                 RelatedEntityId = review.Id
             });
 
-            await _realtimeNotifier.BroadcastAsync("ReviewUpdated", resultDto);
+            await _realtimeNotifier.BroadcastPublicRefreshAsync("ReviewUpdated");
         }
         catch { }
 

@@ -32,8 +32,11 @@ export function ChatBox({
   const typingTimeoutRef = useRef<any>(null);
 
   useEffect(() => {
+    let active = true;
     loadMessages();
-    signalRService.joinBooking(bookingId);
+    signalRService.joinBooking(bookingId).catch(() => {
+      if (active) setSendError('Unable to join this booking chat. Please reload or sign in again.');
+    });
 
     // Subscribe to new incoming messages via SignalR
     const unsubMessage = signalRService.onMessage((newMsg) => {
@@ -73,6 +76,7 @@ export function ChatBox({
     }, 5000);
 
     return () => {
+      active = false;
       unsubMessage();
       unsubTyping();
       clearInterval(interval);

@@ -36,7 +36,7 @@ public sealed class ApiSecurityTests(SecurityApplicationFixture fixture)
             options.AccessTokenProvider = () => Task.FromResult<string?>(token);
         }).Build();
 
-    [Fact, Trait("Finding", "F3"), Trait("Classification", "ExpectedFailRegression")]
+    [Fact, Trait("Finding", "F3"), Trait("Classification", "GreenBaseline")]
     public async Task UnrelatedAuthenticatedUserCannotJoinBooking()
     {
         var scenario = await fixture.SeedAsync(booking: true);
@@ -119,7 +119,7 @@ public sealed class ApiSecurityTests(SecurityApplicationFixture fixture)
         return (scenario, url, bytes);
     }
 
-    [Fact, Trait("Finding", "F7"), Trait("Classification", "ExpectedFailRegression")]
+    [Fact, Trait("Finding", "F7"), Trait("Classification", "GreenBaseline")]
     public async Task DocumentOwnerReceivesCompleteFileThroughMvc()
     {
         var document = await DocumentAsync();

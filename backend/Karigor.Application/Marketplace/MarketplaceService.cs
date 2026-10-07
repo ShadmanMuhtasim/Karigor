@@ -199,7 +199,7 @@ public class MarketplaceService(
         // Broadcast real-time update to update negotiation screens live
         try
         {
-            await realtimeNotifier.BroadcastAsync("QuotationUpdated", new
+            await NotifyQuotationParticipantsAsync(quotation.Id, new
             {
                 requestId = request.Id,
                 serviceRequestId = request.Id,
@@ -464,7 +464,7 @@ public class MarketplaceService(
         // Broadcast real-time update to update negotiation screens live
         try
         {
-            await realtimeNotifier.BroadcastAsync("QuotationUpdated", new
+            await NotifyQuotationParticipantsAsync(quote.Id, new
             {
                 requestId = quote.ServiceRequestId,
                 serviceRequestId = quote.ServiceRequestId,
@@ -472,6 +472,16 @@ public class MarketplaceService(
                 status = "Accepted",
                 price = booking.AgreedPrice
             });
+            // Competitors learn only that their known request closed, never winning terms.
+            var otherWorkerUsers = await db.Quotations.AsNoTracking()
+                .Where(q => q.ServiceRequestId == quote.ServiceRequestId && q.WorkerId != quote.WorkerId)
+                .Select(q => q.Worker.UserId).Distinct().ToListAsync();
+            foreach (var recipient in otherWorkerUsers)
+                await realtimeNotifier.NotifyUserAsync(recipient, "QuotationUpdated", new
+                {
+                    requestId = quote.ServiceRequestId,
+                    status = "Closed"
+                });
         }
         catch { /* Non-blocking */ }
 
@@ -560,7 +570,7 @@ public class MarketplaceService(
         // Broadcast real-time update to update negotiation screens live
         try
         {
-            await realtimeNotifier.BroadcastAsync("QuotationUpdated", new
+            await NotifyQuotationParticipantsAsync(counter.Id, new
             {
                 requestId = quote.ServiceRequestId,
                 serviceRequestId = quote.ServiceRequestId,
@@ -573,6 +583,15 @@ public class MarketplaceService(
 
         bool warning = await CheckSimultaneousJobWarningAsync(quote.WorkerId, quote.ServiceRequest);
         return ToDto(counter, quote.Worker, newDepth, warning);
+    }
+
+    private async Task NotifyQuotationParticipantsAsync(int quotationId, object data)
+    {
+        var recipients = await db.Quotations.AsNoTracking().Where(q => q.Id == quotationId)
+            .Select(q => new { Customer = q.ServiceRequest.Customer.UserId, Worker = q.Worker.UserId })
+            .SingleAsync();
+        foreach (var recipient in new[] { recipients.Customer, recipients.Worker }.Distinct())
+            await realtimeNotifier.NotifyUserAsync(recipient, "QuotationUpdated", data);
     }
 
     public async Task<BookingDto> CreateBookingAsync(string customerUserId, CreateBookingDto dto)

@@ -210,6 +210,9 @@ public class WorkerController : ControllerBase
     [ProducesResponseType(typeof(WorkerDocumentDto), 201)]
     [ProducesResponseType(400)]
     [ProducesResponseType(404)]
+    [RequestSizeLimit(Karigor.Application.Worker.WorkerDocumentLimits.MaxRequestSizeBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = Karigor.Application.Worker.WorkerDocumentLimits.MaxFileSizeBytes,
+        ValueLengthLimit = 1024, MultipartHeadersLengthLimit = 4096, ValueCountLimit = 8)]
     public async Task<IActionResult> UploadDocument(
         [FromForm] string documentType,
         IFormFile file)

@@ -53,12 +53,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Sync SignalR lifecycle with user session
   useEffect(() => {
-    if (user?.accessToken) {
-      signalRService.startConnection();
-    } else {
-      signalRService.stopConnection();
-    }
-  }, [user]);
+    signalRService.setAccount(user?.userId ?? null);
+  }, [user?.userId]);
 
   // Register auth synchronization with axios client
   useEffect(() => {

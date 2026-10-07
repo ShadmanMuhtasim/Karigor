@@ -6,7 +6,7 @@ namespace Karigor.Security.Tests;
 [Trait("Layer", "Unit")]
 public sealed class UnitSecurityTests
 {
-    [Fact, Trait("Finding", "F7"), Trait("Classification", "ExpectedFailRegression")]
+    [Fact, Trait("Finding", "F7"), Trait("Classification", "GreenBaseline")]
     public void ValidPdfSignatureIsAccepted()
     {
         using var stream = new MemoryStream("%PDF-1.7\nfixture"u8.ToArray());
@@ -14,7 +14,7 @@ public sealed class UnitSecurityTests
             "F7_VALID_PDF: a valid PDF signature must be accepted.");
     }
 
-    [Fact, Trait("Finding", "F7"), Trait("Classification", "ExpectedFailRegression")]
+    [Fact, Trait("Finding", "F7"), Trait("Classification", "GreenBaseline")]
     public void InvalidFdpSignatureIsRejected()
     {
         using var stream = new MemoryStream("%FDP-not-a-pdf"u8.ToArray());

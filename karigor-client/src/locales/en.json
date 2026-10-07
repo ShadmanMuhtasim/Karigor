@@ -412,13 +412,13 @@
       "upload": "Upload",
       "uploading": "Uploading...",
       "docType": "Document Type",
-      "fileLabel": "File (PDF/JPG/PNG, max 10MB)",
+      "fileLabel": "File (PDF/JPG/PNG, max 5 MiB)",
       "status": "Verification Status",
       "yourDocuments": "Your Documents",
       "noDocuments": "No documents uploaded yet.",
       "fileColumn": "File",
       "viewFile": "View File",
-      "fileExceedsLimit": "File exceeds 10MB limit.",
+      "fileExceedsLimit": "File exceeds the 5 MiB limit.",
       "types": {
         "nationalId": "National ID",
         "passport": "Passport",
@@ -777,5 +777,10 @@
     "location": "Dhaka, Bangladesh",
     "privacyPolicy": "Privacy Policy",
     "termsOfService": "Terms of Service"
+  },
+  "privateDocuments": {
+    "error": "Unable to retrieve this private document. Close and try again or sign in again.",
+    "pdfReady": "PDF ready. Download it to view safely.",
+    "download": "Download document"
   }
 }

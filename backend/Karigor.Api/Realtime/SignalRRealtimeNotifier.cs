@@ -8,29 +8,39 @@ namespace Karigor.Api.Realtime;
 public class SignalRRealtimeNotifier : IRealtimeNotifier
 {
     private readonly IHubContext<KarigorHub> _hubContext;
+    private readonly BookingAccess _access;
 
-    public SignalRRealtimeNotifier(IHubContext<KarigorHub> hubContext)
+    public SignalRRealtimeNotifier(IHubContext<KarigorHub> hubContext, BookingAccess access)
     {
         _hubContext = hubContext;
+        _access = access;
     }
 
     public async Task NotifyUserAsync(string userId, string eventName, object data)
     {
+        if (!await _access.IsActiveUserAsync(userId)) return;
         await _hubContext.Clients.Group($"user_{userId}").SendAsync(eventName, data);
     }
 
     public async Task NotifyBookingGroupAsync(int bookingId, string eventName, object data)
     {
-        await _hubContext.Clients.Group($"booking_{bookingId}").SendAsync(eventName, data);
+        var participants = await _access.GetParticipantsAsync(bookingId);
+        if (participants is null) return;
+        foreach (var userId in participants.UserIds)
+            await NotifyUserAsync(userId, eventName, data);
     }
 
     public async Task NotifyAdminsAsync(string eventName, object data)
     {
-        await _hubContext.Clients.Group("Admins").SendAsync(eventName, data);
+        foreach (var userId in await _access.GetAdminUserIdsAsync())
+            await NotifyUserAsync(userId, eventName, data);
     }
 
-    public async Task BroadcastAsync(string eventName, object data)
+    public async Task BroadcastPublicRefreshAsync(string eventName)
     {
-        await _hubContext.Clients.All.SendAsync(eventName, data);
+        await _hubContext.Clients.All.SendAsync(eventName, new { refresh = true });
     }
+
+    public Task NotifyWorkersRefreshAsync(string eventName) =>
+        _hubContext.Clients.Group("Workers").SendAsync(eventName, new { refresh = true });
 }

@@ -144,8 +144,6 @@ public sealed class SecurityApplicationFactory(SecurityApplicationFixture fixtur
         builder.UseContentRoot(Path.Combine(fixture.Database.RepositoryRoot, "backend/Karigor.Api"));
         builder.ConfigureServices(services =>
         {
-            services.RemoveAll<IUploadPathProvider>();
-            services.AddSingleton<IUploadPathProvider>(new TestUploadPath(fixture.UploadRoot));
             services.PostConfigure<SslCommerzOptions>(options =>
             {
                 options.StoreId = "fixture"; options.StorePassword = "fixture"; options.IsSandbox = false;
@@ -159,8 +157,4 @@ public sealed class SecurityApplicationFactory(SecurityApplicationFixture fixtur
         });
     }
 
-    private sealed class TestUploadPath(string root) : IUploadPathProvider
-    {
-        public string GetUploadRoot() => root;
-    }
 }

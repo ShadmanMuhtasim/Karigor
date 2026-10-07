@@ -8,6 +8,7 @@ using Karigor.Infrastructure.Models;
 using Microsoft.EntityFrameworkCore;
 using Karigor.Abstractions.Worker;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace Karigor.Application.Worker;
 
@@ -15,17 +16,19 @@ public class WorkerService : IWorkerService
 {
     private readonly KarigorDbContext _db;
     private readonly IUploadPathProvider _pathProvider;
+    private readonly ILogger<WorkerService> _logger;
 
     // Allowed document extensions (lower-case, without dot).
     private static readonly HashSet<string> AllowedExtensions =
         new(StringComparer.OrdinalIgnoreCase) { "pdf", "jpg", "jpeg", "png" };
 
-    private const long MaxFileSizeBytes = 5 * 1024 * 1024; // 5 MB
+    private const long MaxFileSizeBytes = WorkerDocumentLimits.MaxFileSizeBytes;
 
-    public WorkerService(KarigorDbContext db, IUploadPathProvider pathProvider)
+    public WorkerService(KarigorDbContext db, IUploadPathProvider pathProvider, ILogger<WorkerService> logger)
     {
         _db = db;
         _pathProvider = pathProvider;
+        _logger = logger;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -294,11 +297,11 @@ public class WorkerService : IWorkerService
             throw new KeyNotFoundException("Worker profile not found.");
 
         // ── File validation ───────────────────────────────────────────────────
-        if (fileStream is null || fileSizeBytes == 0)
+        if (fileStream is null || fileSizeBytes <= 0)
             throw new InvalidOperationException("No file was uploaded.");
 
         if (fileSizeBytes > MaxFileSizeBytes)
-            throw new InvalidOperationException($"File exceeds the {MaxFileSizeBytes / (1024 * 1024)} MB limit.");
+            throw new InvalidOperationException("File exceeds the 5 MiB limit.");
 
         // Extract and validate extension — never trust the client filename for type
         var ext = Path.GetExtension(originalFileName).TrimStart('.').ToLowerInvariant();
@@ -310,27 +313,19 @@ public class WorkerService : IWorkerService
         if (string.IsNullOrWhiteSpace(documentType) || documentType.Length > 50)
             throw new InvalidOperationException("DocumentType must be 1-50 characters.");
 
-        // ── Magic-byte signature check ────────────────────────────────────────
-        // Reject extension-spoofing (e.g. a renamed .exe that declares .pdf).
-        // FileValidationService preserves the caller's original stream position
-        // so the subsequent CopyToAsync still reads the full file.
-        if (!FileValidationService.ValidateStream(fileStream, ext, out string detectedExt))
-            throw new InvalidOperationException(
-                $"File bytes do not match declared extension '{ext}'. " +
-                $"Detected signature: {detectedExt}.");
-
         // ── Secure storage ────────────────────────────────────────────────────
         // Store under <uploadRoot>/<workerId>/<guid>.<ext>
         // Generated filename → no path traversal, no executable exposure
         var uploadRoot = _pathProvider.GetUploadRoot();
         var workerUploadDir = Path.Combine(uploadRoot, profile.Id.ToString());
         Directory.CreateDirectory(workerUploadDir);   // idempotent
+        if ((new DirectoryInfo(workerUploadDir).Attributes & FileAttributes.ReparsePoint) != 0)
+            throw new InvalidOperationException("Private document storage cannot use linked directories.");
 
         var safeFileName = $"{Guid.NewGuid():N}.{ext}";
         var filePath     = Path.Combine(workerUploadDir, safeFileName);
 
-        await using (var dest = File.Create(filePath))
-            await fileStream.CopyToAsync(dest);
+        var stagingPath = filePath + ".uploading";
 
         // Store the relative URL only — never the raw filesystem path
         var fileUrl = $"/uploads/worker-documents/{profile.Id}/{safeFileName}";
@@ -344,8 +339,61 @@ public class WorkerService : IWorkerService
             Status       = "Pending"    // schema default — newly submitted docs are Pending
         };
 
-        _db.WorkerDocuments.Add(doc);
-        await _db.SaveChangesAsync();
+        var persistenceAttempted = false;
+        var stagingOwned = false;
+        var finalized = false;
+        try
+        {
+            if (fileStream.CanSeek) fileStream.Position = 0;
+            await using (var dest = new FileStream(stagingPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, true))
+            {
+                stagingOwned = true;
+                var buffer = new byte[81920];
+                long written = 0;
+                int read;
+                while ((read = await fileStream.ReadAsync(buffer)) > 0)
+                {
+                    written += read;
+                    if (written > MaxFileSizeBytes)
+                        throw new InvalidOperationException("File exceeds the 5 MiB limit.");
+                    await dest.WriteAsync(buffer.AsMemory(0, read));
+                }
+                if (written != fileSizeBytes)
+                    throw new InvalidOperationException("Uploaded file length does not match its declared size.");
+            }
+            // Validate the actual staged bytes, including non-seekable input streams.
+            using (var staged = File.OpenRead(stagingPath))
+                if (!FileValidationService.ValidateStream(staged, ext, out _))
+                    throw new InvalidOperationException("File bytes do not match the declared extension.");
+
+            File.Move(stagingPath, filePath); // Same-directory finalization; no public exposure.
+            finalized = true;
+            _db.WorkerDocuments.Add(doc);
+            persistenceAttempted = true;
+            await _db.SaveChangesAsync();
+        }
+        catch
+        {
+            if (stagingOwned) DeleteNewFile(stagingPath, profile.Id, safeFileName);
+            var mayBeCommitted = false;
+            if (persistenceAttempted)
+            {
+                _db.Entry(doc).State = EntityState.Detached;
+                try
+                {
+                    // A lost commit response is ambiguous. Do not delete a possibly committed file.
+                    mayBeCommitted = await _db.WorkerDocuments.AsNoTracking()
+                        .AnyAsync(d => d.WorkerId == profile.Id && d.FileUrl == fileUrl);
+                }
+                catch
+                {
+                    mayBeCommitted = true;
+                    _logger.LogWarning("Document persistence uncertain; reconcile worker {WorkerId}, file {FileId}.", profile.Id, safeFileName);
+                }
+            }
+            if (finalized && !mayBeCommitted) DeleteNewFile(filePath, profile.Id, safeFileName);
+            throw;
+        }
 
         return new WorkerDocumentDto
         {
@@ -359,6 +407,13 @@ public class WorkerService : IWorkerService
     // ─────────────────────────────────────────────────────────────────────────
     // Dashboard Stats
     // ─────────────────────────────────────────────────────────────────────────
+    private void DeleteNewFile(string path, int workerId, string fileId)
+    {
+        try { File.Delete(path); }
+        catch (IOException) { _logger.LogWarning("Document cleanup deferred for worker {WorkerId}, file {FileId}.", workerId, fileId); }
+        catch (UnauthorizedAccessException) { _logger.LogWarning("Document cleanup deferred for worker {WorkerId}, file {FileId}.", workerId, fileId); }
+    }
+
     public async Task<WorkerDashboardStatsDto> GetDashboardStatsAsync(string userId)
     {
         var profile = await _db.WorkerProfiles

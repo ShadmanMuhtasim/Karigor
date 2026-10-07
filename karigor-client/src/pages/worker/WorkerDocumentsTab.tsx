@@ -1,21 +1,29 @@
 import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { workerApi } from '../../api/workerApi';
-import { getFileUrl } from '../../api/client';
+import { workerApi, type WorkerDocumentDto } from '../../api/workerApi';
+import { MAX_PRIVATE_DOCUMENT_BYTES } from '../../api/privateDocumentApi';
+import { PrivateDocumentViewer } from '../../components/PrivateDocumentViewer';
+import { useAuth } from '../../context/AuthContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/card';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 
 export function WorkerDocumentsTab() {
+  const { user } = useAuth();
+  return user ? <WorkerDocumentsForAccount key={user.userId} account={user.userId} /> : null;
+}
+
+function WorkerDocumentsForAccount({ account }: { account: string }) {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [documentType, setDocumentType] = useState<string>('NationalId');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedDocument, setSelectedDocument] = useState<WorkerDocumentDto | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const { data: documents, isLoading } = useQuery({
-    queryKey: ['workerDocuments'],
+    queryKey: ['workerDocuments', account],
     queryFn: workerApi.getDocuments,
   });
 
@@ -48,7 +56,7 @@ export function WorkerDocumentsTab() {
     setActionMessage(null);
 
     // basic client-side validation
-    if (selectedFile.size > 10 * 1024 * 1024) {
+    if (selectedFile.size > MAX_PRIVATE_DOCUMENT_BYTES) {
       setActionMessage({ type: 'error', text: t('worker.documents.fileExceedsLimit') });
       return;
     }
@@ -133,14 +141,13 @@ export function WorkerDocumentsTab() {
                     <tr key={doc.id} className="table-row-hover border-b border-gray-100 dark:border-gray-800">
                       <td className="px-4 py-3.5 text-gray-900 dark:text-gray-200 font-medium">{doc.documentType}</td>
                       <td className="px-4 py-3.5">
-                        <a
-                          href={getFileUrl(doc.fileUrl)}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          type="button"
+                          onClick={() => setSelectedDocument(doc)}
                           className="text-emerald-600 dark:text-emerald-400 hover:underline font-medium"
                         >
                           {t('worker.documents.viewFile')}
-                        </a>
+                        </button>
                       </td>
                       <td className="px-4 py-3.5 text-right">
                         <StatusBadge status={doc.status} />
@@ -153,6 +160,8 @@ export function WorkerDocumentsTab() {
           )}
         </CardContent>
       </Card>
+      {selectedDocument && <PrivateDocumentViewer fileUrl={selectedDocument.fileUrl}
+        label={selectedDocument.documentType} onClose={() => setSelectedDocument(null)} />}
     </div>
   );
 }

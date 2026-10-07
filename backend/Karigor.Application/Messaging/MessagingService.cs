@@ -16,15 +16,18 @@ public class MessagingService : IMessagingService
     private readonly KarigorDbContext _db;
     private readonly IRealtimeNotifier _notifier;
     private readonly INotificationService _notificationService;
+    private readonly BookingAccess _bookingAccess;
 
     public MessagingService(
         KarigorDbContext db,
         IRealtimeNotifier notifier,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        BookingAccess bookingAccess)
     {
         _db = db;
         _notifier = notifier;
         _notificationService = notificationService;
+        _bookingAccess = bookingAccess;
     }
 
     public async Task<MessageDto> SendMessageAsync(string senderUserId, SendMessageDto dto)
@@ -34,6 +37,10 @@ public class MessagingService : IMessagingService
 
         if (dto.BookingId.HasValue)
         {
+            var participants = await _bookingAccess.GetParticipantsAsync(dto.BookingId.Value);
+            if (participants is null || !participants.Contains(senderUserId) ||
+                !await _bookingAccess.IsActiveUserAsync(senderUserId))
+                throw new UnauthorizedAccessException("You are not a participant in this booking.");
             var booking = await _db.Bookings
                 .Include(b => b.Customer)
                 .Include(b => b.Worker)
@@ -121,7 +128,10 @@ public class MessagingService : IMessagingService
         {
             await _notifier.NotifyBookingGroupAsync(dto.BookingId.Value, "ReceiveMessage", result);
         }
-        await _notifier.NotifyUserAsync(receiverUserId, "ReceiveMessage", result);
+        else
+        {
+            await _notifier.NotifyUserAsync(receiverUserId, "ReceiveMessage", result);
+        }
 
         // Create In-App Notification for recipient
         var preview = message.Content.Length > 60 ? message.Content.Substring(0, 57) + "..." : message.Content;
@@ -138,6 +148,10 @@ public class MessagingService : IMessagingService
 
     public async Task<List<MessageDto>> GetBookingMessagesAsync(string userId, int bookingId)
     {
+        var participants = await _bookingAccess.GetParticipantsAsync(bookingId);
+        if (participants is null || !participants.Contains(userId) ||
+            !await _bookingAccess.IsActiveUserAsync(userId))
+            throw new UnauthorizedAccessException("You are not a participant in this booking.");
         var booking = await _db.Bookings
             .Include(b => b.Customer)
             .Include(b => b.Worker)

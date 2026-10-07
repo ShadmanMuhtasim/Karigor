@@ -269,22 +269,12 @@ try
     var contentRoot = builder.Environment.ContentRootPath
         ?? Path.Combine(AppContext.BaseDirectory, "..", "..", "..");
     var configuredUploadPath = builder.Configuration["Storage:UploadPath"];
-    var uploadRoot = string.IsNullOrWhiteSpace(configuredUploadPath)
-        ? Path.Combine(contentRoot, "App_Data", "Uploads", "WorkerDocuments")
-        : configuredUploadPath;
-
-    if (!Directory.Exists(uploadRoot))
-    {
-        Directory.CreateDirectory(uploadRoot);
-    }
-
-    // Register the private (content-root) provider — the web-root provider is
-    // intentionally NOT used so uploaded documents cannot leak to the public
-    // static-file pipeline.
-    builder.Services.AddScoped<IUploadPathProvider>(sp =>
-        new PrivateUploadPathProvider(contentRoot));
+    var privateUploads = new PrivateUploadPathProvider(contentRoot, configuredUploadPath, builder.Environment.WebRootPath);
+    privateUploads.GetUploadRoot(); // Both consumers use the validated effective root.
+    builder.Services.AddSingleton<IUploadPathProvider>(privateUploads);
 
     builder.Services.AddSignalR();
+    builder.Services.AddScoped<Karigor.Application.Realtime.BookingAccess>();
 
     // -------------------------------------------------------------------------
     // Application services
@@ -476,7 +466,9 @@ try
         app.UseHttpsRedirection();
     }
     app.UseDefaultFiles();  // serves index.html by default
-    app.UseStaticFiles();   // serves wwwroot/assets, wwwroot/uploads, etc.
+    // Reserve the document namespace for authorized MVC delivery, including old public copies.
+    app.UseWhen(context => !context.Request.Path.StartsWithSegments("/uploads/worker-documents", StringComparison.OrdinalIgnoreCase),
+        staticFiles => staticFiles.UseStaticFiles());
     app.UseCors(CorsPolicyName);
     app.UseAuthentication();
 
@@ -487,7 +479,7 @@ try
 
     app.UseAuthorization();
     app.MapControllers();
-    app.MapHub<Karigor.Api.Hubs.KarigorHub>("/hubs/chat");
+    app.MapHub<Karigor.Api.Hubs.KarigorHub>("/hubs/chat", options => options.CloseOnAuthenticationExpiration = true);
     app.MapFallbackToFile("index.html");  // SPA client-side fallback
 
     app.Run();

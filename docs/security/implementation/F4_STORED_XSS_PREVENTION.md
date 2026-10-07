@@ -273,3 +273,10 @@ The tradeoff is more verbose DOM construction. A sanitizer or new React-root lif
 3. **Why not remove angle brackets?** It damages valid text and does not fix existing rows or every interpretation path.
 4. **Why a browser test?** Execution depends on real HTML parsing, image/SVG events and Leaflet behavior.
 5. **Can static SVG still be HTML?** Yes, if it remains repository-owned constants and no user data is interpolated into that parser boundary.
+
+
+## Final popup-regression reconciliation (2026-10-07)
+
+The repeated-redraw locator occasionally matched two buttons during Leaflet's closing animation. Inspection of the installed Leaflet DivOverlay.onRemove and a real Chrome lifecycle probe showed one opacity-0 closing popup plus one opacity-1 current popup. Leaflet schedules DOM removal after 200 ms. Each old node detached, one marker/current popup remained after settlement, and callbacks advanced once. Unmount left no map/popup/button DOM. No persistent duplicate popup, duplicate callback or missing application cleanup was reproduced.
+
+The regression now asserts exactly one marker/popup/button before quotation, waits for the removed popup/button count to become zero after each redraw, and verifies three unmount/remount cycles with exactly one callback per action. It uses state-based Playwright assertions, no arbitrary sleep, forced click or `.first()` selection. The diagnostic's immediate DOM dispatch was only used to observe the transition, never as a passing-test shortcut. All stored-XSS assertions and production DOM/text rendering remain unchanged. A real duplicate-DOM leak would still fail the zero/one counts or callback counters. See [final evidence](../SECURITY_WORKDONE.md#phase-1-final-regression-reconciliation).

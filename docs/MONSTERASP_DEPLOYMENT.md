@@ -110,7 +110,7 @@ Before deploying, ensure you have:
 
 ## 7. Database Schema & Seed Deployment
 
-Before launching the web application, provision the baseline, seed data and explicit versioned upgrades in [database/production/](../database/production/). Ordinary startup verifies F5 and Payment prerequisites; it does not install them.
+Before launching the web application, provision the baseline, seed data and explicit versioned upgrades in [database/production/](../database/production/). Ordinary startup verifies F5, Payment and F6 RefreshSession prerequisites; it does not install them.
 
 ### Execution Order
 
@@ -128,6 +128,8 @@ Before launching the web application, provision the baseline, seed data and expl
    *Idempotently seeds core Identity Roles (`Customer`, `Worker`, `Admin`) and the 10 starter trade categories with CDN icons.*
 
 5. Preflight `database/production/005_f5_negotiation_integrity.sql`, `006_payment_schema_authority.sql`, then `007_payment_concurrency.sql` in their default read-only modes. Resolve reported issues, then follow the [F5](database/F5_SCHEMA_AUTHORITY_AND_MIGRATION.md) and [Payment](database/PAYMENT_SCHEMA_AUTHORITY.md) guides to explicitly apply them during a writer outage. All are required in order on fresh databases; current Payment marker is 2. On marker 2, do not rerun frozen 006. Financial history is not automatically corrected, and the retired development 004 script is not an alternative Payment owner.
+
+   F6 additionally requires `008_refresh_session_authority.sql` and explicit acknowledgement of a forced sign-in reset. Stop all old API writers, preflight, set both apply/reset session-context flags on the intended connection, execute the full script, then deploy matching API/browser artifacts. Old no-sid JWTs and legacy refresh cookies are rejected. Check trusted Origin configuration, HTTPS, browser Web Locks and cookie behavior in the actual host. [F6 migration and rollback limits](security/implementation/F6_REFRESH_SESSION_ARCHITECTURE.md#migration-and-rollback) apply; an old binary redeploy is not a safe rollback.
 
 ### Schema Verification Query
 ```sql
@@ -225,7 +227,7 @@ sequenceDiagram
     Admin->>Dashboard: 1. Create Website & MSSQL DB
     Admin->>Dashboard: 2. Enable WebDeploy & Copy Credentials
     Admin->>Dashboard: 3. Set Environment Variables (ASPNETCORE_ENVIRONMENT, DB, JWT)
-    Admin->>DB: 4. Run baseline/seed, preflight and explicitly apply 005/006/007
+    Admin->>DB: 4. Run baseline/seed, preflight and explicitly apply 005/006/007/008 with planned sign-in reset
     Admin->>GitHub: 5. Add GitHub Secrets (WEBSITE_NAME, SERVER_*, etc.)
     Admin->>GitHub: 6. Push to main (or trigger workflow_dispatch)
     GitHub->>IIS: 7. Build, Test, Publish & Deploy via WebDeploy

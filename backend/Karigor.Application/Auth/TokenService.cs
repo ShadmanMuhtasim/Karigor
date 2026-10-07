@@ -11,13 +11,15 @@ namespace Karigor.Application.Auth;
 public class TokenService : ITokenService
 {
     private readonly IConfiguration _config;
+    private readonly TimeProvider _clock;
 
-    public TokenService(IConfiguration config)
+    public TokenService(IConfiguration config, TimeProvider clock)
     {
         _config = config;
+        _clock = clock;
     }
 
-    public (string token, DateTime expiry) GenerateAccessToken(ApplicationUser user, IList<string> roles)
+    public (string token, DateTime expiry) GenerateAccessToken(ApplicationUser user, IList<string> roles, Guid sessionId, DateTime sessionExpiry)
     {
         var key = _config["Jwt:Key"]
             ?? throw new InvalidOperationException("Jwt:Key is not configured.");
@@ -32,6 +34,7 @@ public class TokenService : ITokenService
         {
             new Claim(JwtRegisteredClaimNames.Sub,   user.Id),
             new Claim(JwtRegisteredClaimNames.Email, user.Email!),
+            new Claim("sid", sessionId.ToString()),
             new Claim(JwtRegisteredClaimNames.Jti,   Guid.NewGuid().ToString()),
         };
 
@@ -39,7 +42,8 @@ public class TokenService : ITokenService
         foreach (var role in roles)
             claims.Add(new Claim(ClaimTypes.Role, role));
 
-        var expiry = DateTime.UtcNow.AddMinutes(expiryMinutes);
+        var expiry = _clock.GetUtcNow().UtcDateTime.AddMinutes(expiryMinutes);
+        if (expiry > sessionExpiry) expiry = sessionExpiry;
 
         var token = new JwtSecurityToken(
             issuer:             issuer,

@@ -298,6 +298,8 @@ These are **normal** for ASP.NET Core Identity tables and do not affect Karigor 
 
 Before starting the current API, also preflight and explicitly apply `database/production/005_f5_negotiation_integrity.sql`, `006_payment_schema_authority.sql`, and `007_payment_concurrency.sql` in order against the intended local database. All three are required on a fresh baseline; current Payment schema marker is 2. Do not rerun frozen 006 on an already upgraded marker-2 database. Follow [F5 schema authority](docs/database/F5_SCHEMA_AUTHORITY_AND_MIGRATION.md) and [Payment schema authority](docs/database/PAYMENT_SCHEMA_AUTHORITY.md) for apply mode and legacy review. Startup only verifies these prerequisites; retired `database/004_add_payments.sql` no longer owns Payment DDL.
 
+F6 also requires `database/production/008_refresh_session_authority.sql` after those prerequisites. Its default preflight is read-only; apply requires an explicit forced sign-in reset during a writer outage. Do not invent families for old refresh tokens or deploy mixed old/new binaries. See [F6 session architecture and cutover](docs/security/implementation/F6_REFRESH_SESSION_ARCHITECTURE.md).
+
 ```bash
 sqlcmd -S .\SQLEXPRESS -E -d KarigorDev -i database\002_seed_categories.sql
 ```

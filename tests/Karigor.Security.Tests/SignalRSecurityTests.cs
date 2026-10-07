@@ -1,7 +1,10 @@
 using System.Collections.Concurrent;
 using System.Data.Common;
+using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
+using Karigor.Api.Controllers;
 using Karigor.Api.Hubs;
 using Karigor.Application.Auth;
 using Karigor.Application.Marketplace.DTOs;
@@ -9,12 +12,17 @@ using Karigor.Application.Realtime;
 using Karigor.Infrastructure.Models;
 using Karigor.Security.Tests.Infrastructure;
 using Microsoft.AspNetCore.Http.Connections;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 
 namespace Karigor.Security.Tests;
 
@@ -24,14 +32,15 @@ public sealed class SignalRSecurityTests(SecurityApplicationFixture fixture)
     private sealed class Peer : IAsyncDisposable
     {
         public HubConnection Connection { get; }
+        public string? ConnectionToken { get; private set; }
         public ConcurrentQueue<(string Name, JsonElement Data)> Events { get; } = new();
         public ConcurrentDictionary<string, TaskCompletionSource> Fences { get; } = new();
-        public Peer(SecurityApplicationFactory factory, string? token)
+        public Peer(WebApplicationFactory<PaymentsController> factory, string? token)
         {
             Connection = new HubConnectionBuilder().WithUrl("https://localhost/hubs/chat", options =>
             {
                 options.Transports = HttpTransportType.LongPolling;
-                options.HttpMessageHandlerFactory = _ => factory.Server.CreateHandler();
+                options.HttpMessageHandlerFactory = _ => new CaptureConnectionToken(factory.Server.CreateHandler(), value => ConnectionToken = value);
                 options.AccessTokenProvider = () => Task.FromResult(token);
             }).Build();
             foreach (var name in new[] { "ReceiveMessage", "UserTyping", "PaymentReceived", "QuotationUpdated",
@@ -43,11 +52,42 @@ public sealed class SignalRSecurityTests(SecurityApplicationFixture fixture)
         public JsonElement Single(string name) => Assert.Single(Events, e => e.Name == name).Data;
     }
 
-    private async Task FenceAsync(params Peer[] peers)
+    private sealed class CaptureConnectionToken(HttpMessageHandler inner, Action<string> capture) : DelegatingHandler(inner)
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.RequestUri!.AbsolutePath == "/hubs/chat" &&
+                QueryHelpers.ParseQuery(request.RequestUri.Query).TryGetValue("id", out var id)) capture(id.ToString());
+            return base.SendAsync(request, cancellationToken);
+        }
+    }
+
+    // Observe the actual lifetime manager; all group operations still execute normally.
+    private sealed class ObservedGroups(ILogger<DefaultHubLifetimeManager<KarigorHub>> logger) : DefaultHubLifetimeManager<KarigorHub>(logger)
+    {
+        public ConcurrentQueue<(string ConnectionId, string Group)> Adds { get; } = new();
+        public override async Task AddToGroupAsync(string connectionId, string groupName, CancellationToken cancellationToken = default)
+        {
+            await base.AddToGroupAsync(connectionId, groupName, cancellationToken);
+            Adds.Enqueue((connectionId, groupName));
+        }
+    }
+
+    private WebApplicationFactory<PaymentsController> ObservedHost() => fixture.Factory.WithWebHostBuilder(builder =>
+        builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<HubLifetimeManager<KarigorHub>>();
+            services.AddSingleton<ObservedGroups>();
+            services.AddSingleton<HubLifetimeManager<KarigorHub>>(sp => sp.GetRequiredService<ObservedGroups>());
+        }));
+
+    private Task FenceAsync(params Peer[] peers) => FenceAsync(fixture.Factory, peers);
+
+    private async Task FenceAsync(WebApplicationFactory<PaymentsController> factory, params Peer[] peers)
     {
         var id = Guid.NewGuid().ToString("N");
         foreach (var peer in peers) peer.Fences[id] = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        using var scope = fixture.Factory.Services.CreateScope();
+        using var scope = factory.Services.CreateScope();
         await scope.ServiceProvider.GetRequiredService<IHubContext<KarigorHub>>().Clients.All.SendAsync("SecurityFence", id);
         await Task.WhenAll(peers.Select(p => p.Fences[id].Task)).WaitAsync(TimeSpan.FromSeconds(10));
     }
@@ -60,7 +100,7 @@ public sealed class SignalRSecurityTests(SecurityApplicationFixture fixture)
         var manager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         Assert.True((await manager.CreateAsync(user)).Succeeded);
         Assert.True((await manager.AddToRoleAsync(user, "Admin")).Succeeded);
-        return scope.ServiceProvider.GetRequiredService<ITokenService>().GenerateAccessToken(user, ["Admin"]).token;
+        return (await scope.ServiceProvider.GetRequiredService<RefreshSessionService>().CreateAsync(user.Id)).result.AccessToken;
     }
 
     [Fact]
@@ -141,19 +181,73 @@ public sealed class SignalRSecurityTests(SecurityApplicationFixture fixture)
     public async Task SuspensionDeniesMethodsAndPrivateDeliveryWithExistingJwt()
     {
         var s = await fixture.SeedAsync(booking: true);
-        await using var worker = new Peer(fixture.Factory, s.WorkerToken);
-        await worker.Connection.StartAsync();
+        await using var factory = ObservedHost();
+        await using var worker = new Peer(factory, s.WorkerToken);
+        await using var customer = new Peer(factory, s.CustomerToken);
+        await Task.WhenAll(worker.Connection.StartAsync(), customer.Connection.StartAsync());
         await worker.Connection.InvokeAsync("JoinBooking", s.BookingId!.Value);
-        using var scope = fixture.Factory.Services.CreateScope();
+        using var scope = factory.Services.CreateScope();
+        var groups = scope.ServiceProvider.GetRequiredService<ObservedGroups>();
+        var before = groups.Adds.Count;
         var db = scope.ServiceProvider.GetRequiredService<KarigorDbContext>();
         var user = await db.Users.FindAsync(s.WorkerUserId);
         user!.LockoutEnd = DateTimeOffset.UtcNow.AddDays(1);
         await db.SaveChangesAsync();
-        await Assert.ThrowsAsync<HubException>(() => worker.Connection.InvokeAsync("JoinBooking", s.BookingId.Value));
-        await Assert.ThrowsAsync<HubException>(() => worker.Connection.InvokeAsync("SendTyping", s.BookingId.Value, true));
+        // Long Polling sends each invocation over HTTP. Assert the authentication boundary
+        // directly, so background poll disconnection cannot change the client exception type.
+        Assert.NotNull(worker.ConnectionToken);
+        using var http = factory.CreateClient(new() { BaseAddress = new Uri("https://localhost") });
+        http.DefaultRequestHeaders.Authorization = new("Bearer", s.WorkerToken);
+        foreach (var (method, arguments) in new[]
+        {
+            ("JoinBooking", new object[] { s.BookingId.Value }),
+            ("SendTyping", new object[] { s.BookingId.Value, true })
+        })
+        {
+            var invocation = JsonSerializer.Serialize(new { type = 1, invocationId = method, target = method, arguments }) + '\u001e';
+            using var denied = await http.PostAsync("/hubs/chat?id=" + Uri.EscapeDataString(worker.ConnectionToken!),
+                new StringContent(invocation, Encoding.UTF8, "text/plain"));
+            Assert.Equal(HttpStatusCode.Unauthorized, denied.StatusCode);
+        }
+        Assert.Equal(before, groups.Adds.Count);
+        var recipients = await scope.ServiceProvider.GetRequiredService<Karigor.Api.Realtime.SessionConnections>()
+            .AuthorizedConnections(s.WorkerUserId, scope.ServiceProvider.GetRequiredService<RefreshSessionService>());
+        Assert.Empty(recipients);
         await scope.ServiceProvider.GetRequiredService<IRealtimeNotifier>().NotifyBookingGroupAsync(s.BookingId.Value, "ReceiveMessage", new { content = "Denied" });
-        await FenceAsync(worker);
+        await FenceAsync(factory, customer);
+        Assert.Equal("Denied", customer.Single("ReceiveMessage").GetProperty("content").GetString());
+        await worker.Connection.StopAsync();
         Assert.Empty(worker.Events);
+    }
+
+    [Theory]
+    [InlineData(false)] [InlineData(true)]
+    public async Task RevokedOrSuspendedHandshakeCannotObtainGroupsOrPrivateDelivery(bool suspend)
+    {
+        var s = await fixture.SeedAsync(booking: true);
+        await using var factory = ObservedHost();
+        using var scope = factory.Services.CreateScope();
+        var sessions = scope.ServiceProvider.GetRequiredService<RefreshSessionService>();
+        var session = await sessions.CreateAsync(s.WorkerUserId);
+        await using var healthy = new Peer(factory, s.CustomerToken);
+        await healthy.Connection.StartAsync();
+        await healthy.Connection.InvokeAsync("JoinBooking", s.BookingId!.Value);
+        var groups = scope.ServiceProvider.GetRequiredService<ObservedGroups>();
+        var before = groups.Adds.Count;
+        if (suspend) await sessions.SetSuspensionAsync(s.WorkerUserId, true);
+        else await sessions.LogoutAsync(session.rawRefreshToken);
+        await using var denied = new Peer(factory, session.result.AccessToken);
+        var failure = await Assert.ThrowsAsync<HttpRequestException>(() => denied.Connection.StartAsync());
+        Assert.Equal(HttpStatusCode.Unauthorized, failure.StatusCode);
+        Assert.Equal(HubConnectionState.Disconnected, denied.Connection.State);
+        Assert.Equal(before, groups.Adds.Count); // No user/role/booking membership from the denied handshake.
+        Assert.All(groups.Adds, entry => Assert.Equal(healthy.Connection.ConnectionId, entry.ConnectionId));
+        await scope.ServiceProvider.GetRequiredService<IRealtimeNotifier>().NotifyBookingGroupAsync(s.BookingId.Value,
+            "ReceiveMessage", new { content = "Healthy participant only" });
+        await FenceAsync(factory, healthy);
+        Assert.Equal("Healthy participant only", healthy.Single("ReceiveMessage").GetProperty("content").GetString());
+        Assert.Empty(denied.Events);
+        Assert.False(await sessions.IsActiveAsync(s.WorkerUserId, session.result.SessionId));
     }
 
     [Fact]

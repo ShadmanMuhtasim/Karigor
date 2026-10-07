@@ -1,5 +1,5 @@
 import * as signalR from '@microsoft/signalr';
-import { getAccessToken } from '../api/client';
+import { getAccessToken, refreshAuthToken } from '../api/client';
 import type { MessageDto } from '../api/messagingApi';
 import type { NotificationDto } from '../api/notificationApi';
 import type { SosAlertDto } from '../api/adminApi';
@@ -166,6 +166,18 @@ class SignalRService {
               console.warn(`Could not rejoin booking #${bId}:`, err);
             }
           }
+        });
+
+        // A server expiry close can be terminal (unlike a transient transport loss).
+        // Reauthenticate through the same tab/cross-tab flight before creating a new connection.
+        conn.onclose(async () => {
+          if (generation !== this.generation || this.connection !== conn) return;
+          this.connection = null;
+          this.connectionPromise = null;
+          try {
+            await refreshAuthToken();
+            if (generation === this.generation && this.accountId) await this.startConnection();
+          } catch { /* Auth synchronization clears a denied session. */ }
         });
 
         await conn.start();

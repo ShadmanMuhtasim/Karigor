@@ -109,6 +109,12 @@ try
                 }
                 return Task.CompletedTask;
             },
+            OnTokenValidated = async context =>
+            {
+                var sessions = context.HttpContext.RequestServices.GetRequiredService<RefreshSessionService>();
+                if (!await sessions.IsActiveAsync(context.Principal, context.HttpContext.RequestAborted))
+                    context.Fail("Session unavailable.");
+            },
             OnAuthenticationFailed = context =>
             {
                 if (context.Exception is SecurityTokenExpiredException)
@@ -134,6 +140,9 @@ try
         };
     });
 
+    builder.Services.AddSingleton(TimeProvider.System);
+    builder.Services.AddScoped<RefreshSessionService>();
+    builder.Services.AddSingleton<Karigor.Api.Realtime.SessionConnections>();
     builder.Services.AddAuthorization();
 
     // -------------------------------------------------------------------------
@@ -362,6 +371,7 @@ try
     {
         F5SchemaGate.Verify(scope.ServiceProvider.GetRequiredService<KarigorDbContext>());
         PaymentSchemaGate.Verify(scope.ServiceProvider.GetRequiredService<KarigorDbContext>());
+        RefreshSessionSchemaGate.Verify(scope.ServiceProvider.GetRequiredService<KarigorDbContext>());
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
         IdentityRoleSeeder.EnsureAsync(roleManager, "Customer", "Worker", "Admin").GetAwaiter().GetResult();
 

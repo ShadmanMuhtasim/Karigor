@@ -9,6 +9,7 @@ namespace Karigor.Api.Controllers;
 [ApiController]
 [Route("api/auth")]
 [EnableRateLimiting("AuthLimiter")]
+[AuthCookieOrigin]
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
@@ -16,7 +17,6 @@ public class AuthController : ControllerBase
     private readonly IWebHostEnvironment _env;
     private readonly IConfiguration _config;
     private const string RefreshTokenCookieName = "karigor_rt";
-    private const int RefreshTokenExpiryDays = 7;
 
     public AuthController(
         IAuthService authService,
@@ -55,7 +55,7 @@ public class AuthController : ControllerBase
         try
         {
             var (result, rawRefreshToken) = await _authService.RegisterCustomerAsync(dto);
-            SetRefreshCookie(rawRefreshToken);
+            SetRefreshCookie(rawRefreshToken, result.RefreshTokenExpiry);
             return Ok(result);
         }
         catch (AuthValidationException ex)
@@ -79,7 +79,7 @@ public class AuthController : ControllerBase
         try
         {
             var (result, rawRefreshToken) = await _authService.RegisterWorkerAsync(dto);
-            SetRefreshCookie(rawRefreshToken);
+            SetRefreshCookie(rawRefreshToken, result.RefreshTokenExpiry);
             return Ok(result);
         }
         catch (AuthValidationException ex)
@@ -103,7 +103,7 @@ public class AuthController : ControllerBase
         try
         {
             var (result, rawRefreshToken) = await _authService.LoginAsync(dto);
-            SetRefreshCookie(rawRefreshToken);
+            SetRefreshCookie(rawRefreshToken, result.RefreshTokenExpiry);
             return Ok(result);
         }
         catch (UnauthorizedAccessException ex)
@@ -122,7 +122,7 @@ public class AuthController : ControllerBase
         try
         {
             var (result, rawRefreshToken) = await _authService.GoogleLoginAsync(dto);
-            SetRefreshCookie(rawRefreshToken);
+            SetRefreshCookie(rawRefreshToken, result.RefreshTokenExpiry);
             return Ok(result);
         }
         catch (UnauthorizedAccessException ex)
@@ -151,8 +151,12 @@ public class AuthController : ControllerBase
         try
         {
             var (result, newRawToken) = await _authService.RefreshAsync(rawToken);
-            SetRefreshCookie(newRawToken);
+            SetRefreshCookie(newRawToken, result.RefreshTokenExpiry);
             return Ok(result);
+        }
+        catch (RefreshConflictException)
+        {
+            return Conflict(new { error = "Refresh overlapped another request. No credentials were issued." });
         }
         catch (UnauthorizedAccessException ex)
         {
@@ -162,7 +166,7 @@ public class AuthController : ControllerBase
 
     // POST /api/auth/logout
     [HttpPost("logout")]
-    [Authorize]
+    [AllowAnonymous]
     public async Task<IActionResult> Logout()
     {
         var rawToken = Request.Cookies[RefreshTokenCookieName];
@@ -185,7 +189,7 @@ public class AuthController : ControllerBase
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
-    private void SetRefreshCookie(string rawToken)
+    private void SetRefreshCookie(string rawToken, DateTime expiry)
     {
         var isSecure = Request.IsHttps || !_env.IsDevelopment();
         Response.Cookies.Append(RefreshTokenCookieName, rawToken, new CookieOptions
@@ -193,7 +197,7 @@ public class AuthController : ControllerBase
             HttpOnly = true,
             Secure   = isSecure,
             SameSite = SameSiteMode.Lax,
-            Expires  = DateTimeOffset.UtcNow.AddDays(RefreshTokenExpiryDays),
+            Expires  = new DateTimeOffset(DateTime.SpecifyKind(expiry, DateTimeKind.Utc)),
             Path     = "/"
         });
     }

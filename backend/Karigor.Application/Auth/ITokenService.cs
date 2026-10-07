@@ -5,10 +5,10 @@ namespace Karigor.Application.Auth;
 public interface ITokenService
 {
     /// <summary>Generate a signed JWT access token for the given user and roles.</summary>
-    (string token, DateTime expiry) GenerateAccessToken(ApplicationUser user, IList<string> roles);
+    (string token, DateTime expiry) GenerateAccessToken(ApplicationUser user, IList<string> roles, Guid sessionId, DateTime sessionExpiry);
 
     /// <summary>
-    /// Generate a cryptographically random refresh token (Base64Url, 96 chars).
+    /// Generate a cryptographically random refresh token (64 random bytes encoded as Base64).
     /// The raw value is returned ONCE to be set as a cookie; the caller must hash it before persisting.
     /// </summary>
     string GenerateRefreshToken();

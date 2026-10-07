@@ -102,7 +102,7 @@ public sealed class PrivateDocumentSecurityTests(SecurityApplicationFixture fixt
         var user = new ApplicationUser { UserName = email, Email = email };
         Assert.True((await manager.CreateAsync(user)).Succeeded);
         Assert.True((await manager.AddToRoleAsync(user, "Admin")).Succeeded);
-        return scope.ServiceProvider.GetRequiredService<ITokenService>().GenerateAccessToken(user, ["Admin"]).token;
+        return (await scope.ServiceProvider.GetRequiredService<RefreshSessionService>().CreateAsync(user.Id)).result.AccessToken;
     }
 
     [Fact]

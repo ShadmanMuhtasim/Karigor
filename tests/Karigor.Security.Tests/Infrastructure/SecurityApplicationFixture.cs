@@ -59,6 +59,8 @@ public sealed class SecurityApplicationFixture : IAsyncLifetime
     public HttpClient Client(string? token = null)
     {
         var client = Factory.CreateClient(new() { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false });
+        client.DefaultRequestHeaders.Add("Origin", "https://localhost");
+        client.DefaultRequestHeaders.Add("X-Karigor-CSRF", "1");
         if (token is not null) client.DefaultRequestHeaders.Authorization = new("Bearer", token);
         return client;
     }
@@ -68,7 +70,7 @@ public sealed class SecurityApplicationFixture : IAsyncLifetime
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<KarigorDbContext>();
         var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-        var tokens = scope.ServiceProvider.GetRequiredService<ITokenService>();
+        var sessions = scope.ServiceProvider.GetRequiredService<RefreshSessionService>();
         async Task<ApplicationUser> User(string role)
         {
             var id = Guid.NewGuid().ToString("N");
@@ -112,9 +114,9 @@ public sealed class SecurityApplicationFixture : IAsyncLifetime
         await db.SaveChangesAsync();
         return new Scenario(request.Id, worker.Id, job?.Id,
             customerUser.Id, workerUser.Id,
-            tokens.GenerateAccessToken(customerUser, ["Customer"]).token,
-            tokens.GenerateAccessToken(workerUser, ["Worker"]).token,
-            tokens.GenerateAccessToken(stranger, ["Customer"]).token);
+            (await sessions.CreateAsync(customerUser.Id)).result.AccessToken,
+            (await sessions.CreateAsync(workerUser.Id)).result.AccessToken,
+            (await sessions.CreateAsync(stranger.Id)).result.AccessToken);
     }
 }
 
@@ -133,7 +135,8 @@ public sealed class SecurityApplicationFactory(SecurityApplicationFixture fixtur
             ["ConnectionStrings:DefaultConnection"] = fixture.Database.ConnectionString,
             ["Jwt:Key"] = "fixture-only-signing-key-64-characters-never-use-in-production-123456",
             ["Jwt:Issuer"] = "karigor-security-tests", ["Jwt:Audience"] = "karigor-security-tests",
-            ["Storage:UploadPath"] = fixture.UploadRoot
+            ["Storage:UploadPath"] = fixture.UploadRoot,
+            ["RateLimiting:Policies:AuthLimiter:PermitLimit"] = "1000"
         }));
         return base.CreateHost(builder);
     }

@@ -1,6 +1,8 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
+import { assertGeneration, authGeneration, authRequestOptions, invalidateAuth, isSignedOut, onAuthInvalidated, withAuthLock } from './authSession';
 
 export interface AuthUserResponse {
+  sessionId?: string;
   userId: string;
   email: string;
   role: string;
@@ -34,8 +36,12 @@ export const apiClient = axios.create({
   withCredentials: true,
 });
 
+type SessionRequest = InternalAxiosRequestConfig & { _retry?: boolean; _authGeneration?: string };
+
 // Attach access token to every request
-apiClient.interceptors.request.use((config) => {
+apiClient.interceptors.request.use((config: SessionRequest) => {
+  if (config._authGeneration) assertGeneration(config._authGeneration);
+  config._authGeneration = authGeneration();
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`;
   }
@@ -54,62 +60,39 @@ export function registerAuthSync(callbacks: AuthSyncCallbacks) {
   authSyncCallbacks = { ...authSyncCallbacks, ...callbacks };
 }
 
-// Mutex & Subscriber Queue for Token Refresh
-let isRefreshing = false;
-interface RefreshSubscriber {
-  resolve: (user: AuthUserResponse) => void;
-  reject: (err: unknown) => void;
-}
-let refreshSubscribers: RefreshSubscriber[] = [];
+onAuthInvalidated(() => {
+  setAccessToken(null);
+  authSyncCallbacks.onSessionExpired?.();
+});
 
-function subscribeTokenRefresh(subscriber: RefreshSubscriber) {
-  refreshSubscribers.push(subscriber);
-}
-
-function onTokenRefreshed(user: AuthUserResponse) {
-  refreshSubscribers.forEach((s) => s.resolve(user));
-  refreshSubscribers = [];
-}
-
-function onTokenRefreshFailed(err: unknown) {
-  refreshSubscribers.forEach((s) => s.reject(err));
-  refreshSubscribers = [];
-}
-
-/**
- * Execute a single-flight token refresh with deduplication and locking.
- * Proactive refresh timers and reactive 401 interceptors share this flight.
- */
-export async function refreshAuthToken(): Promise<AuthUserResponse> {
-  if (isRefreshing) {
-    return new Promise<AuthUserResponse>((resolve, reject) => {
-      subscribeTokenRefresh({ resolve, reject });
-    });
-  }
-
-  isRefreshing = true;
-
-  try {
-    const { data } = await axios.post<AuthUserResponse>('/api/auth/refresh', {}, { withCredentials: true });
-    setAccessToken(data.accessToken);
-    authSyncCallbacks.onTokenUpdated?.(data);
-    onTokenRefreshed(data);
-    return data;
-  } catch (refreshErr) {
-    setAccessToken(null);
-    onTokenRefreshFailed(refreshErr);
-    authSyncCallbacks.onSessionExpired?.();
-    throw refreshErr;
-  } finally {
-    isRefreshing = false;
-  }
+// One promise per tab; Web Locks serialize cookie mutations across same-origin tabs.
+let refreshFlight: Promise<AuthUserResponse> | null = null;
+export function refreshAuthToken(): Promise<AuthUserResponse> {
+  if (refreshFlight) return refreshFlight;
+  const generation = authGeneration();
+  refreshFlight = withAuthLock(async () => {
+    assertGeneration(generation);
+    if (isSignedOut()) throw new Error('Sign in to start a new session.');
+    try {
+      const { data } = await axios.post<AuthUserResponse>('/api/auth/refresh', {}, authRequestOptions);
+      assertGeneration(generation);
+      setAccessToken(data.accessToken);
+      authSyncCallbacks.onTokenUpdated?.(data);
+      return data;
+    } catch (error) {
+      // A stale failure must not erase a newer account. No failure writes/deletes cookies.
+      if (generation === authGeneration()) invalidateAuth();
+      throw error;
+    }
+  }).finally(() => { refreshFlight = null; });
+  return refreshFlight;
 }
 
 // Response Interceptor
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    const originalRequest = error.config as (InternalAxiosRequestConfig & { _retry?: boolean }) | undefined;
+    const originalRequest = error.config as SessionRequest | undefined;
 
     // Handle 403 Forbidden:
     // Indicates valid authentication but insufficient permissions (role mismatch).
@@ -131,10 +114,12 @@ apiClient.interceptors.response.use(
       !originalRequest.url?.includes('/auth/refresh') &&
       !originalRequest.url?.includes('/auth/login')
     ) {
+      if (originalRequest._authGeneration !== authGeneration()) return Promise.reject(error);
       originalRequest._retry = true;
 
       try {
         const refreshedUser = await refreshAuthToken();
+        assertGeneration(originalRequest._authGeneration!);
         originalRequest.headers.Authorization = `Bearer ${refreshedUser.accessToken}`;
         return apiClient(originalRequest);
       } catch (refreshError) {

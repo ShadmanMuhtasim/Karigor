@@ -115,20 +115,32 @@ test('F4: picker text remains literal and map selection works', async ({ page })
 
 test('F4: redraw and remount do not accumulate quotation handlers', async ({ page }) => {
   await page.goto('/e2e/fixtures/map.html');
+  const popup = page.locator('.leaflet-popup');
   for (let i = 1; i <= 3; i++) {
+    await expect(page.locator('.custom-marker-req-123')).toHaveCount(1);
     await page.locator('.custom-marker-req-123').click();
-    await page.locator('#quote-btn-123').click();
+    await expect(popup).toHaveCount(1);
+    await expect(popup.locator('#quote-btn-123')).toHaveCount(1);
+    await popup.locator('#quote-btn-123').click();
     await expect(page.getByTestId('quote-count')).toHaveText(String(i));
     await page.getByRole('button', { name: 'Redraw Markers', exact: true }).click();
     await expect(page.getByTestId('marker-version')).toHaveText(String(i));
+    // Leaflet fades the removed popup before detaching its DOM. Require cleanup to finish
+    // before opening another popup with the same request/button ID; never choose an arbitrary match.
+    await expect(popup).toHaveCount(0);
+    await expect(page.locator('#quote-btn-123')).toHaveCount(0);
   }
-  await page.getByRole('button', { name: 'Toggle Map', exact: true }).click();
-  await expect(page.locator('.leaflet-container')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Toggle Map', exact: true }).click();
-  await expect(page.locator('.leaflet-container')).toHaveCount(1);
-  await page.locator('.custom-marker-req-123').click();
-  await page.locator('#quote-btn-123').click();
-  await expect(page.getByTestId('quote-count')).toHaveText('4');
+  for (let i = 4; i <= 6; i++) {
+    await page.getByRole('button', { name: 'Toggle Map', exact: true }).click();
+    await expect(page.locator('.leaflet-container, .leaflet-popup, #quote-btn-123')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Toggle Map', exact: true }).click();
+    await expect(page.locator('.leaflet-container')).toHaveCount(1);
+    await expect(page.locator('.custom-marker-req-123')).toHaveCount(1);
+    await page.locator('.custom-marker-req-123').click();
+    await expect(popup).toHaveCount(1);
+    await popup.locator('#quote-btn-123').click();
+    await expect(page.getByTestId('quote-count')).toHaveText(String(i));
+  }
 });
 
 test('F4: quotation button preserves request-selection fallback', async ({ page }) => {

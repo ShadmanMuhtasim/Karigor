@@ -2197,3 +2197,478 @@ Exact changed-file inventory at handoff:
 - `tests/Karigor.Security.Tests/PaymentConcurrencySchemaTests.cs`
 - `tests/Karigor.Security.Tests/PaymentConcurrencyTests.cs`
 - `tests/Karigor.Security.Tests/PaymentSchemaTests.cs`
+
+
+# F6 Refresh Token Rotation and Session Revocation
+
+Date: 2026-10-07 (Asia/Dhaka). This section is appended; earlier findings, study notes and historical results are preserved. F6 is implemented and locally verified. The complete Phase 1 pass has actual failing regressions, described below; it is not declared complete merely because F6 passes.
+
+The implementation reference is [F6 RefreshSession architecture](implementation/F6_REFRESH_SESSION_ARCHITECTURE.md), with Mermaid diagrams for rotation, concurrent consumption, family state, logout/revocation and SignalR. [ADR 0006](../adr/0006-refresh-session-authority.md) records the decision. The original remediation plan describes the audit-time state; ADR 0001 remains its original empty historical file.
+
+## 1. The original failure was more than a long-lived token
+
+Imagine a browser owns refresh token R0. It refreshes, the API retires R0 and creates R1, and the browser receives R1. Someone who still possesses R0 presents it 30 seconds later. Previously, the server found the replacement during its 60-second grace window, minted another access JWT, and returned **R0 itself** as the cookie. That response could reinstall the retired predecessor. Checking that R1 existed did not make R0 trustworthy again.
+
+There were additional races. Two requests could read R0 as active before either saved, producing multiple successors. Logout retired one row, so a successor could survive. Suspension checked LockoutEnd before mutation, so refresh could save after the administrator had revoked the rows they found. JWTs had no session identifier, allowing a correctly signed token to authorize ordinary requests after logout. F3 fixed current resource authorization, but its private user-group routing could not distinguish two sessions belonging to the same user.
+
+Removing the grace branch alone was insufficient. Rotation, revocation, HTTP authorization and realtime delivery needed a shared login-family authority.
+
+## 2. Access token versus refresh token
+
+An **access token** is the short-lived signed credential sent with ordinary API calls. Claims identify the user, roles, expiry and now session ID. Its signature proves issuance; it does not prove that today's session is still allowed. Karigor therefore verifies the JWT normally, then reads current session/account state from SQL.
+
+A **refresh token** is a high-entropy bearer secret used to obtain replacement credentials. It stays in an HttpOnly cookie, so normal application JavaScript cannot read it. Unlike a JWT, its raw value contains no meaningful claims: its hash resolves to the user, family, expiry and consumption state in SQL.
+
+Access tokens stay in memory. Refresh tokens stay in the browser cookie store. Neither goes into localStorage or BroadcastChannel. SQL stores only lowercase SHA-256 hashes of 64 random bytes encoded as Base64. This differs from password hashing: a cryptographically random secret does not need a deliberately slow password KDF to compensate for a guessable input. Hash-only storage still requires protection of database integrity, application memory, browser state, logs and signing keys.
+
+## 3. Rotation and replay, with a concrete sequence
+
+Rotation replaces one refresh credential with a new independent random credential. The sequence is R0 active → R0 consumed plus R1 active → R1 consumed plus R2 active. All rows belong to RefreshSession S. Each successful consumption creates exactly one child. SQL never stores a recoverable raw successor for later replay.
+
+**Replay** means presenting a consumed token. A new request that first observes consumed, unexpired R0 revokes S and receives 401. R1/R2 and access JWTs bound to S then fail future authorization. Another device's family T remains valid. A replay immediately after commit is still replay; there is no 0-, 30-, 60- or 61-second allowance.
+
+A stolen current token is still a bearer credential: an attacker can win its first use. Strict rotation prevents a second successful use and detects later reuse; it cannot identify which presenter is the legitimate person.
+
+## 4. What a session family is
+
+A family represents **one login**, not the entire account. Its GUID is the JWT `sid` and every refresh row's SessionId. It owns CreatedAt, ExpiresAt, RevokedAt, bounded RevocationReason and SQL rowversion. UserId binds it to Identity.
+
+Separate logins create separate families. Logout/replay revokes one family; suspension revokes all families for the account. Signing back in creates a new family. Unsuspension never reactivates old families.
+
+Browser tabs normally share a cookie and family, so they must coordinate rotations. Physical devices normally have independent cookie stores/families. “Device isolation” means independent login families here, not hardware attestation or device fingerprinting.
+
+## 5. Expiration and revocation answer different questions
+
+**Expiration** asks whether a deadline passed. The family has an absolute deadline from `Jwt:RefreshTokenExpiryDays`, default seven days. Rotation does not restart it. Every successor and cookie receives the same deadline. Access expiry is the earlier of its configured lifetime and that deadline. Even an active user eventually signs in again.
+
+**Revocation** asks whether authority was deliberately withdrawn before the deadline. Logout, replay and suspension change SQL state. A JWT with ten minutes remaining can be correctly signed and unexpired but unauthorized.
+
+Expiry is checked at initial observation and again under transaction locks, **before replay handling**. An expired predecessor yields no credentials and causes no new replay revocation. Expired history must not become a perpetual revocation trigger. Guarded logout can still use a known predecessor to identify a family, because logout withdraws authority rather than issuing credentials.
+
+`RefreshToken.RevokedAt` describes consumed/retired token state. `RefreshSession.RevokedAt` withdraws the whole family. A null token RevokedAt inside a revoked or expired family does not mean usable authorization.
+
+## 6. One-use consumption is a database property
+
+An application `if (token.RevokedAt == null)` is only a read; two callers can both pass it. The new conditional SQL update includes token ID, observed rowversion, unconsumed state and expiry. Exactly one matching version can be consumed.
+
+The transaction updates the predecessor, inserts its successor hash, builds the access result and commits before credentials leave the controller. A successor-write failure rolls back predecessor consumption. Unknown commit acknowledgement is not converted into another issuance attempt; reauthentication may be required.
+
+SQL backstops enforce unique bounded TokenHash, unique non-null ParentTokenId and one unconsumed row per non-null SessionId. Composite foreign keys prohibit a token naming another user's family or a parent in another family. Parent ID must precede child ID. Application logic governs transitions; constraints independently enforce structure.
+
+## 7. The exact race timeline
+
+A race happens when the result depends on how concurrent operations interleave. When both requests first read R0 as active:
+
+| Order | Request A | Request B | Authoritative state |
+|---|---|---|---|
+| 1 | Reads active R0/version V | Reads active R0/version V | R0 unconsumed |
+| 2 | Locks User then Session | Waits for User lock | No mutation yet |
+| 3 | Consumes V and inserts R1 | Waiting | Uncommitted changes |
+| 4 | Commits and returns new cookie | Acquires locks; sees consumed R0 | One committed child |
+| 5 | Winner remains valid | 409; no Set-Cookie | Family remains valid |
+| Later | — | New request first reads consumed R0 | Revoke family; 401 |
+
+A and B could be reversed. Initial SQL observation defines overlap, not elapsed seconds or a client-supplied timestamp. A request sent earlier but first reading after commit falls into replay. This strict boundary makes browser serialization important.
+
+The losing overlap response sets **neither** a replacement cookie **nor** a deletion cookie. Deleting on failure would also be dangerous: it could erase the winner's successor. The invariant is no cookie mutation on refresh failure.
+
+## 8. Optimistic concurrency and rowversion
+
+SQL Server rowversion is an automatically changing binary database version, not a date or time interval. Reading V and updating only while the row still has V is optimistic concurrency: a stale writer loses rather than overwriting a newer decision.
+
+Token versions alone cannot serialize a family-wide logout or account-wide suspension against successor insertion. F6 combines token conditional consumption with shared User/Session locks. Session rowversion is additional database concurrency metadata; the implementation does not claim that reading it outside a transaction provides revocation ordering. Unique indexes remain independent structural backstops.
+
+## 9. Why the lock order starts with Identity
+
+Mutations follow **User → Session → Token**. The Identity row is read using UPDLOCK,HOLDLOCK inside a transaction, then the family is locked, then token mutation occurs. SQL owns these locks until commit/rollback, across API processes sharing the database.
+
+Suspension takes the same user lock, writes LockoutEnd and a new concurrency stamp, and revokes all families atomically. New-session creation also takes this lock, so a login cannot rely on a suspension check made before waiting. Refresh rechecks current account state under the lock.
+
+If refresh holds the lock first, it may commit R1, but queued suspension/logout revokes S including R1. If revocation wins first, refresh observes denial and creates no child. Real SQL barriers exercise both orders, including a contender waiting while refresh holds the update lock.
+
+This serializes session mutations across one user's devices. Ordinary authorization reads do not take these update locks. The initial tradeoff favors simple correctness; production contention has not been benchmarked.
+
+## 10. Logout semantics with expired access JWTs
+
+Logout withdraws the family identified by the refresh cookie, then deletes that cookie after successful revocation. Unknown/missing cookies return the same generic success body. A consumed predecessor still identifies its family, important when the caller lost the latest refresh response.
+
+Expired access credentials cannot perform ordinary protected work, but logout uses a separately guarded cookie path and AllowAnonymous. Every authentication POST requires trusted Origin plus `X-Karigor-CSRF: 1`. Missing/null/hostile origins or a missing header produce 403 with no cookie mutation. SameSite=Lax is additional protection, not the whole CSRF defense. Exact request origin or an explicit `Cors:AllowedOrigins` entry is trusted; wildcard trust is rejected. Non-browser clients must send the headers too.
+
+On database failure the API does not claim confirmed revocation or delete the cookie. The browser clears local state immediately, displays that sign-out could not be confirmed and offers a guarded retry. A network failure cannot prove the server received logout.
+
+## 11. How sid changes access authorization
+
+The signed `sid` identifies a family; it is not a refresh secret. Knowing its GUID does not allow refresh. SQL additionally binds sid to the JWT's user ID.
+
+After normal signature/issuer/audience/expiry validation, bearer authentication reads current family/account state using indexed SQL. Missing sid, wrong user binding, revoked/expired family, suspension or lookup failure grants no authorization. Old no-sid JWTs deliberately fail. This applies to future protected API authorization and the hub handshake.
+
+The policy is **immediate at the next authority check after revocation commits**, not waiting for JWT expiry. No positive cache adds delay. Already authorized HTTP work may finish; already queued events cannot be recalled. Current SQL lookups do not lock an entire business operation or network send. Ordinary role-claim changes remain outside this session redesign.
+
+## 12. SignalR authentication is a connection lifetime
+
+A WebSocket handshake establishes a principal for a long-lived connection. Refreshing the browser's access token does not rewrite that principal automatically. Connection-only signature validation would leave later revocation unexamined.
+
+Karigor retains `CloseOnAuthenticationExpiration` and checks current family/account/JWT expiry on every sensitive join/typing invocation, followed by F3's current booking-participant rule. An active sid proves a login, not ownership of an arbitrary booking. Account changes stop the old connection and clear booking intent; reconnect/rejoin repeats authorization.
+
+The browser uses the coordinated refresh flight before reconnecting after a terminal expiry close. A bounded hosted WebSocket test observes actual transport closure at a short JWT deadline while the family is still active. Controlled-clock tests separately verify method/delivery denial for an expired JWT. These distinguish transport closure, expiration and revocation.
+
+## 13. Passive private pushes need their own boundary
+
+A revoked client can simply wait for notifications. Method checks alone would not prevent disclosure. User groups cannot distinguish revoked S from valid device T belonging to the same user.
+
+`SessionConnections` records local connection ID, user ID, sid and JWT expiry. It stores no raw credentials or cached permission. The notifier derives current F3 recipients, then checks SQL family/account state and each connection's JWT expiry before sending to explicit eligible connection IDs. Typing uses the same path. Metadata is removed on disconnect.
+
+A revoked socket may remain physically connected until normal expiry/disconnect, but subsequent sensitive calls and private delivery checks deny it. Broad refresh hints retain the fixed non-private `{ refresh: true }` shape. The registry matches the configured in-process SignalR lifetime manager. Multi-node/backplane delivery is not implemented or claimed; it requires a reviewed design preserving these per-connection boundaries.
+
+## 14. Cookie ordering is not JavaScript assignment ordering
+
+Browsers apply Set-Cookie headers independently of React state. Ignoring a stale JSON body does not undo its cookie header. A generation check alone is insufficient.
+
+The server never returns a predecessor on successful refresh and never changes cookies on refresh failure. The browser holds one same-origin Web Lock through each complete cookie-mutating request: refresh, logout, login, Google login and registration. Logout waits for a pending refresh response, then sends the latest cookie to revoke that family and delete it.
+
+Logout/account change invalidates JavaScript state before waiting. A late body fails its captured-generation check. A successor cookie applied before logout acquires the lock is subsequently revoked/deleted. Non-cooperating clients can delay a formerly successful response outside these browser rules, but its family remains unusable after revocation. Server authority and cooperative browser ordering solve different parts of the problem.
+
+## 15. In-tab and cross-tab coordination
+
+A module-level promise deduplicates proactive, wake-up and 401-triggered refresh within a tab. Web Locks order those flights across tabs. Each request uses the browser's latest HttpOnly cookie; access JWTs are not copied between tabs.
+
+Only random generation/signed-out metadata goes to localStorage. BroadcastChannel/storage events clear other tabs' memory and realtime state. Queued mutations and refresh results check their generation. Protected requests also retain their account generation: a stale old-account 401 cannot refresh/replay its original mutation under a newly signed-in account.
+
+Account switch revokes the old cookie family inside the lock before new authentication. Coordination is same-origin. Distinct frontend origins sharing an API need separate review. Web Locks and writable storage are required; missing support fails closed before cookie mutation instead of claiming a per-tab fallback is cross-tab safe.
+
+## 16. Lost response and unknown outcome
+
+SQL may commit R0 → R1 while the entire response is lost. The browser may still possess consumed R0. Because SQL never stored raw R1, it cannot reconstruct that credential from its hash. Blindly retrying R0 would be later replay.
+
+The client clears local authority, broadcasts invalidation and requires sign-in after a failed flight rather than replaying indefinitely. New authentication first revokes the old cookie family if identifiable. A 20-second request timeout bounds a hung response. If headers installed R1 but its body was lost, sign-in remains a conservative safe choice. Strict rotation intentionally trades some availability for simpler one-use authority.
+
+## 17. Before versus after
+
+| Concern | Previous behavior | Implemented behavior |
+|---|---|---|
+| Predecessor replay | Grace minted JWT and returned old cookie | No credentials; expiry-first replay policy |
+| Two active reads | Separate saves could produce multiple children | SQL ordering, conditional consume, uniqueness |
+| Overlap loser | Could overwrite winner cookie | Cookie-free 409; no race-only family revoke |
+| Later replay | No coherent family boundary | Revoke only that login family |
+| Logout | Active JWT required; retire one row | Guarded cookie revokes family, even with expired JWT |
+| Suspension | Pre-check/token enumeration could race | Shared user lock and all-family transaction |
+| Access JWT | No sid/current family lookup | sid plus indexed current authority |
+| Realtime | Current F3 recipients, all their sessions | F3 plus current session/connection expiry |
+| Tabs | In-tab queue only | Promise, Web Lock, generation invalidation |
+| Refresh lifetime | Renewed on every rotation | Fixed family deadline |
+| Legacy lineage | Ambiguous history | Retire explicitly; force sign-in |
+
+## 18. Invariants future changes must retain
+
+1. Consume each token at most once; predecessor retirement and successor insertion commit atomically.
+2. An active family has at most one unconsumed successor, backed by SQL uniqueness.
+3. Expired/revoked/legacy credentials never mint usable credentials.
+4. Suspension cannot lose to concurrent refresh or new-session creation.
+5. Logout/replay revoke one family; suspension revokes all account families.
+6. Refresh failures never set/delete cookies; success never returns its predecessor.
+7. Persistent application storage contains hashes, never raw refresh values.
+8. Future protected authorization/private eligibility uses current SQL authority, with explicit in-flight limits.
+9. Session identity never replaces F3 resource/recipient checks.
+10. Old-account protected requests are never automatically replayed as a new account.
+
+## 19. SQL cutover and legacy history
+
+The sole owner is `database/production/008_refresh_session_authority.sql`, after the established baseline/005/006/007 path. Startup verifies but performs no F6 DDL. The stale EF snapshot remains historical; a competing EF migration is not appropriate.
+
+Default execution is read-only preflight. Apply requires `KarigorF6Apply=1` and `KarigorF6ForceSignInReset=1` on the same connection. Malformed/duplicate hashes and partial schema require review; the script refuses to truncate, deduplicate or fabricate history. One transaction retires old rows, leaves SessionId null, creates authority/constraints and records version 1. No legacy family is invented.
+
+Stop all old writers and deploy matching API/browser code after the explicit cutover. Old no-sid JWTs and legacy cookies require sign-in. Missing prerequisites stop startup. Restoring old backups could resurrect credentials; old binaries omit sid checks and conflict with active-token constraints. Prefer forward repair and a separately reviewed rollback/invalidation plan.
+
+Only generated loopback `Karigor_SecurityTests_<guid>` databases were modified. No application/production database was migrated or production key rotated. Automatic retention is deferred; retain consumed predecessors through the family deadline if replay detection must last that long.
+
+## 20. Alternatives and tradeoffs
+
+| Alternative | Reason not selected |
+|---|---|
+| Short grace window | Seconds cannot prove overlap; old-cookie replay weakens one-use semantics. |
+| Revoke every overlapping loser | Ordinary concurrent active reads would destroy a valid winner. |
+| Recoverable raw successors | Persistent-store compromise would expose live secrets; expressly excluded. |
+| JWT expiry only | Logout/suspension would retain authority until expiry. |
+| Per-process refresh mutex | Does not coordinate API instances or replace SQL invariants. |
+| Per-tab browser queue only | Tabs share cookies, not module variables. |
+| Broadcast access tokens | Unnecessary credential exposure; serialize cookie use instead. |
+| Redis positive cache | No measured need, extra invalidation/latency semantics. |
+| New OAuth server/framework | Much broader than the current application's F6 requirement. |
+| Infer legacy families | Historical replacement relationships can be ambiguous after races. |
+
+Direct indexed SQL is the starting point, not a claim of unlimited capacity. Benchmark before adding a cache, since positive caching changes the immediate-revocation promise. Absolute expiry, required browser coordination, a forced reset and strict response-loss handling are explicit convenience/availability costs.
+
+## 21. Test design and what it proves
+
+TimeProvider drives replay ages and expiry authorization without arbitrary sleeps. SQL command barriers hold both observations before either mutates, or hold a real user lock while logout/suspension reaches its contender boundary. Independent contexts/connections exercise actual SQL Server behavior.
+
+Assertions include token counts/parents, one unconsumed token, rollback state, family revocation/reason and separate-device validity. HTTP checks cover status, absence of access output/cookie writes on failure, cookie security/scope/expiry and guarded expired-access logout. Migration tests create controlled legacy shapes and deliberate drift in generated databases.
+
+Hosted .NET WebSocket clients test sensitive methods and passive delivery using awaited delivery fences. A timed expiry test observes real closure. Real Chrome tabs run production auth modules and AuthProvider with controlled local HTTP responses, exercising browser cookies, Web Locks and invalidation. These layers do not claim one browser-to-production-SQL run, live Google OAuth, gateway, IIS, backplane or hosted CI verification.
+
+## 22. Actual F6 cases and results
+
+| Suite | Executed result |
+|---|---|
+| RefreshSessionSecurityTests | 20 passed: replay ages, expiry-first, atomic race, both revocation orders, queued lock races, registration/login/sid/legacy JWT, rollback, five Origin/CSRF cases, configured cookie lifetime/generic logout |
+| RefreshSessionSchemaTests | 8 passed: read-only/default/reset acknowledgement, legacy retirement, dirty-hash refusal, structural gate drift and SQL lineage/uniqueness |
+| RefreshSessionSignalRTests | 5 passed: logout/replay/suspension/controlled expiry method/private-push denial and timed WebSocket closure |
+| F6 Chrome fixtures | 9 passed: two-tab/in-tab flight, delayed logout, account switch, old-account request, lost success, conflict/no loop, missing lock support, delayed AuthProvider initialization and unconfirmed logout/retry |
+
+An initial smoke test exposed that EF's NonRetryingExecutionStrategy did not establish the ambient execution-strategy scope required by the retry-configured DbContext. An ExecutionStrategy subclass with **zero retries** supplies that scope; the next smoke test passed. The first F6 browser pattern also intercepted `/src/api/` modules; the fixture was narrowed to `/api/`. These setup/implementation failures were corrected before the successful targeted gate, not hidden behind expected-failure exceptions.
+
+## 23. Full Phase 1 verification and honest status
+
+After targeted F6 passed, the complete strict backend run executed **246 tests: 244 passed, 2 failed, 0 skipped, 0 expected failures**. Raw dotnet exit was 1; the classifier reported both blocking failures. No known-defect exception was added.
+
+- F2 `ExistingAdministratorSurvivesStartupAndCanSignIn` constructs a client without the new Origin/CSRF headers. It expects 200 and receives 403. The test remains unchanged; F6's guarded password-login test is separate evidence, not a substitute pass.
+- F3 `SuspensionDeniesMethodsAndPrivateDeliveryWithExistingJwt` expects an exact HubException. Current-account bearer validation rejects a Long Polling HTTP operation earlier with 401/HttpRequestException, so later delivery assertions do not execute. Its assertions remain unchanged. F6's passing WebSocket suspension/delivery tests are separate evidence.
+- The first complete browser run had **45/46 passes**. The unchanged F4 remount test found two `#quote-btn-123` elements and failed strict locator selection, also observed historically. No F4 source/assertion changed. The final browser run followed the last AuthProvider adjustment and two new F6 tests.
+
+The final full browser run executed **48 tests: 47 passed, 1 failed, 0 skipped, 0 flaky/retried outcomes**. The same unchanged F4 remount/duplicate-popup locator case failed again. All nine F6 browser cases passed in that final complete run. This repeat failure remains a blocking verification gap; no unrelated source or assertion was changed.
+
+| Finding | Implemented | Regression Tests | Remaining Risk |
+|---|---|---|---|
+| F1 | Yes | **VERIFIED**: 64 F1 backend plus 45 PaymentSchema tests passed; eight browser cases passed | Real gateway/IIS, reconciliation and legacy financial adoption unverified. |
+| F2 | Yes | **PARTIALLY VERIFIED**: 16/17 backend, one browser passed; login test failed 403 | Existing direct-client regression needs reviewed adaptation to the new protocol; production admin review unperformed. |
+| F3 | Yes, integrated with F6 | **PARTIALLY VERIFIED**: 12/13 original backend passed; earlier 401 failed exact exception assertion | Failed case is not counted as pass; in-flight and multi-node/IIS limits remain. |
+| F4 | Yes | **PARTIALLY VERIFIED**: 12/13 browser cases passed in both complete runs; remount locator failed | Existing remount/popup timing instability; no F4 fix performed. |
+| F5 | Yes | **VERIFIED**: 35 backend/SQL and six browser passed | Ambiguous legacy history and production cutover remain operator work. |
+| F6 | Yes | **VERIFIED**: 33 backend/SQL/WebSocket and nine browser passed | Planned reset, SQL cost/availability, strict response loss, browser support, in-flight events and scale-out. |
+| F7 | Yes | **VERIFIED**: 38 backend/unit and eleven browser passed | Production legacy public files, host mappings and content-scanning/serving limits unverified. |
+
+VERIFIED means named local evidence passed, not production certification. PARTIALLY VERIFIED means the implemented finding has an executed failure or unresolved gate. Production IIS/backplane/live identity-provider behavior is **NOT VERIFIED**. A passing F6 test never silently promotes another finding's failed test.
+
+**Is Phase 1 remediation actually complete? NO.** All seven implementations exist and F6's selected invariants pass locally, but the complete gate has blocking failures. Other findings were reported rather than repaired, as requested. Production rollout and legacy operational review remain outside this task.
+
+## 24. Commands and evidence
+
+```text
+dotnet build Karigor.slnx --configuration Release --no-restore -v quiet
+dotnet test tests/Karigor.Security.Tests/Karigor.Security.Tests.csproj --configuration Release --filter "Finding=F6" --logger "trx;LogFileName=f6-targeted.trx" --results-directory TestResults/f6-targeted
+python scripts/run-security-tests.py --strict
+npm --prefix karigor-client run test:security -- auth.security.spec.ts
+npm --prefix karigor-client run test:security
+npm --prefix karigor-client run typecheck:security
+npm --prefix karigor-client run build
+npm --prefix karigor-client run lint
+python -m unittest discover -s scripts/tests
+git diff --check
+```
+
+Installed Node was placed on PATH and `KARIGOR_TEST_BROWSER_CHANNEL=chrome` selected Chrome. Backend build passed with zero warnings/errors. Frontend build/typechecks passed; lint retained 20 existing warnings and zero errors. Vite retains existing configuration/bundle warnings. Six classifier self-tests and diff whitespace validation passed. Final frontend source was compiled again after the last AuthProvider change.
+
+Ignored generated evidence: `TestResults/f6-targeted/f6-targeted.trx`; full backend `TestResults/security/09876d31354f4e0e93b973aa9e8de389/security.trx`; `TestResults/f6-full-backend.log`; first browser JSON `TestResults/f6-browser-first-full.json`; `TestResults/f6-full-browser.log`; `TestResults/f6-browser-targeted.log`; `TestResults/f6-full-browser-final.log`; `karigor-client/test-results/security-browser/results.json`; `TestResults/f6-typecheck.log`, `f6-frontend-build.log`, `f6-lint.log`. No test was skipped or marked expected failure to make a gate green.
+
+## 25. Remaining limitations
+
+Authority checks are point-in-time, not cancellation of work already authorized. Local connection filtering matches in-process SignalR; no backplane delivery is claimed. SQL cost/contention is unbenchmarked in production. Outages can deny authorization and lose realtime pushes. There is no durable push outbox, cleanup job, session/device-management UI or administrative session dashboard.
+
+Absolute expiry can interrupt active users; lost success can force reauthentication. Web Locks/writable storage are required, and cross-origin tab coordination is not supplied. A stolen current bearer can win first use. Role-claim changes and identity-provider behavior were not redesigned. Live Google OAuth, IIS/proxy cookies and production rollout were not exercised.
+
+No commit, push, merge, deployment, production credential rotation or production database modification occurred. Local Windows shell commands used the established approved sandbox fallback; database fixtures remained explicitly loopback guarded.
+
+## 26. Thirty-second interview explanation
+
+“I replaced a refresh grace path that could reissue a revoked cookie with strict one-use rotation. Each login owns a SQL RefreshSession. Conditional consumption and uniqueness create one successor; shared user/session locks order logout and suspension. An active-observation race loser gets a cookie-free conflict; later replay revokes only that family. JWT sid checks, SignalR private delivery and browser cross-tab ordering follow that authority. F6's tests pass, and I report full-suite failures separately.”
+
+## 27. Two-minute interview explanation
+
+“The original code treated individual token rows as authority. Its 60-second grace branch could return the retired predecessor, and logout/suspension could miss a concurrently inserted successor. I introduced one SQL family per login, with absolute expiry and hash-only token history.
+
+Refresh records whether its token was active, then locks the Identity row and family in a fixed order. It checks current suspension/expiry/revocation, conditionally consumes the observed version and inserts one new random-token hash. Constraints enforce unique hashes, one child and one unconsumed token per family. If both calls observed active, the loser gets 409 without changing a cookie or revoking the winner. A later consumed observation revokes the family and gets 401. Expiry is checked before replay.
+
+Logout and suspension share that authority, preventing successor escape. JWTs contain sid and future protected authentication checks current SQL state, so logout does not wait for JWT expiry. Sensitive hub calls repeat session plus booking checks, and private pushes filter individual current connections.
+
+Access tokens remain in memory and refresh tokens in HttpOnly cookies. Web Locks serialize auth cookie mutations across tabs; generation metadata rejects stale bodies and old-account retries. Strict rotation means a lost success can require sign-in. I tested real SQL races with barriers, controlled time, HTTP cookies, hosted WebSockets and Chrome tabs. Legacy tokens are retired through explicit SQL cutover rather than guessed into families. The complete suite's remaining failures are reported honestly.”
+
+## 28. Interview questions and answers
+
+1. **Why does an unexpired JWT fail after logout?** Its signature proves issuance; current sid authority has been revoked in SQL.
+2. **Why not sixty seconds of grace?** Time proximity cannot prove overlap, and returning old cookies violates strict rotation and response-order safety.
+3. **Why not revoke every concurrent loser?** Two active observations can be a legitimate race. Deny credentials without destroying the committed winner; later consumed observations revoke.
+4. **Why locks and rowversion?** Token versions prevent stale consumption; shared user/session locks order family/account revocation against insertion. Constraints backstop structure.
+5. **How does suspension beat an earlier refresh?** It either wins the shared user lock and refresh sees denial, or runs afterward and revokes the newly created successor's family.
+6. **Can you promise zero post-logout packets?** No. New checks after commit deny, but previously authorized work/queued bytes can finish. The boundary is explicit.
+7. **Why are user groups insufficient?** One user can have both a revoked family and an active device. Private delivery needs current session/connection eligibility too.
+8. **How do tabs coordinate without sharing secrets?** Web Locks order requests using the browser's latest HttpOnly cookie; only invalidation metadata is shared.
+9. **Why can response loss require sign-in?** SQL may already have consumed the predecessor, and hashes cannot recover the raw successor.
+10. **Why reset legacy sessions?** Ambiguous replacement strings cannot prove trustworthy family history after old races.
+11. **Why no Redis?** No measured need; positive caching adds revocation latency/invalidation semantics. Indexed SQL is the chosen baseline.
+12. **Why is Phase 1 not complete?** The full executed backend gate has blocking F2/F3 failures; F6 passing cannot replace their evidence.
+
+## 29. Study next
+
+Study SQL lock modes/deadlocks and execution strategies, especially retries involving one-time secrets. Continue with rowversion/CAS and filtered indexes, bearer theft/replay, CSRF Origin/custom-header policies, cookie/network ordering and Web Locks. Then study SignalR lifetime, per-message authorization and multi-node delivery, followed by revocation caches, safe cutover/backup restoration and response-loss fault injection. Measure real production performance before proposing cache or distributed infrastructure.
+
+## 30. Exact changed-file inventory
+
+The following 42 source/documentation files differ from the clean starting checkout. Generated logs/results are listed separately above. F3/F7 test helper edits create real sid-backed sessions; no failed F2/F3/F4 assertion was changed.
+
+- `README.md`
+- `backend/Karigor.Api/Controllers/AuthController.cs`
+- `backend/Karigor.Api/Controllers/AuthCookieOriginAttribute.cs`
+- `backend/Karigor.Api/Hubs/KarigorHub.cs`
+- `backend/Karigor.Api/Program.cs`
+- `backend/Karigor.Api/Realtime/SessionConnections.cs`
+- `backend/Karigor.Api/Realtime/SignalRRealtimeNotifier.cs`
+- `backend/Karigor.Application/Admin/AdminService.cs`
+- `backend/Karigor.Application/Auth/AuthService.cs`
+- `backend/Karigor.Application/Auth/DTOs/AuthResultDto.cs`
+- `backend/Karigor.Application/Auth/ITokenService.cs`
+- `backend/Karigor.Application/Auth/RefreshSessionService.cs`
+- `backend/Karigor.Application/Auth/TokenService.cs`
+- `backend/Karigor.Infrastructure/Migrations/README.md`
+- `backend/Karigor.Infrastructure/Models/KarigorDbContext.cs`
+- `backend/Karigor.Infrastructure/Models/RefreshSession.cs`
+- `backend/Karigor.Infrastructure/Models/RefreshSessionSchemaGate.cs`
+- `backend/Karigor.Infrastructure/Models/RefreshToken.cs`
+- `database/production/008_refresh_session_authority.sql`
+- `database/production/README.md`
+- `docs/MONSTERASP_DEPLOYMENT.md`
+- `docs/adr/0006-refresh-session-authority.md`
+- `docs/security/SECURITY_WORKDONE.md`
+- `docs/security/implementation/F6_REFRESH_SESSION_ARCHITECTURE.md`
+- `docs/testing/PHASE1_SECURITY_TEST_HARNESS.md`
+- `karigor-client/e2e/auth.security.spec.ts`
+- `karigor-client/e2e/fixtures/auth-provider.html`
+- `karigor-client/e2e/fixtures/auth-provider.tsx`
+- `karigor-client/e2e/fixtures/auth.html`
+- `karigor-client/e2e/fixtures/auth.ts`
+- `karigor-client/src/api/authApi.ts`
+- `karigor-client/src/api/authSession.ts`
+- `karigor-client/src/api/client.ts`
+- `karigor-client/src/context/AuthContext.tsx`
+- `karigor-client/src/services/signalrService.ts`
+- `tests/Karigor.Security.Tests/Infrastructure/DisposableSqlDatabase.cs`
+- `tests/Karigor.Security.Tests/Infrastructure/SecurityApplicationFixture.cs`
+- `tests/Karigor.Security.Tests/PrivateDocumentSecurityTests.cs`
+- `tests/Karigor.Security.Tests/RefreshSessionSchemaTests.cs`
+- `tests/Karigor.Security.Tests/RefreshSessionSecurityTests.cs`
+- `tests/Karigor.Security.Tests/RefreshSessionSignalRTests.cs`
+- `tests/Karigor.Security.Tests/SignalRSecurityTests.cs`
+
+
+# Phase 1 Final Regression Reconciliation
+
+Date: 2026-10-07 (Asia/Dhaka). Scope: investigate and reconcile the three regressions remaining after F6. This entry appends to the completed study history; earlier failed runs and their matrices remain historical evidence. No F1–F7 architecture was redesigned. No application production code or SQL migration changed in this follow-up.
+
+## 1. What was failing and what was actually wrong?
+
+| Finding | Original failure | Diagnosis | Correction |
+|---|---|---|---|
+| F2 | ExistingAdministratorSurvivesStartupAndCanSignIn expected 200; received 403 | The direct test client omitted the intentional F6 Origin/custom-header login contract | Exercise missing-protection denials, then send trusted Origin and X-Karigor-CSRF and require legitimate Admin login with a real SQL family |
+| F3 | SuspensionDeniesMethodsAndPrivateDeliveryWithExistingJwt expected HubException; received HTTP 401/HttpRequestException | Long Polling authentication now rejects suspended identities before hub execution; the exception-layer assumption was stale | Send real invocation frames to the established transport endpoint and require exactly 401; retain private-delivery and group-isolation checks |
+| F4 | Redraw/remount locator matched two quote buttons | A closing Leaflet popup remains in DOM during normal fade removal; the global locator ran before settlement | Wait for removed popup/button counts to reach zero, then require one current marker/popup/button and exactly one callback per action |
+
+All three corrections are in tests/verification documentation. No server guard was relaxed, no current resource check was removed, no output sink became HTML, and no known-defect exception or retry allowance was introduced.
+
+## 2. F2: why login needs this protection
+
+The implemented F6 architecture protects cookie-mutating authentication POSTs, including login. Login issues an HttpOnly session cookie, so an attacker-induced login could bind a victim browser to the attacker's account. Login CSRF is a meaningful boundary even before an access JWT exists. The Origin/custom-header filter is scoped to AuthController POST actions; it is not a new requirement on every ordinary protected API operation. SameSite alone would also miss some hostile same-site sibling-origin cases.
+
+The actual flow is LoginPage submit → AuthProvider.loginUser → authApi.authenticate → same-origin Web Lock → guarded logout of the old cookie family → guarded login → in-memory access token and new cookie. `authRequestOptions` supplies `X-Karigor-CSRF: 1`; Chrome supplies Origin on the POST. The server accepts the exact request origin or an explicitly configured allowed frontend origin. These values are not secrets; browser Origin/custom-header restrictions and the server allowlist are the protection.
+
+The failed bootstrap test constructed an HttpClient directly after restarting the API, bypassing those browser/client behaviors. Its 403 was correct. It now asserts that no headers, and Origin without the custom header, produce 403 and no Set-Cookie. It then sends both required values and requires 200/Admin, the returned SessionId, exactly one unrevoked SQL family and one token. The original invariant that legitimate existing administrators survive normal startup remains.
+
+A new Chrome case submits the real LoginPage and production AuthProvider/authApi. It verifies automatic Origin, the explicit CSRF header, old-session logout before login, the resulting HttpOnly cookie and a subsequent bearer-authenticated notification read. Browser responses are controlled local fixtures; the restarted real API/SQL case separately verifies actual server acceptance. This is not claimed as one browser-to-production-SQL run.
+
+Expired-access-token logout's Origin/CSRF policy is unchanged. All 33 F6 backend cases and nine F6 browser cases remain passing, including the five allowed/denied expired-access logout variations.
+
+## 3. F3: why earlier 401 is the correct boundary
+
+Long Polling uses HTTP for invocation sends and polls. F6's bearer validation checks current SQL session/account state for those requests. Once suspension or family revocation commits, a future request should fail authentication with 401 before the hub receives the method. Forcing it into JoinBooking merely to produce HubException would bypass the layer responsible for current identity/session validity.
+
+Authentication and resource authorization remain separate. A denied session must fail before attempting resource access. An active unrelated customer, worker or admin still reaches F3's booking-participant rule and receives HubException. Legitimate active participants still join, type and receive their private data. An earlier rejection is appropriate because the caller no longer has valid current authentication; it does not establish booking ownership for any other caller.
+
+The original suspended-connection regression now captures the actual Long Polling connection token from test-host traffic. After confirming the worker can initially join, it suspends that user and sends actual JoinBooking and SendTyping SignalR protocol frames to that established connection endpoint. Both must return exactly HTTP 401. This avoids the race between a background poll disconnecting and the client library deciding which exception to throw; it does not accept arbitrary errors as authorization success.
+
+A test-only subclass observes group-add operations while delegating to the real DefaultHubLifetimeManager. Denied requests add no groups. Current private connection eligibility for the worker is empty. A real private booking event reaches the healthy customer positive control, while the old worker receives none. Two additional real-host cases revoke or suspend a session before handshake: connection start must return 401, state must be Disconnected, group additions must remain unchanged, all observed memberships must belong to the healthy peer, and no private event reaches the denied peer. SQL authority is also asserted inactive.
+
+This follow-up changed no production JWT event, session service, hub method or notifier. F6's hosted WebSocket cases continue to cover sensitive method/passive-delivery denial while the physical socket remains alive. Read/send eligibility still has the previously documented in-flight limit; this work does not promise cancellation of bytes already queued.
+
+## 4. F4: a transient DOM overlap versus a real duplicate bug
+
+The existing failure was reproduced in prior complete runs. An unchanged targeted pre-correction run passed all 13 map cases, confirming that it was timing-sensitive. A dedicated Chrome probe then deliberately opened a new popup during the closing transition and reproduced **two popup nodes and two quote buttons** in each of three redraw cycles.
+
+The probe identified one old popup at inline opacity 0 and one new popup at opacity 1. Inspection of the installed Leaflet `DivOverlay.onRemove` showed its normal 200 ms delayed DOM removal. Each old node became disconnected; the settled DOM had exactly one popup and one marker. Each action advanced the callback counter once. Unmount removed all map/popup/button DOM. This is evidence of a locator reading a transition, rather than evidence of persistent duplicate mounting, accumulating listeners or missing cleanup.
+
+The passing regression uses normal Playwright clicks. After each redraw, it awaits zero popups and zero quote buttons. Before each quotation, it requires one marker, one popup and one quote button, and scopes the button lookup to that unique popup. It additionally performs three unmount/remount cycles, asserting no map/popup/button DOM while unmounted, exactly one map/marker/popup after remount, and callback counts 1 through 6. It uses no arbitrary sleep, `.first()`, forced click, retries or locator that silently ignores duplicates.
+
+The diagnostic's immediate DOM dispatch was used only to inspect the transition, never as a passing-test shortcut. A real DOM leak would fail the zero/one-count assertions; duplicate handlers would fail the exact counter progression. Original stored-XSS assertions remain unchanged: the harmless execution probe must remain false, untrusted payloads must appear literally, and no attacker-created image/handler element may exist. Production textContent rendering is unchanged.
+
+## 5. Targeted and complete executed results
+
+| Check | Passed | Failed | Skipped | Additional accounting |
+|---|---:|---:|---:|---|
+| Targeted backend F2/F3/F6 | 65 | 0 | 0 | 17 F2 + 15 F3 + 33 F6 |
+| Targeted Chrome F2/F4 | 15 | 0 | 0 | Two F2 + 13 map cases |
+| Complete strict backend | 248 | 0 | 0 | Raw dotnet exit 0; classifier exit 0; zero expected failures |
+| Complete Chrome browser | 49 | 0 | 0 | Zero expected failures, retries or flaky outcomes |
+| Explicit schema/preflight subset | 64 | 0 | 0 | Generated local SQL databases only |
+| Classifier self-tests | 6 | 0 | 0 | Exact-failure/skipped/unexpected-pass rejection rules retained |
+| Release solution build | — | 0 | — | Exit 0, zero warnings/errors |
+| Frontend application typecheck/build | — | 0 | — | Exit 0; existing Vite configuration/bundle warnings |
+| Security browser fixture typecheck | — | 0 | — | Exit 0 |
+| Lint | — | 0 | — | Exit 0, 20 existing warnings, zero errors |
+| git diff --check | — | 0 | — | Repository Windows line-ending settings retained |
+
+Backend count increased from 246 to 248 because the two revoked/suspended handshake cases were added. Browser count increased from 48 to 49 because the real LoginPage contract case was added. No failed case was deleted or hidden. The dedicated schema subset repeats existing full-suite cases; it is not an additional set of unique tests.
+
+The F4 pre-correction targeted run passed rather than being called a stable reproduction. The real Chrome lifecycle probe and the retained earlier full-run failures supply the overlap evidence. Passing after reconciliation follows explicit DOM settlement and strict counts, not enabling retries until a favorable timing occurs.
+
+## 6. Exact commands and artifacts
+
+```text
+dotnet test tests/Karigor.Security.Tests/Karigor.Security.Tests.csproj --configuration Release --filter "Finding=F2|Finding=F3|Finding=F6" --logger "trx;LogFileName=reconciliation-targeted.trx" --results-directory TestResults/reconciliation-targeted
+npm --prefix karigor-client run test:security -- map.security.spec.ts admin-bootstrap.security.spec.ts
+dotnet build Karigor.slnx --configuration Release --no-restore -v quiet
+python scripts/run-security-tests.py --strict --no-build
+npm --prefix karigor-client run test:security
+dotnet test tests/Karigor.Security.Tests/Karigor.Security.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName~SchemaTests" --logger "trx;LogFileName=reconciliation-schema.trx" --results-directory TestResults/reconciliation-schema
+npm --prefix karigor-client run typecheck:security
+npm --prefix karigor-client run build
+npm --prefix karigor-client run lint
+python -m unittest discover -s scripts/tests -v
+git diff --check
+```
+
+Chrome was selected by `KARIGOR_TEST_BROWSER_CHANNEL=chrome`; installed Node was added to PATH. Test-only Vite binds loopback, and generated SQL fixtures reject remote/application database targets. Local commands used the established Windows sandbox ACL fallback.
+
+Full backend TRX: `TestResults/security/5aa8b3e204e14482ba3441f89587e03c/security.trx`; its strict summary has green=248, expected_fail=0, blocking_errors=[], raw_dotnet_exit=0. Targeted TRX: `TestResults/reconciliation-targeted/reconciliation-targeted.trx`. Browser JSON: `karigor-client/test-results/security-browser/results.json`. Schema TRX: `TestResults/reconciliation-schema/reconciliation-schema.trx`.
+
+Ignored logs/evidence: `TestResults/reconciliation-f4-before.log`, `reconciliation-popup-probe.mjs`, `reconciliation-popup-probe.json`, `reconciliation-backend-targeted.log`, `reconciliation-browser-targeted.log`, `reconciliation-full-backend.log`, `reconciliation-full-browser.log`, `reconciliation-schema.log`, `reconciliation-release-build.log`, `reconciliation-typecheck.log`, `reconciliation-frontend-build.log`, `reconciliation-lint.log`, `reconciliation-classifier.log`, and `reconciliation-baseline.json`. No diagnostic token or production secret was printed by the popup probe.
+
+## 7. Final F1–F7 matrix
+
+| Finding | Implemented | Regression Tests | Remaining Risk |
+|---|---|---|---|
+| F1 | Yes | **VERIFIED**: 64 F1 + 45 PaymentSchema backend cases, eight browser cases passed | Live gateway/reconciliation and production legacy financial adoption remain unverified. |
+| F2 | Yes | **VERIFIED**: 17 backend and two browser cases passed | Production exposed-account/credential audit remains authorized operator work. |
+| F3 | Yes | **VERIFIED**: 15 hosted backend cases passed; F6 session tests also pass separately | Already authorized/queued events, IIS and future multi-node delivery remain documented limits. |
+| F4 | Yes | **VERIFIED**: all 13 Chrome map cases passed, including unchanged XSS checks and repeated cleanup/callback checks | Browser fixture scope; production CSP and broader sinks are not redesigned. |
+| F5 | Yes | **VERIFIED**: 35 backend/SQL and six browser cases passed | Ambiguous legacy authors/history need operator review before cutover. |
+| F6 | Yes | **VERIFIED**: 33 backend/SQL/WebSocket and nine browser cases passed | Planned sign-in reset, SQL availability/cost, strict response loss, browser support and scale-out limits. |
+| F7 | Yes | **VERIFIED**: 38 backend/unit and eleven browser cases passed | Production legacy public-file inventory/host mappings and scanning remain outside local evidence. |
+
+The complete backend also contains one passing foundation/fixture-safety case. Every finding is VERIFIED for the approved local regression scope. Production deployment, live Google/gateway behavior, IIS/proxy behavior, hosted CI and production legacy remediation are **NOT VERIFIED** and are not claimed complete by this matrix.
+
+**Is Phase 1 COMPLETE locally? YES.** The explicit schema/preflight and diff checks also passed. All seven repository implementations exist and the complete backend/browser regression gates now pass without skips, exceptions or retries. This supersedes the prior F6-stage local NO while preserving why that earlier report was correct at that point. It does not authorize deployment or data/credential changes.
+
+## 8. Exact correction scope and preserved invariants
+
+Exactly these nine files changed during this reconciliation, relative to the pre-existing F6 worktree:
+
+- `tests/Karigor.Security.Tests/AdminBootstrapSecurityTests.cs`
+- `tests/Karigor.Security.Tests/SignalRSecurityTests.cs`
+- `karigor-client/e2e/admin-bootstrap.security.spec.ts`
+- `karigor-client/e2e/map.security.spec.ts`
+- `docs/security/implementation/F2_SECURE_ADMIN_BOOTSTRAP.md`
+- `docs/security/implementation/F3_SIGNALR_AUTHORIZATION.md`
+- `docs/security/implementation/F4_STORED_XSS_PREVENTION.md`
+- `docs/security/SECURITY_WORKDONE.md`
+- `docs/testing/PHASE1_SECURITY_TEST_HARNESS.md`
+
+The prior F6 worktree changes remain intact. A file-hash baseline verified that no existing backend application, frontend application or database source changed during reconciliation. F2 bootstrap authority, F3 ownership/private recipients, F4 text-only output and F6 expired-access logout protections retain their implementation. Assertions were adapted to the correct protocol boundary or strengthened with state/group/DOM checks; no security assertion was weakened.
+
+No commit, push, merge, deployment, production database modification or credential rotation occurred.

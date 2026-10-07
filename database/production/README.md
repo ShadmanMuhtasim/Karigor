@@ -1,5 +1,7 @@
 # Production Database Scripts
 
+**F6 prerequisite:** After the established 001/005/006/007 path, preflight and explicitly apply `008_refresh_session_authority.sql` before starting the current API. Both `KarigorF6Apply` and `KarigorF6ForceSignInReset` must be 1 on the same connection. Plan a writer outage and forced sign-in reset; existing token rows are retired without fabricated session history. Startup only verifies. See [F6 architecture, deployment order and rollback limits](../../docs/security/implementation/F6_REFRESH_SESSION_ARCHITECTURE.md).
+
 **F5 cutover requirement (2026-10-07):** Before starting the F5 API, run the default read-only preflight in `005_f5_negotiation_integrity.sql`, resolve reported legacy issues, then explicitly apply that same script during a writer outage. It is the only F5 schema owner; ordinary startup only verifies it. Fresh databases also require 005 after the baseline. See [the schema and migration note](../../docs/database/F5_SCHEMA_AUTHORITY_AND_MIGRATION.md). Existing mutable binaries are incompatible with the new guards.
 
 **Payment prerequisite (2026-10-07):** Also preflight and explicitly apply `006_payment_schema_authority.sql` followed by `007_payment_concurrency.sql` on the same intended database connection before starting the API. This versioned path is the sole Payment schema owner; current Payment marker is 2 (do not rerun frozen 006 on marker 2); startup no longer creates Payments/PaymentStatus/ServiceCharge. Old `database/004_add_payments.sql` is retired. Missing financial fields on populated tables require review rather than automatic zero/Unpaid backfills. See [Payment authority and upgrade](../../docs/database/PAYMENT_SCHEMA_AUTHORITY.md).
@@ -39,9 +41,9 @@ When setting up a new production database on MonsterASP:
    - **What it does**: Seeds the core Identity roles (`Customer`, `Worker`, `Admin`) and standard `ServiceCategories` (10 categories with CDN icons).
 
 4. **Apply Versioned Prerequisites**:
-   - Run `005_f5_negotiation_integrity.sql`, `006_payment_schema_authority.sql`, then `007_payment_concurrency.sql` in default read-only mode.
+   - Run `005_f5_negotiation_integrity.sql`, `006_payment_schema_authority.sql`, then `007_payment_concurrency.sql`, followed by `008_refresh_session_authority.sql`, in default read-only mode.
    - Review reported issues; follow their linked guides to opt in and execute each entire script on the same connection during a writer outage.
-   - Fresh databases need both upgrades too. Seed data does not apply schema upgrades.
+   - Fresh databases need all applicable versioned upgrades too. Seed data does not apply schema upgrades.
 
 5. **Explicit Initial Administrator Bootstrap**:
    - Ordinary API startup seeds roles but never creates/promotes an administrator.

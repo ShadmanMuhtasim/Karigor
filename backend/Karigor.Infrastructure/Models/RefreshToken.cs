@@ -12,7 +12,13 @@ public partial class RefreshToken
     [Key]
     public int Id { get; set; }
 
+    [MaxLength(64)]
     public string TokenHash { get; set; } = null!;
+
+    // Null only for explicitly revoked pre-F6 history. Never authenticated.
+    public Guid? SessionId { get; set; }
+    public int? ParentTokenId { get; set; }
+    [Timestamp] public byte[] RowVersion { get; set; } = null!;
 
     public string UserId { get; set; } = null!;
 
@@ -20,7 +26,7 @@ public partial class RefreshToken
 
     public DateTime? RevokedAt { get; set; }
 
-    public string? ReplacedByToken { get; set; }
+    [MaxLength(64)] public string? ReplacedByToken { get; set; }
 
     public DateTime CreatedAt { get; set; }
 

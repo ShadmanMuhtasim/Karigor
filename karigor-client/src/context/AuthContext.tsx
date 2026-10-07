@@ -9,6 +9,7 @@ import type {
   RegisterWorkerPayload,
 } from '../api/authApi';
 import { registerAuthSync, setAccessToken } from '../api/client';
+import { authGeneration } from '../api/authSession';
 import { signalRService } from '../services/signalrService';
 
 interface AuthContextValue {
@@ -45,6 +46,7 @@ function getTokenExpiryMs(token: string, expiryStr?: string): number | null {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   // Keep a ref of the current user to safely distinguish active session expiration from initial guest visits
@@ -63,11 +65,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(refreshedData);
       },
       onSessionExpired: () => {
+        setUser(null);
+        setAccessToken(null);
+        void signalRService.stopConnection();
         // Only redirect with sessionExpired flag if the user was actually logged in previously
         if (userRef.current !== null) {
-          setUser(null);
-          setAccessToken(null);
-          signalRService.stopConnection();
           if (window.location.pathname !== '/login') {
             navigate('/login?sessionExpired=true');
           }
@@ -78,12 +80,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // On mount: attempt to restore session via refresh token cookie
   useEffect(() => {
+    const generation = authGeneration();
     refreshSession()
-      .then((userData) => {
-        setUser(userData);
-        setAccessToken(userData.accessToken);
-      })
       .catch(() => {
+        if (generation !== authGeneration()) return;
         // No valid session — that's fine for guests
         setUser(null);
         setAccessToken(null);
@@ -107,9 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const timer = setTimeout(async () => {
       try {
-        const refreshed = await refreshSession();
-        setUser(refreshed);
-        setAccessToken(refreshed.accessToken);
+        await refreshSession();
       } catch (err) {
         console.warn('[AuthContext] Proactive refresh timer failed:', err);
       }
@@ -131,9 +129,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // If token has less than 2 minutes remaining or is already expired, refresh immediately
       if (remainingMs < 120 * 1000) {
         try {
-          const refreshed = await refreshSession();
-          setUser(refreshed);
-          setAccessToken(refreshed.accessToken);
+          await refreshSession();
         } catch (err) {
           console.warn('[AuthContext] Tab focus wake-up refresh failed:', err);
         }
@@ -150,33 +146,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user?.accessToken, user?.accessTokenExpiry]);
 
   const loginUser = useCallback(async (payload: LoginPayload) => {
+    setLogoutError(null);
     const userData = await login(payload);
     setUser(userData);
     setAccessToken(userData.accessToken);
   }, []);
 
   const loginWithGoogle = useCallback(async (payload: GoogleLoginPayload) => {
+    setLogoutError(null);
     const userData = await googleLogin(payload);
     setUser(userData);
     setAccessToken(userData.accessToken);
   }, []);
 
   const logoutUser = useCallback(async () => {
-    if (user?.accessToken) {
-      try { await logout(user.accessToken); } catch { /* ignore revocation errors */ }
-    }
+    // Invalidation stops local state immediately; report server failure to the caller.
     setUser(null);
     setAccessToken(null);
-    signalRService.stopConnection();
-  }, [user]);
+    void signalRService.stopConnection();
+    try {
+      await logout();
+      setLogoutError(null);
+    } catch {
+      setLogoutError('Sign-out could not be confirmed. Try again when your connection is restored.');
+    }
+  }, []);
 
   const registerAsCustomer = useCallback(async (payload: RegisterCustomerPayload) => {
+    setLogoutError(null);
     const userData = await registerCustomer(payload);
     setUser(userData);
     setAccessToken(userData.accessToken);
   }, []);
 
   const registerAsWorker = useCallback(async (payload: RegisterWorkerPayload) => {
+    setLogoutError(null);
     const userData = await registerWorker(payload);
     setUser(userData);
     setAccessToken(userData.accessToken);
@@ -184,6 +188,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={{ user, isLoading, loginUser, loginWithGoogle, logoutUser, registerAsCustomer, registerAsWorker }}>
+      {logoutError && <div role="alert" className="border border-red-300 bg-red-50 p-3 text-red-900">
+        {logoutError} <button type="button" onClick={logoutUser} className="underline">Retry sign-out</button>
+      </div>}
       {children}
     </AuthContext.Provider>
   );

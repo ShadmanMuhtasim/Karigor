@@ -29,6 +29,7 @@ public partial class KarigorDbContext : IdentityDbContext<ApplicationUser>
     public virtual DbSet<Quotation> Quotations { get; set; }
 
     public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
+    public virtual DbSet<RefreshSession> RefreshSessions { get; set; }
 
     public virtual DbSet<Review> Reviews { get; set; }
 
@@ -126,7 +127,12 @@ public partial class KarigorDbContext : IdentityDbContext<ApplicationUser>
         modelBuilder.Entity<RefreshToken>(entity =>
         {
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())");
+            entity.HasIndex(e => e.TokenHash).IsUnique().HasDatabaseName("UX_F6_TokenHash");
+            entity.HasIndex(e => e.ParentTokenId).IsUnique().HasFilter("[ParentTokenId] IS NOT NULL").HasDatabaseName("UX_F6_Parent");
+            entity.HasIndex(e => e.SessionId).IsUnique().HasFilter("[SessionId] IS NOT NULL AND [RevokedAt] IS NULL").HasDatabaseName("UX_F6_ActiveToken");
+            entity.HasOne<RefreshSession>().WithMany().HasForeignKey(e => e.SessionId).OnDelete(DeleteBehavior.NoAction);
         });
+        modelBuilder.Entity<RefreshSession>().HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.NoAction);
 
         modelBuilder.Entity<ServiceRequest>(entity =>
         {

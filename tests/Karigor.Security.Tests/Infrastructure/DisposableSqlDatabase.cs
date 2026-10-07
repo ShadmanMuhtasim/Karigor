@@ -41,7 +41,7 @@ public sealed class DisposableSqlDatabase : IAsyncDisposable
         return builder.ConnectionString;
     }
 
-    public async Task InitializeAsync(bool applyF5 = true, bool applyPayment = true, bool applyPaymentConcurrency = true)
+    public async Task InitializeAsync(bool applyF5 = true, bool applyPayment = true, bool applyPaymentConcurrency = true, bool applyF6 = true)
     {
         // Readiness retry is not a concurrency-test synchronization mechanism.
         using var admin = new SqlConnection(adminConnection);
@@ -94,6 +94,15 @@ public sealed class DisposableSqlDatabase : IAsyncDisposable
                 await File.ReadAllTextAsync(Path.Combine(RepositoryRoot, "database/production/007_payment_concurrency.sql"));
             await command.ExecuteNonQueryAsync();
         }
+        if (applyF6)
+        {
+            using var command = database.CreateCommand();
+            command.CommandText = "EXEC sys.sp_set_session_context @key=N'KarigorF6Apply', @value=1;\n" +
+                "EXEC sys.sp_set_session_context @key=N'KarigorF6ForceSignInReset', @value=1;\n" +
+                await File.ReadAllTextAsync(Path.Combine(RepositoryRoot, "database/production/008_refresh_session_authority.sql"));
+            await command.ExecuteNonQueryAsync();
+        }
+
     }
 
     public async ValueTask DisposeAsync()

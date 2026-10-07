@@ -321,3 +321,10 @@ The tradeoff is an explicit operator step and less verbose secret-safe errors. I
 3. **Why a transaction around Identity?** User creation saves separately from role assignment; both must commit together.
 4. **Why serializable and a barrier test?** Two commands can both see no admin. Serializable protects that decision; the barrier proves real overlap rather than guessing with delays.
 5. **What happens to old administrators?** Their account/role/password remains. Removing unsafe startup does not rotate exposed credentials.
+
+
+## Final regression reconciliation after F6 (2026-10-07)
+
+The restarted-administrator login regression now exercises the implemented cookie-authentication contract: browser-supplied trusted Origin plus `X-Karigor-CSRF: 1` from the production auth client. Login intentionally requires both because it issues a browser session cookie and must resist login CSRF. The previous direct HttpClient omitted them and its 403 was correct. The reconciled case also asserts that missing protections yield 403 without a cookie, then verifies guarded Admin login and exactly one SQL family/token. Ordinary startup/bootstrap authority is unchanged.
+
+A Chrome test submits the actual LoginPage through AuthProvider/authApi, verifies the browser Origin/custom header on logout/login, checks the resulting HttpOnly cookie and a subsequent authenticated notification read. Browser HTTP responses are controlled fixtures; the restarted API/SQL case separately proves actual server acceptance. Expired-access logout's F6 Origin/CSRF guard remains unchanged. See [the final reconciliation evidence](../SECURITY_WORKDONE.md#phase-1-final-regression-reconciliation).

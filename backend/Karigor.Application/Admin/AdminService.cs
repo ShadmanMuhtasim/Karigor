@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Karigor.Application.Admin.DTOs;
+using Karigor.Application.Auth;
 using Karigor.Application.Notifications;
 using Karigor.Application.Notifications.DTOs;
 using Karigor.Application.Realtime;
@@ -15,6 +16,7 @@ namespace Karigor.Application.Admin;
 public class AdminService : IAdminService
 {
     private readonly KarigorDbContext _db;
+    private readonly RefreshSessionService _sessions;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly INotificationService _notificationService;
     private readonly IRealtimeNotifier _realtimeNotifier;
@@ -23,9 +25,10 @@ public class AdminService : IAdminService
         KarigorDbContext db,
         UserManager<ApplicationUser> userManager,
         INotificationService notificationService,
-        IRealtimeNotifier realtimeNotifier)
+        IRealtimeNotifier realtimeNotifier, RefreshSessionService sessions)
     {
         _db = db;
+        _sessions = sessions;
         _userManager = userManager;
         _notificationService = notificationService;
         _realtimeNotifier = realtimeNotifier;
@@ -264,29 +267,8 @@ public class AdminService : IAdminService
         if (user == null)
             throw new KeyNotFoundException($"User #{userId} not found.");
 
-        user.LockoutEnabled = true;
-
-        if (dto.Suspend)
-        {
-            user.LockoutEnd = DateTimeOffset.UtcNow.AddYears(100);
-
-            // Revoke all active refresh tokens immediately
-            var tokens = await _db.RefreshTokens
-                .Where(t => t.UserId == userId && t.RevokedAt == null)
-                .ToListAsync();
-
-            foreach (var t in tokens)
-            {
-                t.RevokedAt = DateTime.UtcNow;
-            }
-        }
-        else
-        {
-            user.LockoutEnd = null;
-        }
-
-        await _userManager.UpdateAsync(user);
-        await _db.SaveChangesAsync();
+        await _sessions.SetSuspensionAsync(userId, dto.Suspend);
+        await _db.Entry(user).ReloadAsync();
 
         var roles = await _userManager.GetRolesAsync(user);
         var userRole = roles.FirstOrDefault() ?? "Customer";

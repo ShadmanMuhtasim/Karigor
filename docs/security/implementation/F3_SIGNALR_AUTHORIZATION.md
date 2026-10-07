@@ -124,3 +124,12 @@ Discovery hints are minimized, but REST request-detail/listing privacy still nee
 A release must restart/disconnect pre-change connections and review compatible client rollout. No deployment, production data access/change, commit, push or merge occurred. The repository is ready to begin local schema-authority reconciliation and F5 work; the remaining F5 red assertion must remain until its consent invariant is repaired.
 
 Concept references: [Microsoft's group security boundary](https://learn.microsoft.com/en-us/aspnet/core/signalr/groups?view=aspnetcore-10.0) and [SignalR authentication lifetime](https://learn.microsoft.com/en-us/aspnet/core/signalr/authn-and-authz?view=aspnetcore-10.0).
+
+
+## Final regression reconciliation after F6 (2026-10-07)
+
+The earlier sections record F3's original verification stage. F6 is now implemented; [its session architecture](F6_REFRESH_SESSION_ARCHITECTURE.md) supersedes the historical absence of family authority and adds current-session HTTP/connection checks plus private connection filtering.
+
+Long Polling sends invocation frames over HTTP. A suspended or revoked session can now receive 401 before a hub method executes; requiring a later HubException would demand bypassing the correct authentication boundary. The reconciled suspension regression sends actual JoinBooking/SendTyping protocol frames to the established Long Polling connection endpoint and requires exactly HTTP 401. A test-only subclass of the real DefaultHubLifetimeManager records successful group additions without replacing transport/delivery behavior. Denied requests add no new groups, current connection eligibility is empty, the old worker receives no private event and a healthy participant receives the positive-control event. Fresh revoked/suspended handshake cases independently assert 401, disconnected state and no group additions/private delivery.
+
+Resource authorization remains separate: active unrelated identities still receive the existing HubException from current booking checks, and legitimate participants still join/type/receive events. No server authentication policy or hub production code changed in this reconciliation. Full commands/counts are in [the appended report](../SECURITY_WORKDONE.md#phase-1-final-regression-reconciliation).

@@ -221,10 +221,27 @@ public sealed class AdminBootstrapSecurityTests : IAsyncLifetime
             }
             await using var restart = new SecurityApplicationFactory(isolated);
             using var client = restart.CreateClient(new() { BaseAddress = new Uri("https://localhost") });
+            // F6 protects cookie-issuing login against login CSRF. A browser supplies Origin;
+            // the production auth client supplies the custom header. This direct client must do both.
+            using var unguarded = await client.PostAsJsonAsync("/api/auth/login", new { email, password });
+            Assert.Equal(HttpStatusCode.Forbidden, unguarded.StatusCode);
+            Assert.False(unguarded.Headers.Contains("Set-Cookie"));
+            client.DefaultRequestHeaders.Add("Origin", "https://localhost");
+            using var missingHeader = await client.PostAsJsonAsync("/api/auth/login", new { email, password });
+            Assert.Equal(HttpStatusCode.Forbidden, missingHeader.StatusCode);
+            Assert.False(missingHeader.Headers.Contains("Set-Cookie"));
+            client.DefaultRequestHeaders.Add("X-Karigor-CSRF", "1");
             using var response = await client.PostAsJsonAsync("/api/auth/login", new { email, password });
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
             Assert.Equal("Admin", body.RootElement.GetProperty("role").GetString());
+            var sessionId = body.RootElement.GetProperty("sessionId").GetGuid();
+            using var check = restart.Services.CreateScope();
+            var db = check.ServiceProvider.GetRequiredService<KarigorDbContext>();
+            var session = Assert.Single(await db.RefreshSessions.AsNoTracking().ToArrayAsync());
+            Assert.Equal(sessionId, session.Id);
+            Assert.Null(session.RevokedAt);
+            Assert.Single(await db.RefreshTokens.Where(t => t.SessionId == sessionId).ToArrayAsync());
         }
         finally { await isolated.DisposeAsync(); }
     }

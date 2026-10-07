@@ -1,7 +1,9 @@
 import axios from 'axios';
-import { refreshAuthToken } from './client';
+import { refreshAuthToken, setAccessToken } from './client';
+import { assertGeneration, authRequestOptions, invalidateAuth, markSignedIn, withAuthLock } from './authSession';
 
 export interface AuthUser {
+  sessionId?: string;
   userId: string;
   email: string;
   role: string;
@@ -45,40 +47,36 @@ export async function getAuthConfig(): Promise<AuthConfig> {
   return data;
 }
 
-/** Authenticate using Google ID Token */
-export async function googleLogin(payload: GoogleLoginPayload): Promise<AuthUser> {
-  const { data } = await axios.post<AuthUser>('/api/auth/google', payload, { withCredentials: true });
-  return data;
+// Account changes also revoke the previous cookie family before replacing it.
+async function authenticate(path: string, payload: unknown): Promise<AuthUser> {
+  const generation = invalidateAuth();
+  return withAuthLock(async () => {
+    assertGeneration(generation);
+    await axios.post('/api/auth/logout', {}, authRequestOptions);
+    assertGeneration(generation);
+    const { data } = await axios.post<AuthUser>(path, payload, authRequestOptions);
+    assertGeneration(generation);
+    markSignedIn(generation);
+    setAccessToken(data.accessToken);
+    return data;
+  });
 }
 
-/** Register a new customer account */
-export async function registerCustomer(payload: RegisterCustomerPayload): Promise<AuthUser> {
-  const { data } = await axios.post('/api/auth/register/customer', payload, { withCredentials: true });
-  return data;
-}
-
-/** Register a new worker account */
-export async function registerWorker(payload: RegisterWorkerPayload): Promise<AuthUser> {
-  const { data } = await axios.post('/api/auth/register/worker', payload, { withCredentials: true });
-  return data;
-}
-
-/** Login and receive access token + refresh token cookie */
-export async function login(payload: LoginPayload): Promise<AuthUser> {
-  const { data } = await axios.post('/api/auth/login', payload, { withCredentials: true });
-  return data;
-}
+export function googleLogin(payload: GoogleLoginPayload) { return authenticate('/api/auth/google', payload); }
+export function registerCustomer(payload: RegisterCustomerPayload) { return authenticate('/api/auth/register/customer', payload); }
+export function registerWorker(payload: RegisterWorkerPayload) { return authenticate('/api/auth/register/worker', payload); }
+export function login(payload: LoginPayload) { return authenticate('/api/auth/login', payload); }
 
 /** Attempt to restore session using the httpOnly refresh token cookie */
 export async function refreshSession(): Promise<AuthUser> {
   return refreshAuthToken();
 }
 
-/** Logout — revokes refresh token on server and clears cookie */
-export async function logout(accessToken: string): Promise<void> {
-  await axios.post('/api/auth/logout', {}, {
-    withCredentials: true,
-    headers: { Authorization: `Bearer ${accessToken}` },
+/** Logout works with an expired or absent access JWT; the guarded cookie identifies the family. */
+export async function logout(): Promise<void> {
+  const generation = invalidateAuth();
+  await withAuthLock(async () => {
+    assertGeneration(generation);
+    await axios.post('/api/auth/logout', {}, authRequestOptions);
   });
 }
-

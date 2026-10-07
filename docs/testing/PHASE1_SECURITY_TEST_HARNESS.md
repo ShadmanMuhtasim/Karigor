@@ -1,5 +1,25 @@
 # Phase 1 security test harness: Order 0
 
+## Current final Phase 1 reconciliation (2026-10-07)
+
+**Phase 1 is COMPLETE locally for the approved repository/test scope.** Final strict backend: **248 passed, 0 failed, 0 skipped, 0 expected failures**. Final Chrome browser: **49 passed, 0 failed, 0 skipped, 0 retries/flaky outcomes**. Explicit schema/preflight subset: **64 passed, 0 failed, 0 skipped**. Six classifier self-tests, Release build, frontend typecheck/build, fixture typecheck, lint and diff checks pass; lint retains 20 existing warnings and zero errors.
+
+The three F6-stage failures were stale test assumptions, verified against the actual contract/lifecycle. F2 now supplies intended login Origin/CSRF headers and checks negative guard cases plus normal LoginPage submission. F3 requires earlier HTTP 401 for denied Long Polling invocation/handshake and asserts no new groups/private delivery, preserving legitimate/resource-denied paths. F4 waits for Leaflet's normal popup fade-removal, checks zero/one DOM counts and one callback per action across repeated remounts. No production application/schema code changed, no XSS assertion weakened, no defect exception added and no test hidden.
+
+The [final reconciliation study and matrix](../security/SECURITY_WORKDONE.md#phase-1-final-regression-reconciliation) records root causes, exact nine-file scope, commands and limits. Full backend TRX: `TestResults/security/5aa8b3e204e14482ba3441f89587e03c/security.trx`; browser JSON: `karigor-client/test-results/security-browser/results.json`; schema TRX: `TestResults/reconciliation-schema/reconciliation-schema.trx`. Production deployment, legacy operator remediation, IIS/live-provider/backplane behavior and hosted CI remain unverified. Earlier totals/NO statuses below describe their historical stages and are superseded only for current local verification.
+
+
+## Current F6 verification addendum (2026-10-07)
+
+F6 adds SQL RefreshSession authority and mandatory sid/Origin/CSRF boundaries. Generated fixtures now apply canonical SQL 008 and mint real session-bound JWTs; the F3/F7 token helper changes only establish that authentication prerequisite. The underlying resource assertions are retained. AuthLimiter is raised only in the fixture to keep security cases from becoming rate-limit tests.
+
+Targeted F6: **33 backend/SQL/hosted WebSocket passes** and **9 Chrome passes**, no skips or expected failures. The tests use TimeProvider, coordinated SQL observations/shared-lock contention, database-state assertions, actual response cookies, hosted WebSocket expiry/delivery fences, cross-tab Web Locks and production AuthProvider/module fixtures.
+
+The complete strict backend pass is **244 passed / 2 failed / 246 total**. F2's direct login test lacks newly required Origin/CSRF headers and receives 403. F3's exact HubException assertion receives earlier HTTP 401 during Long Polling after suspension. Both remain blocking and unchanged. The first full browser run is **45/46 passed**, with the unchanged F4 duplicate-popup remount locator failure. The final full browser run is **47/48 passed**, with the same unchanged F4 failure and all nine F6 cases green. Final browser evidence and the per-finding matrix are in the [appended F6 report](../security/SECURITY_WORKDONE.md#f6-refresh-token-rotation-and-session-revocation).
+
+**Phase 1 complete: NO.** This addendum supersedes historical outcome totals below; it does not erase earlier evidence or mark a failed test green. See [F6 architecture and migration](../security/implementation/F6_REFRESH_SESSION_ARCHITECTURE.md) and [ADR 0006](../adr/0006-refresh-session-authority.md). Backend full TRX: `TestResults/security/09876d31354f4e0e93b973aa9e8de389/security.trx`.
+
+
 **Current F1 concurrency state (2026-10-07):** Implemented with SQL 007 after 001/005/006, exact EF mappings and startup metadata verification. Full strict backend: **213 passes**; targeted payment concurrency: **17 passes**; PaymentSchema: **45 passes** (35 frozen 006 + 10 new 007). Full browser: **39 passes**, including three new real booking-page initiation cases. Zero final failures/expected failures/skips. Provider-trust test bodies and defect/classifier rules are unchanged. Actual SQL contexts/barriers prove callback and initiation races, rollback, unknown responses and retained extra settlements; [implemented F1 guide](../security/implementation/F1_PAYMENT_CONCURRENCY_AND_IDEMPOTENCY.md) and [study evidence](../security/SECURITY_WORKDONE.md#f1-payment-concurrency-idempotency-and-settlement-allocation) record commands and intermediate failures. Older counts below are historical stages.
 
 

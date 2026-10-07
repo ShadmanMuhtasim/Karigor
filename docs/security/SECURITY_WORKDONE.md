@@ -2672,3 +2672,60 @@ Exactly these nine files changed during this reconciliation, relative to the pre
 The prior F6 worktree changes remain intact. A file-hash baseline verified that no existing backend application, frontend application or database source changed during reconciliation. F2 bootstrap authority, F3 ownership/private recipients, F4 text-only output and F6 expired-access logout protections retain their implementation. Assertions were adapted to the correct protocol boundary or strengthened with state/group/DOM checks; no security assertion was weakened.
 
 No commit, push, merge, deployment, production database modification or credential rotation occurred.
+
+# Phase 1 Production Deployment Preparation
+
+Prepared 2026-10-08 (Asia/Dhaka). Scope: MonsterASP production preflight/runbook and read-only SQL artifacts. **Deployment status: NOT SAFE TO PROCEED.** Phase 1 remains complete for its locally verified implementation/regression scope; this preparation adds no application security feature and does not prove the hosted release is ready.
+
+## Why local verification is different from production verification
+
+The final reconciliation above reports 248 backend passes, 49 Chrome passes and 64 schema-subset passes. Generated local SQL databases and controlled provider/browser fixtures establish the implemented rules. They do not establish MonsterASP's deployed revision, SQL/data history, effective configuration, certificate/proxy behavior, actual WebSocket transport, backup restoration or private-file persistence. Those production prerequisites were not accessed. Historical proposed/in-progress entries remain preserved; ADR 0001 is empty, so no contents were invented for it.
+
+The new [deployment preflight](../deployment/PHASE1_MONSTERASP_DEPLOYMENT_PREFLIGHT.md) inventories required backend/frontend changes and exact schema authority, distinguishes repository evidence from public platform capability and actual account unknowns, and supplies a configuration checklist and legacy-data GO/NO-GO matrix. The [deployment runbook](../deployment/PHASE1_MONSTERASP_DEPLOYMENT_RUNBOOK.md) supplies the ordered outage/cutover, test boundaries, monitoring and rollback procedure in terms a CSE student can follow.
+
+## Backup and schema migration
+
+Before a future approved apply, an operator must stop all writers, create/download a final full BAK, record its completion time/size/hash, verify readability and a separate protected copy, and rehearse restoration into an isolated non-production database. Uploaded file bytes, old artifacts and protected configuration need their own consistent backups; a database backup does not contain private documents. A nonzero downloaded file alone is not proof of successful restoration. The documents link the public MonsterASP backup/restore instructions but require the actual account's availability, permissions and restoration process to be verified.
+
+Fresh SQL order is production **001 → optional 002 → 005 → 006 → 007 → 008**. Existing databases require inventory and conditional upgrades, not replay of every numbered file. Final markers are F5 1, Payment 2 and F6 1. 001 is a baseline; 002 seeds roles/categories; development 003 and retired 004 are not hosted upgrades. Frozen 006 must not run against Payment v2. Historical EF migrations/snapshot are not the F5/Payment/F6 migration owner. Ordinary startup validates those schemas but also seeds roles/categories, creates the private root and retains a booking-verification ALTER branch; therefore starting the API is not a read-only production inspection.
+
+The runbook records required filtered-index connection SET options, including QUOTED_IDENTIFIER. An initial local validation using legacy sqlcmd without `-I` failed SQL 005's filtered-index creation. Its transaction rolled back, and the disposable test database was removed. Validation then used compatible quoted-identifier settings and passed. This changed documentation/test-client setup only; no versioned migration file was edited.
+
+## Legacy data and decision gates
+
+F5 refuses unresolved active authorship/structural issues; clean parity cannot recover intent from formerly mutable offers. Do not invent authors/timestamps, choose duplicate bookings or rewrite agreed prices. Inactive unknown history remains unknown. Financial contradictions, missing historical fees/payment status, orphan records and unknown schema shape require evidence and separate review.
+
+The principal production migration limitation is **SQL 007 refuses every existing version-1 Payment row**, including apparently consistent/failed/cancelled/initiated history. It also refuses Booking payment states other than known Unpaid. SQL 006 approval does not make those rows eligible for 007. The repository has no legacy financial-adoption implementation; a separate reviewed versioned migration and rehearsal are required if such rows exist. Deletion, mass Unpaid changes, fabricated merchant/environment or bypassing constraints are not acceptable ways to pass this gate. Production presence of these rows is UNKNOWN.
+
+Read-only preflight also covers token table/counts without revealing hashes, admin-role identities and the historical bootstrap-email match without testing passwords, and document route metadata without claiming to inspect remote files. Public file/credential exposure is not repaired merely by deploying new code. Separate authorized operational review remains necessary; no credentials were rotated and no real file was moved/deleted.
+
+## Maintenance, forced sign-in and rollback
+
+F5/F6 require a coordinated schema/backend/frontend cutover with all old writers stopped. The existing push/main workflow lacks these operational gates, uses a directory package whose project skip-rule propagation is unproven, and only warns on health-check failure while skipping certificate validation. A successful workflow result is not a GO decision. An authorized operator must fence active/queued deployments and prove a separate tester-only access restriction, since no application maintenance/read-only mode exists.
+
+The window sequence is announcement, writer/deployment exclusion, final database/file backup, final read-only preflight, GO, approved SQL order, exact schema validation, paired artifact/config/private-storage validation, forced-sign-in confirmation, restricted restart/smoke tests, monitoring and explicit reopening. User traffic and gateway callbacks must be managed through the outage; an existing provider checkout does not stop with the API, and an HTML maintenance response may not trigger callback retries.
+
+008 retires legacy token rows with null family/parent, without manufacturing sessions from old ReplacedByToken. Old no-sid JWTs and null-family refresh cookies fail the new backend. Users sign in again to create authentic independent families. New browser cookie changes use same-origin Web Locks; incompatible/split-origin clients and mixed old/new deployment are blockers. Already-installed 008 returns early and does not reset existing valid F6 families again.
+
+App rollback replaces binaries; database restore overwrites schema/data and can undo later financial/business state. Old mutable/session-unaware binaries are not guaranteed compatible after 005/007/008. Restoring a pre-008 backup can resurrect credentials/lockout state, so public traffic must stay blocked until a separately approved invalidation/containment and reconciliation plan is tested. Prefer a compatible forward repair. The runbook separately covers failures before schema, after schema before startup, after F6 and after failed smoke tests.
+
+## Post-deployment verification and operational risk
+
+Dedicated low-volume customer/worker/unrelated/admin tests cover normal/invalid login, refresh/logout/expiry/revocation/independent families, no automatic admin/public bootstrap, private SignalR recipients, literal stored map text, versioned offers/counters/stale conflict/exact booking agreement, and authenticated private files/PDF signature rejection. Payment initiation/provider verification/duplicate callbacks/selected settlement are exercised only in guarded local fake or isolated SSLCommerz sandbox environments, with live merchant/callback configuration checked separately. No real money, brute force, scanning, destructive shared-host tests or abusive load is needed.
+
+The documents identify session/schema/payment/realtime/file/500 monitoring, while distinguishing emitted log messages from states requiring a restricted SQL aggregate (Replay and RequiresReview have no promised dedicated log event). A specific configuration risk is credential-bearing URLs: SignalR query access_token and SSLCommerz validation store_passwd can be captured by host/proxy/HttpClient logging. Logging redaction/suppression/access controls must be verified before GO. No tokens, secrets, passwords, hash values or private-file contents were put into the new documents or query results.
+
+Default private storage is ContentRoot/App_Data/Uploads/WorkerDocuments, with authenticated /uploads/worker-documents routes. Those route strings do not identify disk location. Host mapping/ACLs/aliases/links/quota, legacy public copies and actual deployment persistence require a controlled manifest and synthetic-file rehearsal. Project skip rules and public platform documentation do not prove an individual redeploy preserves bytes.
+
+## Preparation validation and exact scope
+
+Two new SQL artifacts accompany the Markdown documents:
+
+- [Read-only supplemental inventory](../deployment/sql/PHASE1_READ_ONLY_PREFLIGHT.sql): explicit database placeholder guard, migration-flag refusal, metadata visibility requirement, version/shape inventory, F5 structural/authorship checks, financial checks for legacy/current shapes, refresh aggregates, document patterns/orphans and admin-role identities. No persistent rows/schema are changed.
+- [Current read-only schema gates](../deployment/sql/PHASE1_SCHEMA_GATES_READ_ONLY.sql): exact SQL from current F5/Payment/F6 C# gates, Payment BaseSql rendered for marker 2, source hashes recorded, isolated local-variable scope, no web startup. These gates validate the current application contract; they do not claim a broader arbitrary-schema audit.
+
+Actual preparation validation used legacy sqlcmd with `-I -b` against **hardcoded local `.\SQLEXPRESS` only**, Windows integrated authentication and uniquely named `Karigor_PreflightTests_<random GUID>` disposable databases. It checked empty/missing schema, baseline 001, Payment v1, complete 005/006/007/008, valid legacy-token retirement with no fabricated family, deliberately dirty negotiation/financial/token/document/admin history, placeholder/target/flag refusals and installed-marker/disabled-trigger refusal. Both SQL artifacts also executed under a test principal with db_datareader plus VIEW DEFINITION and no data/schema write grants. Before/after schema/data fingerprints for read-only runs matched. All final cases passed and the generated databases were removed. Local scripts/logs are ignored under `TestResults/phase1-deployment`; no existing local application database or production connection was used.
+
+Markdown/relative-link/source-snapshot/diff/scope checks are recorded with the preparation evidence. Existing F1–F7 regressions were not rerun for this documentation-only change; their latest local evidence is the final reconciliation above. No production check or external gateway transaction was performed. Actual hosted permissions, restore, topology, secrets, legacy resolutions and smoke evidence remain outstanding, so **NOT SAFE TO PROCEED** is the only supported production decision.
+
+Changed scope: the two requested deployment Markdown files, their two read-only SQL companions and this appended study section. Backend/frontend application files, versioned SQL migrations, historical ADRs, workflows and test suite remain unchanged. No commit, push, merge, deployment, production query/write, schema apply, credential rotation or production file operation occurred.

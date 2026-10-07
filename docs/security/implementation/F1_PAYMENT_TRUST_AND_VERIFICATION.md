@@ -1,5 +1,7 @@
 # F1 Payment Trust and Provider Verification
 
+**Subsequent schema-only update (2026-10-07):** [Payment schema authority](../../database/PAYMENT_SCHEMA_AUTHORITY.md) now uses sole SQL owner 006, explicit runtime EF mappings and read-only startup prerequisites. Immediate F1 verifier/business behavior below is unchanged. Payment concurrency/idempotency remains proposed; financial history and deployment are not verified in production. Earlier test counts below describe the containment task's historical stage.
+
 Date: 2026-10-07 (Asia/Dhaka).
 Scope: immediate F1 containment from the [approved plan](../PHASE1_SECURITY_REMEDIATION_PLAN.md), using the [Order 0 harness](../../testing/PHASE1_SECURITY_TEST_HARNESS.md).
 Status: locally verified containment. This is not completion of the later payment concurrency/idempotency phase or verification of production financial history.

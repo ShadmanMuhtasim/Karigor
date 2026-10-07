@@ -1731,3 +1731,147 @@ F5 schema authority is now specified/tested for the affected invariants. **Overa
 5. Barrier-coordinated race tests with separate DbContexts and authoritative UI refresh.
 6. SQL-first schema authority, preflight, legacy ambiguity and coordinated compatibility cutovers.
 7. Next scoped work: canonical payment schema, settlement allocation uniqueness and payment/booking concurrency.
+
+# Payment Schema Authority and Database Evolution
+
+Date: 2026-10-07 (Asia/Dhaka). **IMPLEMENTED:** Payment schema ownership, explicit EF mappings, preflight, deterministic upgrade and read-only startup gate. **PROPOSED:** the later F1 concurrency/idempotency metadata and business logic. **NOT VERIFIED IN PRODUCTION:** data, schema application, deployment and provider operations. No commit, push, merge, deployment or production inspection/modification was performed.
+
+References: [audit/authority/upgrade guide](../database/PAYMENT_SCHEMA_AUTHORITY.md), [ADR 0004](../adr/0004-payment-schema-authority.md), [F1 verifier](implementation/F1_PAYMENT_TRUST_AND_VERIFICATION.md).
+
+## 1. What schema drift means
+
+Schema drift means the application's expected table structure, the scripts used to create it and the actual database are different. A model can contain a property that never appeared in an applied migration, or startup can create a table missing from production provisioning. The application might work only after one particular restart has filled a gap.
+
+Different owners can also agree today but diverge on the next change. Updating one SQL copy while leaving another unchanged makes the result depend on installation order and environment. Restarting the app is then an accidental migration mechanism with runtime DDL privileges and poorly visible failure/data assumptions.
+
+## 2. What Karigor did before and why three owners were dangerous
+
+Development 004 and Program.cs both defined Payments and Booking.PaymentStatus. Production baseline 001 omitted them. Startup also added missing ServiceCharge with zero as the default. Runtime EF knew Payment columns, but its SQL defaults and delete behavior were implicit, and TransactionId was represented as an index while SQL created a unique constraint. The historical migration/snapshot did not contain Payment or PaymentStatus at all.
+
+The two SQL definitions mostly agreed about types, including decimal(18,2). The problem was ownership/completeness and mapping accuracy, not proof of a conflicting amount precision in valid current storage. The detailed comparison table in the database guide records every object and its actual before/after definition.
+
+Allowing SQL scripts, EF migrations and startup DDL to independently evolve the same financial tables would create three possible histories. Missing/defaulted fields can silently invent financial facts; incompatible keys/FKs can change behavior or fail only on one installation. Role checks and provider validation cannot repair that database evolution problem.
+
+## 3. Source of truth now used and why
+
+`database/production/006_payment_schema_authority.sql` is the sole current Payment definition/upgrade. This follows F5's versioned-SQL decision and avoids a broad EF migration adoption from a stale snapshot. Old development 004 now fails with a clear pointer to 006 and changes no database context/schema. Program's Payment DDL was removed; PaymentSchemaGate verifies metadata before ordinary seeding.
+
+Current EF mappings explicitly match SQL defaults, decimal precision, named TransactionId unique constraint and the existing booking cascade FK. Historical EF migrations/snapshot remain frozen and documented; no fictitious migration entry was manufactured. No Payment/Booking rowversion, initiation key, provider session identity, settlement allocation, outbox or concurrency behavior was added.
+
+## 4. Fresh database flow
+
+An operator selects/provisions the database, runs production baseline 001 and ordinary seed 002 as needed, then preflights and explicitly applies F5 005 and Payment 006. The API starts only after both schema gates pass. Missing PaymentStatus/ServiceCharge can be added on empty affected tables because there are no historical values to infer.
+
+The real-SQL test fixture now performs that same explicit sequence before hosting. It no longer depends on application startup to create payment structures. The API still retains unrelated legacy booking-verification compatibility DDL; this task did not modernize that workflow.
+
+## 5. Existing database upgrade flow
+
+Run 006 normally for persistent-data read-only preflight. Review its report and stop every writer through an authorized operator outage. Opt into application through the documented same-connection session-context flag. The script locks existing Bookings/Payments, repeats checks and commits all DDL/defaults/FK/index/stamp changes atomically using XACT_ABORT.
+
+Valid audited current schemas preserve every stored Payment/Booking field. Matching legacy EF uniqueness can be adopted as the SQL unique constraint; missing valid supporting indexes/FK and wrong/missing defaults can be reconciled. Unsupported types, key/FK definitions or unknown version stamps are refused instead of silently coerced.
+
+The script contains no persistent UPDATE/DELETE, USE or database create/drop. It does not fill historical timestamps, receipts or provider identity. It refuses adding missing ServiceCharge to populated Payments or PaymentStatus to populated Bookings rather than assigning invented zero/Unpaid values.
+
+## 6. Preflight checks and why history must not be auto-corrected
+
+Preflight reports duplicate/malformed/missing TransactionId, apparent duplicate ValId/BankTranId, multiple Completed attempts for one booking, Paid without completion, completion without Paid, invalid/missing amounts, unsupported/missing currency, orphan payments, suspicious statuses, incomplete completion evidence and fee/booking-price inconsistencies. It also checks readable schema shape and missing historical financial fields.
+
+An extra Completed payment might be a real second settlement, not an expendable duplicate. Paid/Completed without complete evidence might be an old defect, missing records or another historical workflow. Replacing values until constraints pass would hide the uncertainty. The script reports IDs, preserves records and refuses application when review is needed; it does not choose a settlement winner or reconstruct merchant provenance.
+
+Provider identifiers are only *apparently* duplicated because merchant/environment scope is not stored yet. This task does not add provider uniqueness or a single-Completed-per-booking constraint. The later consistency design must preserve real additional settlements rather than preventing their observation.
+
+## 7. EF model versus database schema
+
+The EF model describes how runtime properties map to storage; it does not prove how that storage was provisioned. C# defaults such as Currency="BDT" or CreatedAt=UtcNow are not themselves SQL defaults. An index and a SQL unique constraint can both enforce uniqueness while representing different metadata.
+
+EF now maps BDT/Initiated/Unpaid/zero/server-UTC defaults, (18,2) precision, the alternate key and explicit cascade FK. Tests compare actual sys.columns to EF types/nullability, verify defaults/key/FK mapping and run the schema gate on the generated SQL result. The old snapshot remains an older model and is explicitly not an authoritative Payment upgrade path.
+
+## 8. Migration versus runtime schema mutation
+
+A controlled migration is a reviewed, explicit change with a known source version, preflight, atomic DDL and a deployment boundary. Runtime schema mutation changes storage merely because an application starts, potentially with unreviewed history/default assumptions. PaymentSchemaGate reads metadata/stamp and fails clearly; it cannot invent or repair Payments, PaymentStatus or ServiceCharge.
+
+An actual Production-mode TestServer with F5 installed but Payment absent proves startup fails with 51061 while both payment objects remain absent. Ordinary startup does not run financial preflight or auto-correct history.
+
+## 9. Forward migration and rollback limits
+
+Later Payment concurrency/provider/initiation/settlement additions must use a new reviewed SQL version, matching runtime mappings and disposable upgrade tests. Version 1 refuses unknown future stamps rather than downgrading them. Failed DDL transactions roll back; successful changes are not reversed by dropping financial tables or reintroducing old startup-owned binaries. Use compatible binaries/schema or a reviewed forward correction. No destructive rollback script was created.
+
+Existing ON DELETE CASCADE behavior is explicitly preserved. This task deletes no records; a future retention/delete-policy change needs a separate business decision. Operators must account for the current FK before deleting a booking.
+
+## 10. Actual local-development findings
+
+Read-only `.\SQLEXPRESS/KarigorDev` metadata/preflight found **no Payments table**, **no Booking.PaymentStatus** and **nine existing bookings, IDs 1–9, with unknown payment-status history**. The upgrade would refuse labeling those bookings Unpaid automatically. No payment attempt/receipt/amount rows exist in a Payments table there, so their duplicate/currency/provider consistency is not evaluable—not certified clean.
+
+The local application database was not changed. Production was not inspected. Valid audited-current upgrades use generated fixtures copied from the old Program/004 schema; they are not inferred from the incomplete local development schema. Existing F5 legacy findings remain separate.
+
+## 11. Tests and results
+
+Schema tests use real disposable SQL Server. Fresh creation verifies all 15 Payment columns and exact EF/default/key/FK correspondence. Valid audited, matching-EF-index, missing-index/FK and wrong-default upgrades compare complete financial snapshots before/after and reapply successfully. Dirty fixtures exercise every selected history condition and confirm no financial change. Missing-column cases prove empty-table compatibility and populated-table refusal. Metadata drift and actual startup refusal are tested.
+
+The first startup check was corrected for SQL Server's normalization of a function's casing. Legacy fixture DDL/data were split into separate batches so the newly added PaymentStatus was visible at compilation. An empty-table JSON snapshot helper was corrected to handle SQL NULL as an empty result. These were setup/verification corrections; no F1 safe assertion or financial preservation assertion was weakened.
+
+Executed commands and final counts are also recorded in the authority guide/harness note. Release build has zero warnings/errors. Full backend and existing real-browser security suites are run; F1 verifier and frontend code are unchanged. Raw logs/reports live in ignored TestResults/payment-schema-* and TestResults/security; browser results are under karigor-client/test-results/security-browser. Final counts are appended below after the final run. Generated databases are dropped through the guarded fixture lifecycle.
+
+## 12. Files changed
+
+| File | Change and purpose |
+|---|---|
+| database/production/006_payment_schema_authority.sql | Sole schema owner, read-only financial/shape preflight, explicit atomic upgrade/stamp |
+| database/004_add_payments.sql | Retire duplicate development owner; clear error, no context/DDL |
+| backend/Karigor.Infrastructure/Models/PaymentSchemaGate.cs | Read-only exact metadata prerequisite verification |
+| backend/Karigor.Infrastructure/Models/KarigorDbContext.cs / Payment.cs | Explicit defaults/precision/alternate key/FK; remove conflicting index metadata |
+| backend/Karigor.Api/Program.cs | Remove Payment DDL and call gate before seeding |
+| tests/Karigor.Security.Tests/Infrastructure/DisposableSqlDatabase.cs | Explicit canonical Payment SQL provisioning and upgrade-test opt-out |
+| tests/Karigor.Security.Tests/PaymentSchemaTests.cs | Fresh/upgrade/history/mapping/metadata/actual-startup SQL evidence |
+| docs/database/PAYMENT_SCHEMA_AUTHORITY.md / ADR 0004 | Comparison, authority, apply/refusal flow, limitations and decision |
+| Migration README, root/production/deployment documentation | One setup path and frozen snapshot policy |
+| F5 database note, F1 guide, harness, this study entry | Current cross-references and truthful historic-versus-current state |
+
+No PaymentService, provider verifier, frontend, historical migration/snapshot, dependency, deployment workflow or production database was changed.
+
+## 13. Remaining limitations and readiness
+
+**YES: Payment schema is sufficiently canonical in this repository and tested disposable databases to begin the next F1 concurrency/idempotency implementation.** SQL 006 owns its definition, runtime EF matches, startup verifies and upgrade/history behavior is tested. Future features can extend that path without independent migration/startup owners.
+
+This is not a concurrency guarantee or deployment approval. Payment versions, initiation idempotency, provider scope/session storage, allocation state, reconciliation worker and durable effect deduplication are still proposed. Ambiguous legacy data needs evidence/operator review. Current cascade delete semantics remain; broader historical snapshot drift and unrelated verification DDL are outside this task. Production, actual hosted upgrade and provider operations are unverified.
+
+## 14. Interview explanations
+
+**30 seconds:** Karigor's payment table was defined independently by a development script and application startup, while production baseline and EF snapshot omitted it. I established one versioned SQL owner, explicit runtime mappings and a read-only startup gate. The upgrade preserves valid financial rows and reports ambiguous history instead of inventing defaults. Real SQL fresh/upgrade/refusal tests and existing security regressions verify it; concurrency/idempotency is the next separate task.
+
+**Two minutes:** A working EF property does not establish a reliable migration history. Karigor only obtained complete payment storage through a particular combination of scripts and restart-time DDL. I audited each definition and followed the SQL-first direction already chosen for negotiations. One host-neutral version owns Payments/PaymentStatus, canonical defaults, unique transaction identity and the existing FK/indexes. EF accurately describes that result, while the old snapshot stays documented as historical.
+
+The upgrade defaults to a read-only report. Explicit application repeats checks with writers stopped and commits the DDL atomically. It never rewrites Paid/Completed or fills a missing historical fee/status just to make storage match. Duplicate-looking receipts and multiple completions remain financial evidence requiring review. Tests compare every valid financial field before/after upgrades, exercise invalid legacy cases on real SQL and prove actual startup refuses missing prerequisites without creating them. That gives the next consistency task a deterministic schema path; it does not itself establish exactly-once financial behavior or production correctness.
+
+## 15. Five interview questions and answers
+
+1. **What is schema drift?** A mismatch between expected models, provisioning definitions and actual installed tables/constraints; different environments may have different results.
+2. **Why freeze the EF snapshot instead of adding a Payment migration?** It already omits newer structures and is not the chosen owner. Adding a migration from it would re-own broader schema and misrepresent deployment history.
+3. **Why not fill a missing ServiceCharge with zero?** Zero is a financial fact, not proof of absence. Existing records need evidence; empty tables can safely acquire a default for future inserts.
+4. **Why report multiple Completed attempts rather than add uniqueness now?** A second real settlement must remain observable. The later allocation model should select one booking settlement while preserving additional financial observations.
+5. **What does the startup gate prove?** Required schema metadata/stamp matches the implemented contract. It does not prove provider truth, correct historical financial data or safe concurrent business transitions.
+
+## 16. What to study next
+
+1. SQL schema ownership, explicit forward versions, migration preflight and writer-outage boundaries.
+2. EF model/default/value generation versus physical SQL metadata and migration history.
+3. Financial uncertainty, immutable evidence and why deduplication differs from deleting duplicate-looking records.
+4. Unique constraints, FK delete/retention semantics, decimal precision and transactional DDL.
+5. Next scoped F1 design: payment/booking versions, initiation keys/fingerprints, provider merchant/environment/session identity, settlement allocation and real-SQL race tests.
+
+## Final executed verification
+
+| Check | Result |
+|---|---|
+| Release solution build | Passed; zero warnings/errors |
+| Full strict backend security gate | **186 passed**, zero failed/expected-failed/skipped; raw/gate exit 0 |
+| Payment schema/upgrade cases within that suite | **35 passed**; fresh schema, four valid upgrade variants, dirty-history refusal, missing-field compatibility and metadata/actual startup checks |
+| Existing F1 verifier cases within that suite | **47 passed**, assertions unchanged |
+| Other established backend security cases | All passing; existing F2/F3/F5/F7 included |
+| Full existing browser security suite, installed Chrome | **36 passed**, including F4 and F1/F5/F7; zero skipped/unexpected/flaky |
+| Diff / documentation links/fences | Passed |
+| Existing local financial preflight | Read-only: nine unknown booking payment statuses; no Payments/PaymentStatus objects added |
+
+Executed: `dotnet build Karigor.slnx --configuration Release --no-restore`; `python scripts/run-security-tests.py --no-build --strict --filter "Finding=PaymentSchema"`; final `python scripts/run-security-tests.py --no-build --strict`; `npm --prefix karigor-client run test:security` with `KARIGOR_TEST_BROWSER_CHANNEL=chrome`; `git diff --check` and document/scope checks.
+
+Final backend report: ignored `TestResults/security/15083a5481824e4b8c3f613d9b5b13ae/security.trx`. The earlier focused schema run had 33 passes before adding actual startup and unsupported-booking-type cases; the final suite includes both. Browser report: ignored `karigor-client/test-results/security-browser/results.json`; logs: `TestResults/payment-schema-*.log`. No new known-defect exception was introduced. Production, hosted CI and an actual production upgrade remain unverified.

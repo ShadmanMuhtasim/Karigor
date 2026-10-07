@@ -8,7 +8,6 @@ namespace Karigor.Infrastructure.Models;
 [Table("Payments")]
 [Index(nameof(BookingId), Name = "IX_Payments_BookingId")]
 [Index(nameof(Status), Name = "IX_Payments_Status")]
-[Index(nameof(TransactionId), Name = "UQ_Payments_TransactionId", IsUnique = true)]
 public partial class Payment
 {
     [Key]

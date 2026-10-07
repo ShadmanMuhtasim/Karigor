@@ -361,6 +361,7 @@ try
     using (var scope = app.Services.CreateScope())
     {
         F5SchemaGate.Verify(scope.ServiceProvider.GetRequiredService<KarigorDbContext>());
+        PaymentSchemaGate.Verify(scope.ServiceProvider.GetRequiredService<KarigorDbContext>());
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
         IdentityRoleSeeder.EnsureAsync(roleManager, "Customer", "Worker", "Admin").GetAwaiter().GetResult();
 
@@ -368,7 +369,7 @@ try
         // here so a new developer database works without manually running SQL.
         var db = scope.ServiceProvider.GetRequiredService<KarigorDbContext>();
 
-        // Ensure database schema migrations (idempotent)
+        // Legacy booking verification compatibility only. Payment DDL belongs to versioned SQL.
         db.Database.ExecuteSqlRaw(@"
             IF NOT EXISTS(SELECT 1 FROM sys.columns WHERE Name = N'VerificationCodeHash' AND Object_ID = Object_ID(N'dbo.Bookings'))
             BEGIN
@@ -380,46 +381,6 @@ try
                     [CheckedInAt]               datetime2     NULL;
             END
 
-            IF NOT EXISTS(SELECT 1 FROM sys.columns WHERE Name = N'PaymentStatus' AND Object_ID = Object_ID(N'dbo.Bookings'))
-            BEGIN
-                ALTER TABLE [dbo].[Bookings]
-                ADD [PaymentStatus] nvarchar(50) NOT NULL DEFAULT 'Unpaid';
-            END
-
-            IF OBJECT_ID(N'[dbo].[Payments]', N'U') IS NULL
-            BEGIN
-                CREATE TABLE [dbo].[Payments] (
-                    [Id]              int            NOT NULL IDENTITY,
-                    [BookingId]       int            NOT NULL,
-                    [TransactionId]   nvarchar(100)  NOT NULL,
-                    [ValId]           nvarchar(100)  NULL,
-                    [BankTranId]      nvarchar(100)  NULL,
-                    [CardType]        nvarchar(100)  NULL,
-                    [Currency]        nvarchar(10)   NOT NULL DEFAULT 'BDT',
-                    [TotalAmount]     decimal(18, 2) NOT NULL,
-                    [PlatformFee]     decimal(18, 2) NOT NULL,
-                    [ServiceCharge]   decimal(18, 2) NOT NULL DEFAULT 0.00,
-                    [WorkerAmount]    decimal(18, 2) NOT NULL,
-                    [Status]          nvarchar(50)   NOT NULL DEFAULT 'Initiated',
-                    [CreatedAt]       datetime2      NOT NULL DEFAULT SYSUTCDATETIME(),
-                    [PaidAt]          datetime2      NULL,
-                    [GatewayResponse] nvarchar(max)  NULL,
-                    CONSTRAINT [PK_Payments] PRIMARY KEY ([Id]),
-                    CONSTRAINT [FK_Payments_Bookings_BookingId]
-                        FOREIGN KEY ([BookingId]) REFERENCES [dbo].[Bookings] ([Id]) ON DELETE CASCADE,
-                    CONSTRAINT [UQ_Payments_TransactionId] UNIQUE ([TransactionId])
-                );
-
-                CREATE INDEX [IX_Payments_BookingId] ON [dbo].[Payments] ([BookingId]);
-                CREATE INDEX [IX_Payments_Status] ON [dbo].[Payments] ([Status]);
-            END
-            ELSE
-            BEGIN
-                IF NOT EXISTS(SELECT 1 FROM sys.columns WHERE Name = N'ServiceCharge' AND Object_ID = Object_ID(N'dbo.Payments'))
-                BEGIN
-                    ALTER TABLE [dbo].[Payments] ADD [ServiceCharge] decimal(18, 2) NOT NULL DEFAULT 0.00;
-                END
-            END
         ");
         var starterCategories = new (string Name, string IconUrl)[]
         {

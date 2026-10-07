@@ -5,6 +5,7 @@ using Karigor.Application.Notifications.DTOs;
 using Karigor.Application.Realtime;
 using Karigor.Infrastructure.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.SqlClient;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -27,8 +28,10 @@ public class MarketplaceService(
     {
         int depth = 0;
         var curr = q;
+        var visited = new HashSet<int> { q.Id };
         while (curr.ParentQuotationId.HasValue && allQuotes.TryGetValue(curr.ParentQuotationId.Value, out var parent))
         {
+            if (!visited.Add(parent.Id)) break; // Corrupt legacy history must not hang reads.
             depth++;
             curr = parent;
         }
@@ -84,106 +87,89 @@ public class MarketplaceService(
 
     public async Task<QuotationDto> CreateQuotationAsync(string workerUserId, CreateQuotationDto dto)
     {
-        var worker = await WorkerAsync(workerUserId);
-        var request = await db.ServiceRequests
-            .Include(x => x.Category)
-            .Include(x => x.Customer)
-            .FirstOrDefaultAsync(x => x.Id == dto.ServiceRequestId)
-            ?? throw new KeyNotFoundException("Service request not found.");
-
-        if (request.Status != "Open")
-            throw new InvalidOperationException("Quotations can only be sent for open requests.");
-
-        // Schedule conflict check:
-        // A worker CAN submit a quotation for a time that overlaps with their existing accepted bookings/active quotes
-        // ONLY IF the Latitude, Longitude, and CustomerId of the new Service Request exactly match the existing one.
-        // If they do not match, block it normally with a time conflict error.
-        var existingBookings = await db.Bookings
-            .Include(b => b.ServiceRequest)
-            .Where(b => b.WorkerId == worker.Id
-                     && b.ServiceRequestId != request.Id
-                     && (b.Status == "Scheduled" || b.Status == "InProgress"))
-            .ToListAsync();
-
-        var existingActiveQuotes = await db.Quotations
-            .Include(q => q.ServiceRequest)
-            .Where(q => q.WorkerId == worker.Id
-                     && q.ServiceRequestId != request.Id
-                     && q.Status == "Pending"
-                     && q.ServiceRequest.Status == "Open")
-            .ToListAsync();
-
-        var overlappingBookings = existingBookings
-            .Where(b => IsTimeOverlapping(b.ScheduledDate, request.PreferredDate))
-            .ToList();
-
-        var overlappingQuotes = existingActiveQuotes
-            .Where(q => IsTimeOverlapping(q.ServiceRequest.PreferredDate, request.PreferredDate))
-            .ToList();
-
-        bool hasOverlap = overlappingBookings.Count > 0 || overlappingQuotes.Count > 0;
-        bool hasSimultaneousJobWarning = false;
-
-        if (hasOverlap)
+        ValidatePrice(dto.ProposedPrice);
+        var (quotation, worker, request, hasSimultaneousJobWarning) = await NegotiationTransactionAsync(async () =>
         {
-            // Verify whether all overlapping bookings and quotes match CustomerId, Latitude, and Longitude
-            bool allMatchGeoCustomer =
-                overlappingBookings.All(b => IsSameLocationAndCustomer(
-                    request.CustomerId, request.Latitude, request.Longitude,
-                    b.CustomerId, b.ServiceRequest?.Latitude, b.ServiceRequest?.Longitude))
-                &&
-                overlappingQuotes.All(q => IsSameLocationAndCustomer(
-                    request.CustomerId, request.Latitude, request.Longitude,
-                    q.ServiceRequest.CustomerId, q.ServiceRequest.Latitude, q.ServiceRequest.Longitude));
+            var worker = await WorkerAsync(workerUserId);
+            var request = await db.ServiceRequests.Include(x => x.Category).Include(x => x.Customer)
+                .SingleOrDefaultAsync(x => x.Id == dto.ServiceRequestId)
+                ?? throw new KeyNotFoundException("Service request not found.");
+            if (request.Customer.UserId == workerUserId) throw new UnauthorizedAccessException("Cannot bid on your own request.");
+            if (request.Status != "Open") throw new NegotiationConflictException();
+            // An initial POST is a submission, never an edit or a second root.
+            if (await db.Quotations.AnyAsync(q => q.ServiceRequestId == request.Id && q.WorkerId == worker.Id))
+                throw new NegotiationConflictException();
+            // Schedule conflict check:
+            // A worker CAN submit a quotation for a time that overlaps with their existing accepted bookings/active quotes
+            // ONLY IF the Latitude, Longitude, and CustomerId of the new Service Request exactly match the existing one.
+            // If they do not match, block it normally with a time conflict error.
+            var existingBookings = await db.Bookings
+                .Include(b => b.ServiceRequest)
+                .Where(b => b.WorkerId == worker.Id
+                         && b.ServiceRequestId != request.Id
+                         && (b.Status == "Scheduled" || b.Status == "InProgress"))
+                .ToListAsync();
 
-            if (!allMatchGeoCustomer)
+            var existingActiveQuotes = await db.Quotations
+                .Include(q => q.ServiceRequest)
+                .Where(q => q.WorkerId == worker.Id
+                         && q.ServiceRequestId != request.Id
+                         && q.Status == "Pending"
+                         && q.ServiceRequest.Status == "Open")
+                .ToListAsync();
+
+            var overlappingBookings = existingBookings
+                .Where(b => IsTimeOverlapping(b.ScheduledDate, request.PreferredDate))
+                .ToList();
+
+            var overlappingQuotes = existingActiveQuotes
+                .Where(q => IsTimeOverlapping(q.ServiceRequest.PreferredDate, request.PreferredDate))
+                .ToList();
+
+            bool hasOverlap = overlappingBookings.Count > 0 || overlappingQuotes.Count > 0;
+            bool hasSimultaneousJobWarning = false;
+
+            if (hasOverlap)
             {
-                throw new InvalidOperationException(
-                    "Schedule conflict: You have an existing booking or quotation overlapping with this scheduled time.");
-            }
+                // Verify whether all overlapping bookings and quotes match CustomerId, Latitude, and Longitude
+                bool allMatchGeoCustomer =
+                    overlappingBookings.All(b => IsSameLocationAndCustomer(
+                        request.CustomerId, request.Latitude, request.Longitude,
+                        b.CustomerId, b.ServiceRequest?.Latitude, b.ServiceRequest?.Longitude))
+                    &&
+                    overlappingQuotes.All(q => IsSameLocationAndCustomer(
+                        request.CustomerId, request.Latitude, request.Longitude,
+                        q.ServiceRequest.CustomerId, q.ServiceRequest.Latitude, q.ServiceRequest.Longitude));
 
-            // Exception triggered: same time, location, and customer!
-            hasSimultaneousJobWarning = true;
-
-            // Automatically generate a Notification record for the Customer warning them about the multi-job bid.
-            if (request.Customer != null)
-            {
-                await notificationService.CreateNotificationAsync(new CreateNotificationDto
+                if (!allMatchGeoCustomer)
                 {
-                    UserId          = request.Customer.UserId,
-                    Type            = "MultiJobBidWarning",
-                    Message         = $"⚠️ Worker submitted a quotation for '{request.Category?.Name ?? "Service"}' scheduled at the same time and location as your other request.",
-                    RelatedEntityId = request.Id
-                });
+                    throw new InvalidOperationException(
+                        "Schedule conflict: You have an existing booking or quotation overlapping with this scheduled time.");
+                }
+
+                // Exception triggered: same time, location, and customer!
+                hasSimultaneousJobWarning = true;
+
             }
-        }
 
-        // If worker already has an active pending quote for this job, update it; otherwise create a new quote
-        var existingPending = await db.Quotations
-            .FirstOrDefaultAsync(x => x.ServiceRequestId == request.Id && x.WorkerId == worker.Id && x.Status == "Pending");
-
-        Quotation quotation;
-        if (existingPending != null)
-        {
-            existingPending.ProposedPrice = dto.ProposedPrice;
-            existingPending.Message = dto.Message?.Trim();
-            quotation = existingPending;
-        }
-        else
-        {
-            quotation = new Quotation
+            await TouchRequestAsync(request);
+            var quotation = new Quotation
             {
-                ServiceRequestId  = request.Id,
-                WorkerId          = worker.Id,
-                ProposedPrice     = dto.ProposedPrice,
-                Message           = dto.Message?.Trim(),
-                Status            = "Pending"
+                ServiceRequestId = request.Id, WorkerId = worker.Id,
+                ProposedPrice = dto.ProposedPrice, Message = dto.Message?.Trim(), Status = "Pending",
+                ProposedByUserId = workerUserId, CreatedAt = DateTime.UtcNow
             };
             db.Quotations.Add(quotation);
-        }
+            await db.SaveChangesAsync();
+            return (quotation, worker, request, hasSimultaneousJobWarning);
+        });
 
-        await db.SaveChangesAsync();
-
+        if (hasSimultaneousJobWarning)
+            await notificationService.CreateNotificationAsync(new CreateNotificationDto
+            {
+                UserId = request.Customer.UserId, Type = "MultiJobBidWarning",
+                Message = "Worker is bidding on another job at the same time and location.", RelatedEntityId = request.Id
+            });
         // Notify customer
         if (request.Customer != null)
         {
@@ -292,9 +278,7 @@ public class MarketplaceService(
             var req = firstQuote.ServiceRequest;
             if (req == null) continue;
 
-            var quotesDict = allInThread.ToDictionary(q => q.Id);
-            int depth = GetNegotiationDepth(latestQuote, quotesDict);
-            string proposedBy = (depth % 2 == 0) ? "Worker" : "Customer";
+            string proposedBy = ProposerRole(latestQuote);
 
             list.Add(new WorkerQuotationSummaryDto
             {
@@ -308,6 +292,8 @@ public class MarketplaceService(
                 LatestPrice           = latestQuote.ProposedPrice,
                 LatestStatus          = latestQuote.Status,
                 LatestProposedBy      = proposedBy,
+                LatestProposedByUserId = latestQuote.ProposedByUserId,
+                Version = Convert.ToBase64String(latestQuote.RowVersion),
                 LatestMessage         = latestQuote.Message,
                 NegotiationStepsCount = allInThread.Count,
                 PreferredDate         = req.PreferredDate
@@ -337,7 +323,7 @@ public class MarketplaceService(
 
         var allQuotes = await db.Quotations
             .Include(x => x.Worker).ThenInclude(x => x.User)
-            .Include(x => x.ServiceRequest)
+            .Include(x => x.ServiceRequest).ThenInclude(x => x.Customer)
             .Where(x => x.ServiceRequestId == requestId)
             .OrderBy(x => x.Id)
             .ToListAsync();
@@ -364,77 +350,31 @@ public class MarketplaceService(
         }).ToList();
     }
 
-    public async Task<BookingDto> AcceptQuotationAsync(string userId, int quotationId)
+    public async Task<BookingDto> AcceptQuotationAsync(string userId, int quotationId, string? expectedVersion)
     {
-        var customer = await db.CustomerProfiles.FirstOrDefaultAsync(x => x.UserId == userId);
-        var worker = await db.WorkerProfiles.FirstOrDefaultAsync(x => x.UserId == userId);
-
-        if (customer is null && worker is null)
-            throw new UnauthorizedAccessException("User profile not found.");
-
-        var quote = await db.Quotations
-            .Include(x => x.ServiceRequest).ThenInclude(x => x.Category)
-            .Include(x => x.ServiceRequest).ThenInclude(x => x.Customer)
-            .Include(x => x.Worker).ThenInclude(x => x.User)
-            .FirstOrDefaultAsync(x => x.Id == quotationId)
-            ?? throw new KeyNotFoundException("Quotation not found.");
-
-        if (quote.Status != "Pending")
-            throw new InvalidOperationException("Only a pending quotation or counter-offer can be accepted.");
-
-        if (quote.ServiceRequest.Status != "Open")
-            throw new InvalidOperationException("This service request is no longer open.");
-
-        // Calculate who proposed this pending quote
-        var allQuotes = await db.Quotations
-            .Where(x => x.ServiceRequestId == quote.ServiceRequestId)
-            .ToDictionaryAsync(x => x.Id);
-
-        int depth = GetNegotiationDepth(quote, allQuotes);
-        string proposedBy = (depth % 2 == 0) ? "Worker" : "Customer";
-
-        // If proposed by Worker, caller must be the Customer
-        if (proposedBy == "Worker")
+        var (quote, booking) = await NegotiationTransactionAsync(async () =>
         {
-            if (customer is null || quote.ServiceRequest.CustomerId != customer.Id)
-                throw new UnauthorizedAccessException("Only the customer can accept this proposal.");
-        }
-        // If proposed by Customer (counter-offer), caller must be the Worker
-        else
-        {
-            if (worker is null || quote.WorkerId != worker.Id)
-                throw new UnauthorizedAccessException("Only the worker can accept this counter-offer.");
-        }
-
-        var strategy = db.Database.CreateExecutionStrategy();
-        var booking = await strategy.ExecuteAsync(async () =>
-        {
-            await using var transaction = await db.Database.BeginTransactionAsync();
-            quote.Status = "Accepted";
+            // Every retry loads fresh state inside its own transaction.
+            var quote = await CurrentOfferAsync(userId, quotationId, expectedVersion);
             quote.ServiceRequest.Status = "InProgress";
-
-            var otherQuotes = await db.Quotations
-                .Where(x => x.ServiceRequestId == quote.ServiceRequestId && x.Id != quote.Id && x.Status == "Pending")
+            await TouchRequestAsync(quote.ServiceRequest);
+            quote.Status = "Accepted";
+            var competitors = await db.Quotations
+                .Where(q => q.ServiceRequestId == quote.ServiceRequestId && q.Id != quote.Id && q.Status == "Pending")
                 .ToListAsync();
-
-            foreach (var other in otherQuotes) other.Status = "Rejected";
-
-            var b = new Booking
-            {
-                ServiceRequestId = quote.ServiceRequestId,
-                WorkerId         = quote.WorkerId,
-                CustomerId       = quote.ServiceRequest.CustomerId,
-                AgreedPrice      = quote.ProposedPrice,
-                ScheduledDate    = quote.ServiceRequest.PreferredDate,
-                Status           = "Scheduled"
-            };
-
-            db.Bookings.Add(b);
+            foreach (var other in competitors) other.Status = "Rejected";
             await db.SaveChangesAsync();
-            await transaction.CommitAsync();
-
-            return b;
+            var booking = new Booking
+            {
+                ServiceRequestId = quote.ServiceRequestId, WorkerId = quote.WorkerId,
+                CustomerId = quote.ServiceRequest.CustomerId, AgreedPrice = quote.ProposedPrice,
+                ScheduledDate = quote.ServiceRequest.PreferredDate, Status = "Scheduled"
+            };
+            db.Bookings.Add(booking);
+            await db.SaveChangesAsync();
+            return (quote, booking);
         });
+        var proposedBy = ProposerRole(quote);
 
         // Notify other party
         var customerName = quote.ServiceRequest.Customer?.FullName ?? "Customer";
@@ -490,57 +430,28 @@ public class MarketplaceService(
 
     public async Task<QuotationDto> CounterQuotationAsync(string userId, int quotationId, CounterQuotationDto dto)
     {
-        var customer = await db.CustomerProfiles.FirstOrDefaultAsync(x => x.UserId == userId);
-        var worker = await db.WorkerProfiles.FirstOrDefaultAsync(x => x.UserId == userId);
-
-        if (customer is null && worker is null)
-            throw new UnauthorizedAccessException("User profile not found.");
-
-        var quote = await db.Quotations
-            .Include(x => x.ServiceRequest).ThenInclude(x => x.Customer)
-            .Include(x => x.Worker).ThenInclude(x => x.User)
-            .FirstOrDefaultAsync(x => x.Id == quotationId)
-            ?? throw new KeyNotFoundException("Quotation not found.");
-
-        if (quote.Status != "Pending" || quote.ServiceRequest.Status != "Open")
-            throw new InvalidOperationException("Only a pending quote on an open request can be countered.");
-
-        // Calculate who proposed this pending quote
-        var allQuotes = await db.Quotations
-            .Where(x => x.ServiceRequestId == quote.ServiceRequestId)
-            .ToDictionaryAsync(x => x.Id);
-
-        int depth = GetNegotiationDepth(quote, allQuotes);
-        string proposedBy = (depth % 2 == 0) ? "Worker" : "Customer";
-
-        // If proposed by Worker, Customer counters
-        if (proposedBy == "Worker")
+        ValidatePrice(dto.ProposedPrice);
+        var (quote, counter) = await NegotiationTransactionAsync(async () =>
         {
-            if (customer is null || quote.ServiceRequest.CustomerId != customer.Id)
-                throw new UnauthorizedAccessException("Only the customer can counter this proposal.");
-        }
-        // If proposed by Customer, Worker counters
-        else
-        {
-            if (worker is null || quote.WorkerId != worker.Id)
-                throw new UnauthorizedAccessException("Only the worker can counter this counter-offer.");
-        }
-
-        quote.Status = "Countered";
-        var counter = new Quotation
-        {
-            ServiceRequestId  = quote.ServiceRequestId,
-            WorkerId          = quote.WorkerId,
-            ProposedPrice     = dto.ProposedPrice,
-            Message           = dto.Message?.Trim(),
-            Status            = "Pending",
-            ParentQuotationId = quote.Id
-        };
-
-        db.Quotations.Add(counter);
-        await db.SaveChangesAsync();
-
-        int newDepth = depth + 1;
+            var quote = await CurrentOfferAsync(userId, quotationId, dto.ExpectedVersion);
+            await TouchRequestAsync(quote.ServiceRequest);
+            quote.Status = "Countered";
+            // Release the filtered Pending key before inserting its immutable child.
+            await db.SaveChangesAsync();
+            var counter = new Quotation
+            {
+                ServiceRequestId = quote.ServiceRequestId, WorkerId = quote.WorkerId,
+                ProposedPrice = dto.ProposedPrice, Message = dto.Message?.Trim(), Status = "Pending",
+                ParentQuotationId = quote.Id, ProposedByUserId = userId, CreatedAt = DateTime.UtcNow
+            };
+            db.Quotations.Add(counter);
+            await db.SaveChangesAsync();
+            return (quote, counter);
+        });
+        var proposedBy = ProposerRole(quote);
+        var history = await db.Quotations.AsNoTracking().Where(q => q.ServiceRequestId == quote.ServiceRequestId)
+            .ToDictionaryAsync(q => q.Id);
+        int newDepth = GetNegotiationDepth(counter, history);
         var customerName = quote.ServiceRequest.Customer?.FullName ?? "Customer";
         var workerName = quote.Worker?.User?.Email ?? "Worker";
 
@@ -583,6 +494,64 @@ public class MarketplaceService(
 
         bool warning = await CheckSimultaneousJobWarningAsync(quote.WorkerId, quote.ServiceRequest);
         return ToDto(counter, quote.Worker, newDepth, warning);
+    }
+
+    private static string ProposerRole(Quotation offer) =>
+        offer.ProposedByUserId is null ? "Unknown" :
+        offer.ProposedByUserId == offer.Worker.UserId ? "Worker" :
+        offer.ProposedByUserId == offer.ServiceRequest.Customer.UserId ? "Customer" : "Unknown";
+
+    private static void ValidatePrice(decimal price)
+    {
+        if (price < 0.01m || price > 99999999m || decimal.Round(price, 2) != price)
+            throw new InvalidOperationException("Offer prices must be positive and have at most two decimal places.");
+    }
+
+    private async Task<Quotation> CurrentOfferAsync(string actor, int id, string? expectedVersion)
+    {
+        var quote = await db.Quotations
+            .Include(q => q.Worker).ThenInclude(w => w.User)
+            .Include(q => q.ServiceRequest).ThenInclude(r => r.Customer)
+            .Include(q => q.ServiceRequest).ThenInclude(r => r.Category)
+            .SingleOrDefaultAsync(q => q.Id == id) ?? throw new KeyNotFoundException("Quotation not found.");
+        var customer = quote.ServiceRequest.Customer.UserId;
+        var worker = quote.Worker.UserId;
+        if ((actor != customer && actor != worker) || actor == quote.ProposedByUserId || customer == worker)
+            throw new UnauthorizedAccessException("Only the opposite participant may respond to an offer.");
+        if (quote.ProposedByUserId != customer && quote.ProposedByUserId != worker)
+            throw new NegotiationConflictException(); // Unknown legacy provenance fails closed.
+        if (quote.Status != "Pending" || quote.ServiceRequest.Status != "Open" ||
+            expectedVersion != Convert.ToBase64String(quote.RowVersion) ||
+            await db.Quotations.AnyAsync(q => q.ParentQuotationId == id) ||
+            await db.Bookings.AnyAsync(b => b.ServiceRequestId == quote.ServiceRequestId))
+            throw new NegotiationConflictException();
+        return quote;
+    }
+
+    private async Task TouchRequestAsync(ServiceRequest request)
+    {
+        // A rowversion-checked write orders all F5 mutations on this request.
+        // Save it first so competing workers cannot commit inconsistent winners.
+        db.Entry(request).Property(r => r.Status).IsModified = true;
+        await db.SaveChangesAsync();
+    }
+
+    private async Task<T> NegotiationTransactionAsync<T>(Func<Task<T>> action)
+    {
+        try
+        {
+            return await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+            {
+                db.ChangeTracker.Clear();
+                await using var transaction = await db.Database.BeginTransactionAsync();
+                var result = await action();
+                await transaction.CommitAsync();
+                return result;
+            });
+        }
+        catch (DbUpdateConcurrencyException) { db.ChangeTracker.Clear(); throw new NegotiationConflictException(); }
+        catch (DbUpdateException e) when (e.InnerException is SqlException { Number: 2601 or 2627 })
+        { db.ChangeTracker.Clear(); throw new NegotiationConflictException(); }
     }
 
     private async Task NotifyQuotationParticipantsAsync(int quotationId, object data)
@@ -944,7 +913,10 @@ public class MarketplaceService(
             Status                      = x.Status,
             ParentQuotationId           = x.ParentQuotationId,
             NegotiationDepth            = depth,
-            ProposedBy                  = (depth % 2 == 0) ? "Worker" : "Customer",
+            ProposedBy                  = ProposerRole(x),
+            ProposedByUserId            = x.ProposedByUserId,
+            CreatedAt                  = x.CreatedAt,
+            Version                    = Convert.ToBase64String(x.RowVersion),
             HasSimultaneousJobWarning   = hasSimultaneousJobWarning
         };
 }

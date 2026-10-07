@@ -25,6 +25,15 @@ public partial class Quotation
 
     public int? ParentQuotationId { get; set; }
 
+    [StringLength(450)]
+    public string? ProposedByUserId { get; set; }
+
+    // Unknown for legacy rows; never synthesize a historical submission time.
+    public DateTime? CreatedAt { get; set; }
+
+    [Timestamp]
+    public byte[] RowVersion { get; set; } = [];
+
     [InverseProperty("ParentQuotation")]
     public virtual ICollection<Quotation> InverseParentQuotation { get; set; } = new List<Quotation>();
 

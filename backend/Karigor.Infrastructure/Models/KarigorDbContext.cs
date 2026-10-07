@@ -52,6 +52,7 @@ public partial class KarigorDbContext : IdentityDbContext<ApplicationUser>
 
         modelBuilder.Entity<Booking>(entity =>
         {
+            entity.HasIndex(e => e.ServiceRequestId).IsUnique().HasDatabaseName("UX_F5_Bookings_Request");
             entity.Property(e => e.Status).HasDefaultValue("Scheduled");
 
             entity.HasOne(d => d.Customer).WithMany(p => p.Bookings).OnDelete(DeleteBehavior.ClientSetNull);
@@ -75,6 +76,18 @@ public partial class KarigorDbContext : IdentityDbContext<ApplicationUser>
 
         modelBuilder.Entity<Quotation>(entity =>
         {
+            entity.ToTable(t =>
+            {
+                t.UseSqlOutputClause(false);
+                t.HasTrigger("TR_F5_Quotation_Immutable");
+                t.HasCheckConstraint("CK_F5_Quotation_Status", "[Status] IN (N'Pending',N'Countered',N'Accepted',N'Rejected')");
+            });
+            entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(e => e.ProposedByUserId)
+                .OnDelete(DeleteBehavior.NoAction).HasConstraintName("FK_F5_Quotation_Proposer");
+            entity.HasIndex(e => new { e.ServiceRequestId, e.WorkerId }).IsUnique()
+                .HasFilter("[Status] = N'Pending'").HasDatabaseName("UX_F5_Quotations_Pending");
+            entity.HasIndex(e => e.ParentQuotationId).IsUnique()
+                .HasFilter("[ParentQuotationId] IS NOT NULL").HasDatabaseName("UX_F5_Quotations_Child");
             entity.Property(e => e.Status).HasDefaultValue("Pending");
 
             entity.HasOne(d => d.Worker).WithMany(p => p.Quotations).OnDelete(DeleteBehavior.ClientSetNull);

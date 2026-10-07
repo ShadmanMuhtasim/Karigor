@@ -2,7 +2,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { marketplaceApi, type QuotationDto } from '../api/marketplaceApi';
+import { marketplaceApi, isNegotiationConflict, negotiationConflictMessage, type QuotationDto } from '../api/marketplaceApi';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
@@ -30,6 +30,8 @@ export function RequestDetailPage() {
 
   // State for Counter Offer
   const [counterFor, setCounterFor] = useState<number | null>(null);
+  const [counterVersion, setCounterVersion] = useState('');
+  const [negotiationError, setNegotiationError] = useState<string | null>(null);
   const [counterPrice, setCounterPrice] = useState('');
   const [counterMessage, setCounterMessage] = useState('');
   const [counterError, setCounterError] = useState<string | null>(null);
@@ -91,8 +93,19 @@ export function RequestDetailPage() {
   });
 
   // Mutations
+  const refreshNegotiation = () => {
+    setCounterFor(null);
+    setCounterPrice('');
+    setCounterMessage('');
+    setNegotiationError(negotiationConflictMessage);
+    queryClient.invalidateQueries({ queryKey: ['quotations', requestId] });
+    queryClient.invalidateQueries({ queryKey: ['serviceRequestDetails', requestId] });
+    queryClient.invalidateQueries({ queryKey: ['workerQuotations'] });
+    queryClient.invalidateQueries({ queryKey: ['customerBookings'] });
+    queryClient.invalidateQueries({ queryKey: ['workerBookings'] });
+  };
   const acceptMutation = useMutation({
-    mutationFn: (quotationId: number) => marketplaceApi.acceptQuotation(quotationId),
+    mutationFn: (offer: QuotationDto) => marketplaceApi.acceptQuotation(offer.id, offer.version),
     onSuccess: (booking) => {
       queryClient.invalidateQueries({ queryKey: ['quotations', requestId] });
       queryClient.invalidateQueries({ queryKey: ['serviceRequestDetails', requestId] });
@@ -102,12 +115,17 @@ export function RequestDetailPage() {
         navigate(`/bookings/${booking.id}`);
       }
     },
+    onError: (err: any) => {
+      if (isNegotiationConflict(err)) refreshNegotiation();
+      else setNegotiationError(err.response?.data?.error || 'Could not accept offer. Please try again.');
+    },
   });
 
   const counterMutation = useMutation({
     mutationFn: () =>
       marketplaceApi.counterQuotation(
         counterFor!,
+        counterVersion,
         Number(counterPrice),
         counterMessage.trim() || undefined
       ),
@@ -121,6 +139,7 @@ export function RequestDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['workerQuotations'] });
     },
     onError: (err: any) => {
+      if (isNegotiationConflict(err)) { refreshNegotiation(); return; }
       const msg = err.response?.data?.error || err.response?.data?.message || 'Failed to submit counter-offer.';
       setCounterError(msg);
     },
@@ -145,6 +164,7 @@ export function RequestDetailPage() {
     onError: (err: any) => {
       const msg = err.response?.data?.error || err.response?.data?.message || 'Failed to submit quotation.';
       setQuoteError(msg);
+      if (isNegotiationConflict(err)) refreshNegotiation();
     },
   });
 
@@ -219,6 +239,7 @@ export function RequestDetailPage() {
       <Navbar />
 
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8 space-y-6 animate-fade-in-up">
+        {negotiationError && <p role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">{negotiationError}</p>}
         {/* Breadcrumb / Back */}
         <div className="flex items-center justify-between">
           <Link
@@ -442,9 +463,10 @@ export function RequestDetailPage() {
                 const isAccepted = latestQuote.status === 'Accepted';
                 const isRejected = latestQuote.status === 'Rejected';
 
-                const latestProposedBy = latestQuote.proposedBy || 'Worker';
-                const canCustomerAct = !isWorker && isPending && latestProposedBy === 'Worker' && request.status === 'Open';
-                const canWorkerAct = isWorker && isPending && latestProposedBy === 'Customer' && request.status === 'Open';
+                const latestProposedBy = latestQuote.proposedBy || 'Unknown';
+                const oppositeAuthor = !!latestQuote.proposedByUserId && latestQuote.proposedByUserId !== user?.userId;
+                const canCustomerAct = !isWorker && oppositeAuthor && isPending && latestProposedBy === 'Worker' && request.status === 'Open';
+                const canWorkerAct = isWorker && oppositeAuthor && isPending && latestProposedBy === 'Customer' && request.status === 'Open';
 
                 return (
                   <div
@@ -513,7 +535,7 @@ export function RequestDetailPage() {
                                     ) : (
                                       <>
                                         <HardHatIcon className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                                        <span>{q.workerName} (Offer)</span>
+                                        <span>{q.proposedBy === 'Worker' ? `${q.workerName} (Offer)` : 'Historical author unknown'}</span>
                                       </>
                                     )}
                                   </span>
@@ -575,7 +597,7 @@ export function RequestDetailPage() {
                         <button
                           type="button"
                           disabled={acceptMutation.isPending}
-                          onClick={() => acceptMutation.mutate(latestQuote.id)}
+                          onClick={() => acceptMutation.mutate(latestQuote)}
                           className="btn-press w-full sm:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition cursor-pointer text-center"
                         >
                           {acceptMutation.isPending
@@ -584,7 +606,7 @@ export function RequestDetailPage() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => setCounterFor(counterFor === latestQuote.id ? null : latestQuote.id)}
+                          onClick={() => { setCounterVersion(latestQuote.version); setCounterFor(counterFor === latestQuote.id ? null : latestQuote.id); }}
                           className="btn-press w-full sm:w-auto px-4 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 text-gray-800 dark:text-gray-200 rounded-xl text-xs font-bold transition cursor-pointer text-center"
                         >
                           Counter-Offer
@@ -602,7 +624,7 @@ export function RequestDetailPage() {
                           <button
                             type="button"
                             disabled={acceptMutation.isPending}
-                            onClick={() => acceptMutation.mutate(latestQuote.id)}
+                            onClick={() => acceptMutation.mutate(latestQuote)}
                             className="btn-press w-full sm:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition cursor-pointer text-center"
                           >
                             {acceptMutation.isPending
@@ -611,7 +633,7 @@ export function RequestDetailPage() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => setCounterFor(counterFor === latestQuote.id ? null : latestQuote.id)}
+                            onClick={() => { setCounterVersion(latestQuote.version); setCounterFor(counterFor === latestQuote.id ? null : latestQuote.id); }}
                             className="btn-press w-full sm:w-auto px-4 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 text-gray-800 dark:text-gray-200 rounded-xl text-xs font-bold transition cursor-pointer text-center"
                           >
                             Counter Back
@@ -623,7 +645,7 @@ export function RequestDetailPage() {
                     {/* Waiting Indicator */}
                     {isPending && !canCustomerAct && !canWorkerAct && request.status === 'Open' && (
                       <p className="text-xs text-amber-600 dark:text-amber-400 italic pt-1">
-                        {latestProposedBy === 'Customer'
+                        {latestProposedBy === 'Unknown' ? 'Historical author unknown. This negotiation requires review.' : latestProposedBy === 'Customer'
                           ? 'Waiting for worker response on your counter-offer…'
                           : 'Waiting for customer review on quotation…'}
                       </p>

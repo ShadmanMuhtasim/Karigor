@@ -14,6 +14,8 @@ public class WorkerQuotationSummaryDto
     public decimal LatestPrice { get; set; }
     public string LatestStatus { get; set; } = string.Empty; // "Pending", "Countered", "Accepted", "Rejected"
     public string LatestProposedBy { get; set; } = string.Empty; // "Worker" or "Customer"
+    public string? LatestProposedByUserId { get; set; }
+    public string Version { get; set; } = string.Empty;
     public string? LatestMessage { get; set; }
     public int NegotiationStepsCount { get; set; }
     public DateTime PreferredDate { get; set; }

@@ -1,5 +1,7 @@
 # Historical EF migrations
 
-These migrations and their snapshot describe an older schema. They are retained as historical artifacts, not the F5 upgrade path. Ordinary startup calls neither `Migrate` nor `EnsureCreated`.
+These migrations and their snapshot describe an older schema. They are retained as historical artifacts, not the F5 or Payment upgrade path. Ordinary startup calls neither `Migrate` nor `EnsureCreated`.
 
 F5 is owned exclusively by [the versioned SQL script](../../../database/production/005_f5_negotiation_integrity.sql). Its mappings are in the current models/DbContext. Do not generate or apply an independent F5 EF migration from this stale snapshot. See [schema authority and migration](../../../docs/database/F5_SCHEMA_AUTHORITY_AND_MIGRATION.md) and [ADR 0003](../../../docs/adr/0003-f5-sql-authority-and-immutable-negotiation.md).
+
+Payment is owned exclusively by [006_payment_schema_authority.sql](../../../database/production/006_payment_schema_authority.sql). Current EF mapping matches it; startup verifies it. The old snapshot has no Payment entity or Booking.PaymentStatus and is deliberately not rewritten to manufacture an applied EF history. Do not generate/apply an independent Payment migration from it. See [Payment schema authority](../../../docs/database/PAYMENT_SCHEMA_AUTHORITY.md) and [ADR 0004](../../../docs/adr/0004-payment-schema-authority.md). Later payment concurrency metadata must use a reviewed forward SQL version plus matching mappings/tests.

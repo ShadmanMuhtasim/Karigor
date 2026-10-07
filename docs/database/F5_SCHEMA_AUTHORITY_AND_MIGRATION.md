@@ -65,4 +65,6 @@ Nine dirty legacy fixtures separately exercise the required failures; a clean in
 
 ## Payment readiness
 
+**Subsequent implemented update (2026-10-07):** [Payment schema authority](PAYMENT_SCHEMA_AUTHORITY.md) now establishes 006 as the sole payment owner, explicit EF mappings and read-only startup verification. Fresh provisioning requires both 005 and 006. The historical paragraph below records the state at F5 completion. Payment concurrency/idempotency is still proposed work, and production is unverified.
+
 F5's relevant columns/guards are canonical through this SQL path. **The overall payment schema is not yet canonical.** Payment/PaymentStatus remain missing from the old production baseline/EF snapshot and are filled by startup DDL. Payment concurrency needs its own narrow authority/reconciliation, booking/payment versions, settlement allocation uniqueness and coordinated tests. This F5 task adds no payment version, settlement pointer, outbox or scheduling guarantee across separate requests.

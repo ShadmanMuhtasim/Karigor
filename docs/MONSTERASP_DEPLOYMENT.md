@@ -110,7 +110,7 @@ Before deploying, ensure you have:
 
 ## 7. Database Schema & Seed Deployment
 
-Before launching the web application, provision the database schema and seed data using the production-safe scripts in [database/production/](file:///j:/SD_3200_1/database/production/).
+Before launching the web application, provision the baseline, seed data and explicit versioned upgrades in [database/production/](../database/production/). Ordinary startup verifies F5 and Payment prerequisites; it does not install them.
 
 ### Execution Order
 
@@ -127,6 +127,8 @@ Before launching the web application, provision the database schema and seed dat
    ```
    *Idempotently seeds core Identity Roles (`Customer`, `Worker`, `Admin`) and the 10 starter trade categories with CDN icons.*
 
+5. Preflight `database/production/005_f5_negotiation_integrity.sql` and `006_payment_schema_authority.sql` in their default read-only modes. Resolve reported issues, then follow the [F5](database/F5_SCHEMA_AUTHORITY_AND_MIGRATION.md) and [Payment](database/PAYMENT_SCHEMA_AUTHORITY.md) guides to explicitly apply them during a writer outage. Both are required on fresh databases. Financial history is not automatically corrected, and the retired development 004 script is not an alternative Payment owner.
+
 ### Schema Verification Query
 ```sql
 SELECT TABLE_NAME, TABLE_TYPE 
@@ -134,7 +136,7 @@ FROM INFORMATION_SCHEMA.TABLES
 WHERE TABLE_TYPE = 'BASE TABLE'
 ORDER BY TABLE_NAME;
 ```
-*Expected: 21 tables.*
+*Expected after the versioned upgrades: 22 tables, including Payments.*
 
 ---
 
@@ -223,7 +225,7 @@ sequenceDiagram
     Admin->>Dashboard: 1. Create Website & MSSQL DB
     Admin->>Dashboard: 2. Enable WebDeploy & Copy Credentials
     Admin->>Dashboard: 3. Set Environment Variables (ASPNETCORE_ENVIRONMENT, DB, JWT)
-    Admin->>DB: 4. Run 001_schema.sql and 002_seed.sql
+    Admin->>DB: 4. Run baseline/seed, preflight and explicitly apply 005/006
     Admin->>GitHub: 5. Add GitHub Secrets (WEBSITE_NAME, SERVER_*, etc.)
     Admin->>GitHub: 6. Push to main (or trigger workflow_dispatch)
     GitHub->>IIS: 7. Build, Test, Publish & Deploy via WebDeploy
@@ -300,7 +302,7 @@ To guarantee that continuous deployment runs do not delete uploaded user files:
 
 ## 18. Rollback & Redeployment
 
-- **Redeploying:** Re-running the GitHub Actions workflow deploys the latest build cleanly. Idempotent database scripts ensure no schema conflicts occur.
+- **Redeploying:** Re-running the workflow deploys application binaries. It does not apply SQL upgrades. Review preflight and apply required versioned prerequisites separately before starting compatible binaries.
 - **Rollback:** In GitHub Actions, navigate to the last successful workflow run or revert the commit on `main`. Pushing the revert commit triggers an automatic redeployment of the prior stable state.
 
 ---

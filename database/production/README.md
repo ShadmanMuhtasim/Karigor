@@ -2,6 +2,8 @@
 
 **F5 cutover requirement (2026-10-07):** Before starting the F5 API, run the default read-only preflight in `005_f5_negotiation_integrity.sql`, resolve reported legacy issues, then explicitly apply that same script during a writer outage. It is the only F5 schema owner; ordinary startup only verifies it. Fresh databases also require 005 after the baseline. See [the schema and migration note](../../docs/database/F5_SCHEMA_AUTHORITY_AND_MIGRATION.md). Existing mutable binaries are incompatible with the new guards.
 
+**Payment prerequisite (2026-10-07):** Also preflight and explicitly apply `006_payment_schema_authority.sql` on the same intended database connection before starting the API. This is the sole Payment schema owner; startup no longer creates Payments/PaymentStatus/ServiceCharge. Old `database/004_add_payments.sql` is retired. Missing financial fields on populated tables require review rather than automatic zero/Unpaid backfills. See [Payment authority and upgrade](../../docs/database/PAYMENT_SCHEMA_AUTHORITY.md).
+
 This directory contains the production-safe database provisioning scripts for **KARIGOR** on MonsterASP.NET (or any hosted MSSQL environment).
 
 ---
@@ -12,8 +14,8 @@ This directory contains the production-safe database provisioning scripts for **
 |---|---|---|
 | **Database Creation** | Contains `CREATE DATABASE [KarigorDev]` | **Excluded**. The database is provisioned through MonsterASP Control Panel. |
 | **Database Context** | Contains `USE [KarigorDev];` | **Excluded**. Scripts run within whatever database context the host assigns. |
-| **Completeness** | Fragmented across `001_initial_schema.sql` and `003_add_booking_verification.sql`; missing `SosAlerts` | **Consolidated**. Contains full schema up to the latest features (`Bookings` verification columns, `SosAlerts`, and all indexes). |
-| **Idempotency** | Partial | **100% Idempotent**. Safe to run multiple times without data loss or duplicate errors. |
+| **Completeness** | Base schema plus older verification script; then the same host-neutral 005/006 upgrades | 001 baseline (including verification/SosAlerts), followed by explicit 005 negotiation and 006 payment upgrades |
+| **Repeatability** | Follow the documented versioned path | 001/002 are repeatable; 005/006 recheck preflight and refuse unresolved data/unsupported schema rather than claiming unconditional success |
 | **Data Safety** | Re-creation assumptions | **Non-destructive**. Never drops tables or clears user data. |
 
 ---
@@ -36,7 +38,12 @@ When setting up a new production database on MonsterASP:
    - Run in the same database context.
    - **What it does**: Seeds the core Identity roles (`Customer`, `Worker`, `Admin`) and standard `ServiceCategories` (10 categories with CDN icons).
 
-4. **Explicit Initial Administrator Bootstrap**:
+4. **Apply Versioned Prerequisites**:
+   - Run `005_f5_negotiation_integrity.sql` and `006_payment_schema_authority.sql` in default read-only mode.
+   - Review reported issues; follow their linked guides to opt in and execute each entire script on the same connection during a writer outage.
+   - Fresh databases need both upgrades too. Seed data does not apply schema upgrades.
+
+5. **Explicit Initial Administrator Bootstrap**:
    - Ordinary API startup seeds roles but never creates/promotes an administrator.
    - From a trusted interactive terminal with the published API and intended database configuration, run `dotnet Karigor.Api.dll bootstrap-admin`.
    - Enter the operator-selected email and password at the prompts; password input is hidden and must not be placed in process arguments, scripts or documentation.
@@ -47,7 +54,7 @@ When setting up a new production database on MonsterASP:
 
 ## Verification Queries
 
-After executing both scripts, verify that all 17 tables are present:
+After executing the baseline and both versioned upgrades, verify that all 22 tables are present:
 
 ```sql
 SELECT TABLE_NAME 
@@ -56,7 +63,7 @@ WHERE TABLE_TYPE = 'BASE TABLE'
 ORDER BY TABLE_NAME;
 ```
 
-Expected tables (17 total):
+Expected tables (22 total):
 1. `AspNetRoleClaims`
 2. `AspNetRoles`
 3. `AspNetUserClaims`
@@ -78,3 +85,4 @@ Expected tables (17 total):
 19. `WorkerDocuments`
 20. `WorkerProfiles`
 21. `WorkerSkills`
+22. `Payments`

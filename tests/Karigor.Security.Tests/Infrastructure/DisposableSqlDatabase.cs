@@ -41,7 +41,7 @@ public sealed class DisposableSqlDatabase : IAsyncDisposable
         return builder.ConnectionString;
     }
 
-    public async Task InitializeAsync(bool applyF5 = true)
+    public async Task InitializeAsync(bool applyF5 = true, bool applyPayment = true)
     {
         // Readiness retry is not a concurrency-test synchronization mechanism.
         using var admin = new SqlConnection(adminConnection);
@@ -57,8 +57,8 @@ public sealed class DisposableSqlDatabase : IAsyncDisposable
             created = true;
         }
 
-        // Mirrors current deployment: production schema, then real Program.cs startup DDL.
-        // Never run 004_add_payments.sql: it contains USE [KarigorDev].
+        // Explicit SQL owners run before startup; startup verifies payment prerequisites.
+        // Retired 004 is never a second Payment definition.
         var script = await File.ReadAllTextAsync(Path.Combine(RepositoryRoot, "database/production/001_schema.sql"));
         var executable = Regex.Replace(script, @"--[^\r\n]*|/\*[\s\S]*?\*/", "");
         if (Regex.IsMatch(executable, @"^\s*(USE\b|(?:CREATE|ALTER|DROP)\s+DATABASE\b)", RegexOptions.Multiline | RegexOptions.IgnoreCase))
@@ -78,6 +78,13 @@ public sealed class DisposableSqlDatabase : IAsyncDisposable
             using var command = database.CreateCommand();
             command.CommandText = "EXEC sys.sp_set_session_context @key=N'KarigorF5Apply', @value=1;\n" +
                 await File.ReadAllTextAsync(Path.Combine(RepositoryRoot, "database/production/005_f5_negotiation_integrity.sql"));
+            await command.ExecuteNonQueryAsync();
+        }
+        if (applyPayment)
+        {
+            using var command = database.CreateCommand();
+            command.CommandText = "EXEC sys.sp_set_session_context @key=N'KarigorPaymentSchemaApply', @value=1;\n" +
+                await File.ReadAllTextAsync(Path.Combine(RepositoryRoot, "database/production/006_payment_schema_authority.sql"));
             await command.ExecuteNonQueryAsync();
         }
     }

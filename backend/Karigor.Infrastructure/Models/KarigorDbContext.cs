@@ -52,6 +52,7 @@ public partial class KarigorDbContext : IdentityDbContext<ApplicationUser>
 
         modelBuilder.Entity<Booking>(entity =>
         {
+            entity.Property(e => e.PaymentStatus).HasDefaultValue("Unpaid");
             entity.HasIndex(e => e.ServiceRequestId).IsUnique().HasDatabaseName("UX_F5_Bookings_Request");
             entity.Property(e => e.Status).HasDefaultValue("Scheduled");
 
@@ -72,6 +73,22 @@ public partial class KarigorDbContext : IdentityDbContext<ApplicationUser>
         modelBuilder.Entity<Notification>(entity =>
         {
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())");
+        });
+
+        modelBuilder.Entity<Payment>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK_Payments");
+            entity.HasAlternateKey(e => e.TransactionId).HasName("UQ_Payments_TransactionId");
+            entity.Property(e => e.Currency).HasDefaultValue("BDT");
+            entity.Property(e => e.Status).HasDefaultValue("Initiated");
+            entity.Property(e => e.ServiceCharge).HasDefaultValue(0m);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+            entity.Property(e => e.TotalAmount).HasPrecision(18, 2);
+            entity.Property(e => e.PlatformFee).HasPrecision(18, 2);
+            entity.Property(e => e.ServiceCharge).HasPrecision(18, 2);
+            entity.Property(e => e.WorkerAmount).HasPrecision(18, 2);
+            entity.HasOne(e => e.Booking).WithMany(b => b.Payments).HasForeignKey(e => e.BookingId)
+                .OnDelete(DeleteBehavior.Cascade).HasConstraintName("FK_Payments_Bookings_BookingId");
         });
 
         modelBuilder.Entity<Quotation>(entity =>

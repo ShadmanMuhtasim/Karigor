@@ -1,0 +1,29 @@
+{
+  "description": "Executed expected-fail regressions. Remove an entry when remediation makes its invariant pass; do not expand this list for new failures.",
+  "tests": [
+    {
+      "name": "Karigor.Security.Tests.ApiSecurityTests.OrdinaryProductionStartupDoesNotProvisionDefaultAdministrator",
+      "marker": "F2_DEFAULT_ADMIN"
+    },
+    {
+      "name": "Karigor.Security.Tests.ApiSecurityTests.UnrelatedAuthenticatedUserCannotJoinBooking",
+      "marker": "F3_BOOKING_MEMBERSHIP"
+    },
+    {
+      "name": "Karigor.Security.Tests.ApiSecurityTests.WorkerCannotOverwriteAndAcceptCustomerCounterOffer",
+      "marker": "F5_CUSTOMER_OFFER"
+    },
+    {
+      "name": "Karigor.Security.Tests.UnitSecurityTests.ValidPdfSignatureIsAccepted",
+      "marker": "F7_VALID_PDF"
+    },
+    {
+      "name": "Karigor.Security.Tests.UnitSecurityTests.InvalidFdpSignatureIsRejected",
+      "marker": "F7_INVALID_FDP"
+    },
+    {
+      "name": "Karigor.Security.Tests.ApiSecurityTests.DocumentOwnerReceivesCompleteFileThroughMvc",
+      "marker": "F7_STREAM_LIFETIME"
+    }
+  ]
+}

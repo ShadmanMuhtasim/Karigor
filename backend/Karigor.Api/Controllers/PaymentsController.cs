@@ -1,11 +1,15 @@
 using System;
 using System.Security.Claims;
+using System.Globalization;
+using System.Text.Encodings.Web;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Karigor.Application.Payments;
 using Karigor.Application.Payments.DTOs;
 using Karigor.Application.Payments.SslCommerz;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -58,87 +62,52 @@ public class PaymentsController : ControllerBase
         return Ok(result);
     }
 
-    /// <summary>
-    /// SSLCommerz browser callback for successful transactions.
-    /// Supports both POST and GET, validates payment, and returns an HTML redirect page.
-    /// </summary>
-    [HttpPost("sslcommerz/success")]
-    [HttpGet("sslcommerz/success")]
-    [AllowAnonymous]
-    public async Task<IActionResult> SslCommerzSuccess([FromForm] SslCommerzCallbackDto? callback)
+    // Route names are hints. Every route uses the same independent verification boundary.
+    [HttpPost("sslcommerz/success"), HttpGet("sslcommerz/success"), AllowAnonymous]
+    public Task<IActionResult> SslCommerzSuccess([FromForm] SslCommerzCallbackDto? callback)
+        => ProcessBrowserCallbackAsync(callback, _paymentService.ProcessSuccessCallbackAsync);
+
+    [HttpPost("sslcommerz/fail"), HttpGet("sslcommerz/fail"), AllowAnonymous]
+    public Task<IActionResult> SslCommerzFail([FromForm] SslCommerzCallbackDto? callback)
+        => ProcessBrowserCallbackAsync(callback, _paymentService.ProcessFailCallbackAsync);
+
+    [HttpPost("sslcommerz/cancel"), HttpGet("sslcommerz/cancel"), AllowAnonymous]
+    public Task<IActionResult> SslCommerzCancel([FromForm] SslCommerzCallbackDto? callback)
+        => ProcessBrowserCallbackAsync(callback, _paymentService.ProcessCancelCallbackAsync);
+
+    private async Task<IActionResult> ProcessBrowserCallbackAsync(SslCommerzCallbackDto? callback,
+        Func<SslCommerzCallbackDto, Task<PaymentDetailsDto>> process)
     {
         callback ??= new SslCommerzCallbackDto();
         PopulateFromRequest(callback);
-        _logger.LogInformation("Received SSLCommerz success callback: TranId={TranId}, ValId={ValId}, Status={Status}",
-            callback.TranId, callback.ValId, callback.Status);
-
-        var clientBaseUrl = _sslOptions.ClientBaseUrl.TrimEnd('/');
+        Response.Headers.CacheControl = "no-store";
+        var query = new Dictionary<string, string?> { ["status"] = "pending" };
+        var verified = false;
         try
         {
-            var payment = await _paymentService.ProcessSuccessCallbackAsync(callback);
-            var redirectUrl = $"{clientBaseUrl}/payment/callback?status=success&bookingId={payment.BookingId}&tranId={Uri.EscapeDataString(payment.TransactionId)}&amount={payment.TotalAmount}&valId={Uri.EscapeDataString(payment.ValId ?? "")}";
-            return RenderRedirectHtml("Payment Successful!", "Your payment has been securely confirmed. Returning you to Karigor...", redirectUrl, isSuccess: true);
+            var payment = await process(callback);
+            verified = string.Equals(payment.Status, "Completed", StringComparison.OrdinalIgnoreCase);
+            query["status"] = verified ? "success" : "pending";
+            query["bookingId"] = payment.BookingId.ToString(CultureInfo.InvariantCulture);
+            query["tranId"] = payment.TransactionId;
+        }
+        catch (PaymentVerificationException ex)
+        {
+            // This ID came from the exact stored attempt, not ValueA. The return API still checks ownership.
+            query["bookingId"] = ex.BookingId.ToString(CultureInfo.InvariantCulture);
+            _logger.LogWarning("Browser payment verification unresolved: {Reason}", ex.Message);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing SSLCommerz success callback for TranId: {TranId}", callback.TranId);
-            var redirectUrl = $"{clientBaseUrl}/payment/callback?status=error&message={Uri.EscapeDataString(ex.Message)}&tranId={Uri.EscapeDataString(callback.TranId ?? "")}";
-            return RenderRedirectHtml("Payment Verification Notice", "Payment processed, but validation returned an alert. Returning to Karigor...", redirectUrl, isSuccess: false);
+            _logger.LogWarning("Browser payment callback unresolved: {ErrorType}", ex.GetType().Name);
         }
-    }
 
-    /// <summary>
-    /// SSLCommerz browser callback for failed transactions.
-    /// </summary>
-    [HttpPost("sslcommerz/fail")]
-    [HttpGet("sslcommerz/fail")]
-    [AllowAnonymous]
-    public async Task<IActionResult> SslCommerzFail([FromForm] SslCommerzCallbackDto? callback)
-    {
-        callback ??= new SslCommerzCallbackDto();
-        PopulateFromRequest(callback);
-        _logger.LogWarning("Received SSLCommerz fail callback: TranId={TranId}", callback.TranId);
-
-        var clientBaseUrl = _sslOptions.ClientBaseUrl.TrimEnd('/');
-        try
-        {
-            var payment = await _paymentService.ProcessFailCallbackAsync(callback);
-            var redirectUrl = $"{clientBaseUrl}/payment/callback?status=failed&bookingId={payment.BookingId}&tranId={Uri.EscapeDataString(payment.TransactionId)}";
-            return RenderRedirectHtml("Payment Failed", "The transaction could not be completed. Returning to Karigor...", redirectUrl, isSuccess: false);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error processing SSLCommerz fail callback for TranId: {TranId}", callback.TranId);
-            var redirectUrl = $"{clientBaseUrl}/payment/callback?status=failed&tranId={Uri.EscapeDataString(callback.TranId ?? "")}";
-            return RenderRedirectHtml("Payment Failed", "The transaction could not be completed. Returning to Karigor...", redirectUrl, isSuccess: false);
-        }
-    }
-
-    /// <summary>
-    /// SSLCommerz browser callback for user cancellation.
-    /// </summary>
-    [HttpPost("sslcommerz/cancel")]
-    [HttpGet("sslcommerz/cancel")]
-    [AllowAnonymous]
-    public async Task<IActionResult> SslCommerzCancel([FromForm] SslCommerzCallbackDto? callback)
-    {
-        callback ??= new SslCommerzCallbackDto();
-        PopulateFromRequest(callback);
-        _logger.LogWarning("Received SSLCommerz cancel callback: TranId={TranId}", callback.TranId);
-
-        var clientBaseUrl = _sslOptions.ClientBaseUrl.TrimEnd('/');
-        try
-        {
-            var payment = await _paymentService.ProcessCancelCallbackAsync(callback);
-            var redirectUrl = $"{clientBaseUrl}/payment/callback?status=cancelled&bookingId={payment.BookingId}&tranId={Uri.EscapeDataString(payment.TransactionId)}";
-            return RenderRedirectHtml("Payment Cancelled", "The payment transaction was cancelled. Returning to Karigor...", redirectUrl, isSuccess: false);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error processing SSLCommerz cancel callback for TranId: {TranId}", callback.TranId);
-            var redirectUrl = $"{clientBaseUrl}/payment/callback?status=cancelled&tranId={Uri.EscapeDataString(callback.TranId ?? "")}";
-            return RenderRedirectHtml("Payment Cancelled", "The payment transaction was cancelled. Returning to Karigor...", redirectUrl, isSuccess: false);
-        }
+        var redirectUrl = QueryHelpers.AddQueryString(
+            $"{_sslOptions.ClientBaseUrl.TrimEnd('/')}/payment/callback", query);
+        return RenderRedirectHtml(verified ? "Payment Confirmed" : "Payment Not Confirmed",
+            verified ? "Karigor has a completed payment record. Returning to Karigor..."
+                     : "Payment confirmation is unresolved. Check your booking status before attempting another payment.",
+            redirectUrl, verified);
     }
 
     private void PopulateFromRequest(SslCommerzCallbackDto callback)
@@ -190,12 +159,14 @@ public class PaymentsController : ControllerBase
         var iconColor = isSuccess ? "#10b981" : "#f43f5e";
         var btnGradient = isSuccess ? "linear-gradient(135deg, #059669, #0d9488)" : "linear-gradient(135deg, #e11d48, #be123c)";
 
+        var encodedUrl = HtmlEncoder.Default.Encode(redirectUrl);
+        var scriptUrl = JsonSerializer.Serialize(redirectUrl);
         var html = $@"<!DOCTYPE html>
 <html lang=""en"">
 <head>
     <meta charset=""utf-8"" />
     <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"" />
-    <meta http-equiv=""refresh"" content=""0;url={redirectUrl}"" />
+    <meta http-equiv=""refresh"" content=""0;url={encodedUrl}"" />
     <title>{title} - Karigor</title>
     <style>
         * {{ box-sizing: border-box; }}
@@ -257,13 +228,13 @@ public class PaymentsController : ControllerBase
         <div class=""icon"">{icon}</div>
         <h1>{title}</h1>
         <p>{message}</p>
-        <a href=""{redirectUrl}"" class=""btn"">Return to Karigor Dashboard →</a>
+        <a href=""{encodedUrl}"" class=""btn"">Return to Karigor Dashboard →</a>
     </div>
     <script>
         try {{
-            window.location.replace('{redirectUrl}');
+            window.location.replace({scriptUrl});
         }} catch (e) {{
-            window.location.href = '{redirectUrl}';
+            window.location.href = {scriptUrl};
         }}
     </script>
 </body>
@@ -279,16 +250,28 @@ public class PaymentsController : ControllerBase
     [Consumes("application/x-www-form-urlencoded")]
     public async Task<IActionResult> SslCommerzIpn([FromForm] SslCommerzCallbackDto callback)
     {
-        _logger.LogInformation("Received SSLCommerz IPN: TranId={TranId}, ValId={ValId}", callback.TranId, callback.ValId);
         try
         {
             var payment = await _paymentService.ProcessIpnAsync(callback);
-            return Ok(new { message = "IPN processed successfully", transactionId = payment.TransactionId, status = payment.Status });
+            return Ok(new { message = "Verified payment recorded", transactionId = payment.TransactionId, status = payment.Status });
+        }
+        catch (PaymentVerificationException ex)
+        {
+            if (ex.Retryable) Response.Headers.RetryAfter = "30";
+            return StatusCode(ex.Retryable ? 503 : 422, new { error = ex.Message, status = "unresolved" });
+        }
+        catch (ArgumentException)
+        {
+            return BadRequest(new { error = "Transaction identifier is required.", status = "unresolved" });
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(new { error = "Payment transaction not found.", status = "unresolved" });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error handling IPN for TranId: {TranId}", callback.TranId);
-            return BadRequest(new { error = ex.Message });
+            _logger.LogError("IPN processing unresolved: {ErrorType}", ex.GetType().Name);
+            return StatusCode(503, new { error = "Payment processing is unavailable.", status = "unresolved" });
         }
     }
 
@@ -299,10 +282,21 @@ public class PaymentsController : ControllerBase
     [Authorize]
     public async Task<ActionResult<PaymentDetailsDto>> GetBookingPayment(int bookingId)
     {
-        var payment = await _paymentService.GetBookingPaymentAsync(CurrentUserId, bookingId);
-        if (payment == null)
-            return NotFound(new { error = "No payment records found for this booking." });
-
-        return Ok(payment);
+        Response.Headers.CacheControl = "no-store";
+        try
+        {
+            var payment = await _paymentService.GetBookingPaymentAsync(CurrentUserId, bookingId);
+            return payment == null
+                ? NotFound(new { error = "No payment records found for this booking." })
+                : Ok(payment);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return StatusCode(403, new { error = "You are not a participant in this booking." });
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(new { error = "Booking not found." });
+        }
     }
 }

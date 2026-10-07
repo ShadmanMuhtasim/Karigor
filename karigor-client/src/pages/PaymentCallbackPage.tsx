@@ -1,147 +1,80 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Navbar } from '../components/Navbar';
+import { useAuth } from '../context/AuthContext';
+import { paymentApi } from '../api/paymentApi';
 
 export const PaymentCallbackPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user, isLoading } = useAuth();
 
-  const status = searchParams.get('status') || 'unknown';
-  const bookingId = searchParams.get('bookingId');
-  const tranId = searchParams.get('tranId');
-  const amount = searchParams.get('amount');
-  const message = searchParams.get('message');
-
-  const [countdown, setCountdown] = useState(6);
-
-  const isSuccess = status.toLowerCase() === 'success';
-  const isCancelled = status.toLowerCase() === 'cancelled';
+  // The URL supplies only a lookup hint. Status, amount and receipt fields are never trusted.
+  const bookingHint = searchParams.get('bookingId');
+  const parsedId = bookingHint && /^[1-9][0-9]*$/.test(bookingHint) ? Number(bookingHint) : NaN;
+  const bookingId = Number.isSafeInteger(parsedId) && parsedId <= 2_147_483_647 ? parsedId : null;
+  const paymentQuery = useQuery({
+    queryKey: ['paymentReturn', user?.userId, bookingId],
+    queryFn: () => paymentApi.getBookingPayment(bookingId!),
+    enabled: !!user && !isLoading && bookingId !== null,
+    retry: false,
+    staleTime: 0,
+  });
 
   useEffect(() => {
-    // Invalidate queries so that booking status and payment status reflect immediately
     queryClient.invalidateQueries({ queryKey: ['customerBookings'] });
     queryClient.invalidateQueries({ queryKey: ['workerBookings'] });
-    if (bookingId) {
-      queryClient.invalidateQueries({ queryKey: ['booking', bookingId] });
-      queryClient.invalidateQueries({ queryKey: ['bookingPayment', bookingId] });
-    }
+    queryClient.invalidateQueries({ queryKey: ['bookingPayment'] });
+    if (bookingId !== null) queryClient.invalidateQueries({ queryKey: ['booking', bookingId] });
   }, [queryClient, bookingId]);
 
-  useEffect(() => {
-    if (!isSuccess) return;
-    const interval = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          navigate('/dashboard/customer');
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [isSuccess, navigate]);
+  const payment = paymentQuery.data?.bookingId === bookingId ? paymentQuery.data : undefined;
+  const checking = isLoading || paymentQuery.isFetching;
+  const isSuccess = !checking && !paymentQuery.isError && !!user &&
+    payment?.status === 'Completed' && !!payment.paidAt;
+  const heading = checking ? 'Checking Payment Status' : isSuccess ? 'Payment Confirmed' : 'Payment Not Confirmed';
+  const explanation = checking
+    ? 'Loading the payment record from Karigor.'
+    : isSuccess
+    ? 'Karigor has a completed payment record for this booking.'
+    : !user
+    ? 'Sign in to check the payment record for your booking.'
+    : bookingId === null
+    ? 'Open your booking to check its payment status.'
+    : 'We cannot confirm a completed payment. Check your booking or retry the status check before attempting another payment.';
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-white flex flex-col transition-colors duration-200">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-white flex flex-col">
       <Navbar />
-
       <main className="flex-1 max-w-xl w-full mx-auto px-4 py-12 flex flex-col items-center justify-center">
-        <div className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-8 sm:p-10 shadow-xl text-center space-y-6 animate-fade-in">
-          
-          {/* Status Icon */}
-          {isSuccess ? (
-            <div className="w-20 h-20 mx-auto rounded-3xl bg-emerald-500/10 border-2 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-4xl shadow-lg shadow-emerald-500/10 animate-bounce-subtle">
-              ✓
-            </div>
-          ) : isCancelled ? (
-            <div className="w-20 h-20 mx-auto rounded-3xl bg-amber-500/10 border-2 border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-center justify-center text-4xl shadow-lg shadow-amber-500/10">
-              ⚠️
-            </div>
-          ) : (
-            <div className="w-20 h-20 mx-auto rounded-3xl bg-rose-500/10 border-2 border-rose-500/30 text-rose-600 dark:text-rose-400 flex items-center justify-center text-4xl shadow-lg shadow-rose-500/10">
-              ✕
-            </div>
+        <div className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-8 shadow-xl text-center space-y-6">
+          <div className="text-4xl" aria-hidden="true">{isSuccess ? '✓' : '…'}</div>
+          <div role="status" aria-live="polite">
+            <h1 className="text-2xl font-black">{heading}</h1>
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{explanation}</p>
+          </div>
+          {payment && !paymentQuery.isError && (
+            <dl className="bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-5 text-left text-sm space-y-2">
+              <div><dt className="inline">Booking: </dt><dd className="inline font-bold">#{payment.bookingId}</dd></div>
+              <div><dt className="inline">Transaction: </dt><dd className="inline font-mono">{payment.transactionId}</dd></div>
+              <div><dt className="inline">{isSuccess ? 'Amount paid: ' : 'Payment amount: '}</dt>
+                <dd className="inline font-bold">{payment.currency} {payment.totalAmount.toLocaleString()}</dd></div>
+              <div><dt className="inline">Recorded status: </dt><dd className="inline">{payment.status}</dd></div>
+            </dl>
           )}
-
-          {/* Heading */}
-          <div className="space-y-2">
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-gray-900 dark:text-white">
-              {isSuccess
-                ? 'Payment Successful!'
-                : isCancelled
-                ? 'Payment Cancelled'
-                : 'Payment Failed'}
-            </h1>
-            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-              {isSuccess
-                ? 'Your payment has been verified and processed securely via SSLCommerz.'
-                : isCancelled
-                ? 'You cancelled the transaction before completing payment. No charges were made.'
-                : message || 'We could not process your transaction. Please try again or use another payment method.'}
-            </p>
-          </div>
-
-          {/* Details Card */}
-          <div className="bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-5 border border-gray-100 dark:border-gray-800 text-left space-y-2.5 text-xs">
-            {bookingId && (
-              <div className="flex items-center justify-between">
-                <span className="text-gray-500 dark:text-gray-400 font-medium">Booking ID:</span>
-                <span className="font-bold text-gray-900 dark:text-white">#{bookingId}</span>
-              </div>
+          {isSuccess && <p className="text-xs text-gray-500">Payment confirmation does not confirm an artisan payout.</p>}
+          <div className="flex flex-wrap justify-center gap-3">
+            {!user && !isLoading && <Link to="/login" className="font-bold text-emerald-600">Sign in</Link>}
+            {user && bookingId !== null && !isSuccess && (
+              <button type="button" disabled={checking} onClick={() => paymentQuery.refetch()}
+                className="font-bold text-emerald-600 disabled:opacity-50">Check Status Again</button>
             )}
-            {tranId && (
-              <div className="flex items-center justify-between">
-                <span className="text-gray-500 dark:text-gray-400 font-medium">Transaction ID:</span>
-                <span className="font-mono font-bold text-gray-900 dark:text-white">{tranId}</span>
-              </div>
-            )}
-            {amount && (
-              <div className="flex items-center justify-between pt-1 border-t border-gray-200 dark:border-gray-700">
-                <span className="text-gray-500 dark:text-gray-400 font-medium">Amount Paid:</span>
-                <span className="text-base font-black text-emerald-600 dark:text-emerald-400">৳ {Number(amount).toLocaleString()}</span>
-              </div>
-            )}
-            <div className="flex items-center justify-between">
-              <span className="text-gray-500 dark:text-gray-400 font-medium">Payment Gateway:</span>
-              <span className="font-bold text-sky-600 dark:text-sky-400">SSLCommerz (Sandbox)</span>
-            </div>
-            {isSuccess && (
-              <div className="pt-2 border-t border-gray-200 dark:border-gray-700 text-[11px] text-emerald-700 dark:text-emerald-300 font-medium flex items-center gap-1.5">
-                <span>🛡️</span>
-                <span>Platform fee and service charges (6%) applied • 94% credited to artisan</span>
-              </div>
-            )}
-          </div>
-
-          {/* Actions */}
-          <div className="pt-2 space-y-3">
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={() => navigate('/dashboard/customer')}
-                className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/20 transition cursor-pointer"
-              >
-                Go to My Bookings
-              </button>
-              {bookingId && (
-                <Link
-                  to={`/bookings/${bookingId}`}
-                  className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 font-bold text-xs transition text-center"
-                >
-                  View Booking Details
-                </Link>
-              )}
-            </div>
-
-            {isSuccess && countdown > 0 && (
-              <p className="text-[11px] text-gray-400">
-                Redirecting to your dashboard in <span className="font-bold text-emerald-600 dark:text-emerald-400">{countdown}s</span>…
-              </p>
-            )}
+            <button type="button" onClick={() => navigate('/dashboard')}
+              className="font-bold text-gray-600 dark:text-gray-300">Go to Dashboard</button>
+            {user && bookingId !== null && <Link to={`/bookings/${bookingId}`}
+              className="font-bold text-emerald-600">View Booking Details</Link>}
           </div>
         </div>
       </main>

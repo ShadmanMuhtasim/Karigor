@@ -77,7 +77,7 @@ public sealed class PaymentSchemaTests(ITestOutputHelper output)
     [Fact]
     public async Task FreshSqlSchemaIsCanonicalAndMatchesEfColumnsDefaultsKeysAndFk()
     {
-        await using var db=new DisposableSqlDatabase(); await db.InitializeAsync();
+        await using var db=new DisposableSqlDatabase(); await db.InitializeAsync(applyPaymentConcurrency:false);
         using var c=new SqlConnection(db.ConnectionString); await c.OpenAsync();
         using(var diagnostic=c.CreateCommand())
         {
@@ -86,7 +86,7 @@ public sealed class PaymentSchemaTests(ITestOutputHelper output)
             while(await r.ReadAsync()) output.WriteLine(string.Join(" | ",Enumerable.Range(0,r.FieldCount).Select(r.GetValue)));
         }
         await using var context=Context(db);
-        PaymentSchemaGate.Verify(context);
+        PaymentSchemaGate.VerifyVersionOne(context);
         var entity=context.Model.FindEntityType(typeof(Payment))!;
         var table=StoreObjectIdentifier.Table("Payments",null);
         var columns=new Dictionary<string,(string Type,int Length,int Precision,int Scale,bool Nullable)>();
@@ -97,8 +97,13 @@ public sealed class PaymentSchemaTests(ITestOutputHelper output)
             while(await r.ReadAsync()) columns.Add(r.GetString(0),(r.GetString(1),r.GetInt16(2),r.GetByte(3),r.GetByte(4),r.GetBoolean(5)));
         }
         Assert.Equal(15,columns.Count);
-        foreach(var p in entity.GetProperties())
+        // Frozen 006 contract: 007 properties intentionally do not exist in this historical fixture.
+        string[] baseProperties = ["Id","BookingId","TransactionId","ValId","BankTranId","CardType","Currency",
+            "TotalAmount","PlatformFee","ServiceCharge","WorkerAmount","Status","CreatedAt","PaidAt","GatewayResponse"];
+        Assert.Equal(15,baseProperties.Length);
+        foreach(var propertyName in baseProperties)
         {
+            var p=entity.FindProperty(propertyName); Assert.NotNull(p);
             var column=columns[p.GetColumnName(table)!]; Assert.Equal(p.IsNullable,column.Nullable);
             var expected=p.GetColumnType()!.Replace(" ","");
             var actual=column.Type switch {
@@ -111,12 +116,12 @@ public sealed class PaymentSchemaTests(ITestOutputHelper output)
         Assert.Equal(0m,entity.FindProperty(nameof(Payment.ServiceCharge))!.GetDefaultValue());
         Assert.Equal("SYSUTCDATETIME()",entity.FindProperty(nameof(Payment.CreatedAt))!.GetDefaultValueSql());
         Assert.Equal("Unpaid",context.Model.FindEntityType(typeof(Booking))!.FindProperty(nameof(Booking.PaymentStatus))!.GetDefaultValue());
-        Assert.Equal("UQ_Payments_TransactionId",entity.GetKeys().Single(k=>k.Properties.Single().Name==nameof(Payment.TransactionId)).GetName());
+        Assert.Equal("UQ_Payments_TransactionId",entity.GetKeys().Single(k=>k.Properties.Count==1 && k.Properties[0].Name==nameof(Payment.TransactionId)).GetName());
         Assert.Equal(DeleteBehavior.Cascade,entity.GetForeignKeys().Single().DeleteBehavior);
         Assert.Equal("FK_Payments_Bookings_BookingId",entity.GetForeignKeys().Single().GetConstraintName());
-        Assert.Null(entity.FindProperty("RowVersion"));
-        Assert.Null(context.Model.FindEntityType(typeof(Booking))!.FindProperty("RowVersion"));
-        await Apply(c,await Script(db)); PaymentSchemaGate.Verify(context); // Repeatable, still no business metadata.
+        Assert.False(columns.ContainsKey("RowVersion"));
+        using(var command=c.CreateCommand()) { command.CommandText="SELECT COL_LENGTH(N'dbo.Bookings',N'RowVersion')"; Assert.Equal(DBNull.Value,await command.ExecuteScalarAsync()); }
+        await Apply(c,await Script(db)); PaymentSchemaGate.VerifyVersionOne(context); // Repeatable, still no business metadata.
     }
 
     [Theory]
@@ -140,8 +145,8 @@ public sealed class PaymentSchemaTests(ITestOutputHelper output)
         Assert.Empty(await Preflight(c,script));
         await Apply(c,script); await Apply(c,script);
         Assert.Equal(before,await Snapshot(c));
-        await using var context=Context(db); PaymentSchemaGate.Verify(context);
-        var completed=await context.Payments.AsNoTracking().SingleAsync(p=>p.Id==1);
+        await using var context=Context(db); PaymentSchemaGate.VerifyVersionOne(context);
+        var completed=await context.Payments.AsNoTracking().Where(p=>p.Id==1).Select(p=>new { p.Status,p.ValId,p.TotalAmount,p.ServiceCharge }).SingleAsync();
         Assert.Equal("Completed",completed.Status); Assert.Equal("validation_one",completed.ValId);
         Assert.Equal(1000m,completed.TotalAmount); Assert.Equal(40m,completed.ServiceCharge);
     }
@@ -177,7 +182,7 @@ public sealed class PaymentSchemaTests(ITestOutputHelper output)
         Assert.Contains(expected,await Preflight(c,script));
         var error=await Assert.ThrowsAsync<SqlException>(()=>Apply(c,script)); Assert.Equal(51060,error.Number);
         Assert.Equal(before,await Snapshot(c));
-        await using var context=Context(db); Assert.Equal(51061,Assert.Throws<SqlException>(()=>PaymentSchemaGate.Verify(context)).Number);
+        await using var context=Context(db); Assert.Equal(51061,Assert.Throws<SqlException>(()=>PaymentSchemaGate.VerifyVersionOne(context)).Number);
     }
 
     [Theory]
@@ -199,7 +204,7 @@ public sealed class PaymentSchemaTests(ITestOutputHelper output)
         else
         {
             Assert.Empty(await Preflight(c,script)); await Apply(c,script);
-            await using var context=Context(db); PaymentSchemaGate.Verify(context);
+            await using var context=Context(db); PaymentSchemaGate.VerifyVersionOne(context);
         }
     }
 
@@ -235,14 +240,14 @@ public sealed class PaymentSchemaTests(ITestOutputHelper output)
     [InlineData("disabled-fk")]
     public async Task StartupGateRejectsDriftWithoutRepairingAnything(string variant)
     {
-        await using var db=new DisposableSqlDatabase(); await db.InitializeAsync(applyPayment:variant!="missing-schema");
+        await using var db=new DisposableSqlDatabase(); await db.InitializeAsync(applyPayment:variant!="missing-schema",applyPaymentConcurrency:false);
         using var c=new SqlConnection(db.ConnectionString); await c.OpenAsync();
         if(variant=="wrong-default") { await DropDefault(c,"Payments","Currency"); await Execute(c,"ALTER TABLE dbo.Payments ADD CONSTRAINT DF_Payments_Currency DEFAULT N'USD' FOR Currency;"); }
         if(variant=="wrong-index") await Execute(c,"DROP INDEX IX_Payments_Status ON dbo.Payments; CREATE INDEX IX_Payments_Status ON dbo.Payments(BookingId);");
         if(variant=="disabled-fk") await Execute(c,"ALTER TABLE dbo.Payments NOCHECK CONSTRAINT FK_Payments_Bookings_BookingId;");
         await using var context=Context(db);
-        Assert.Equal(51061,Assert.Throws<SqlException>(()=>PaymentSchemaGate.Verify(context)).Number);
-        Assert.Equal(51061,Assert.Throws<SqlException>(()=>PaymentSchemaGate.Verify(context)).Number);
+        Assert.Equal(51061,Assert.Throws<SqlException>(()=>PaymentSchemaGate.VerifyVersionOne(context)).Number);
+        Assert.Equal(51061,Assert.Throws<SqlException>(()=>PaymentSchemaGate.VerifyVersionOne(context)).Number);
         var program=await File.ReadAllTextAsync(Path.Combine(db.RepositoryRoot,"backend/Karigor.Api/Program.cs"));
         Assert.Contains("PaymentSchemaGate.Verify",program);
         Assert.DoesNotContain("CREATE TABLE [dbo].[Payments]",program);

@@ -1,5 +1,7 @@
 # F1 Payment Trust and Provider Verification
 
+**Forward status, 2026-10-07:** The trust boundary described here remains in force. The later SQL-owned concurrency/idempotency/allocation extension is now [IMPLEMENTED](F1_PAYMENT_CONCURRENCY_AND_IDEMPOTENCY.md), with 213 backend and 39 browser cases passing. Earlier references below to deferred concurrency describe this guide's original stage.
+
 **Subsequent schema-only update (2026-10-07):** [Payment schema authority](../../database/PAYMENT_SCHEMA_AUTHORITY.md) now uses sole SQL owner 006, explicit runtime EF mappings and read-only startup prerequisites. Immediate F1 verifier/business behavior below is unchanged. Payment concurrency/idempotency remains proposed; financial history and deployment are not verified in production. Earlier test counts below describe the containment task's historical stage.
 
 Date: 2026-10-07 (Asia/Dhaka).

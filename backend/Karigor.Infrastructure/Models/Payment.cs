@@ -51,6 +51,19 @@ public partial class Payment
 
     public string? GatewayResponse { get; set; }
 
+    [Timestamp] public byte[] RowVersion { get; set; } = [];
+    [StringLength(64)] public string? InitiationFingerprint { get; set; }
+    [StringLength(20)] public string? InitiationState { get; set; }
+    public DateTime? InitiationDispatchedAt { get; set; }
+    [StringLength(100)] public string? InitiationMerchantId { get; set; }
+    [StringLength(10)] public string? InitiationEnvironment { get; set; }
+    [StringLength(100)] public string? ProviderSessionKey { get; set; }
+    [StringLength(2048)] public string? ProviderGatewayUrl { get; set; }
+    [StringLength(100)] public string? VerifiedMerchantId { get; set; }
+    [StringLength(10)] public string? VerifiedEnvironment { get; set; }
+    [StringLength(100)] public string? VerifiedTransactionId { get; set; }
+    public bool RequiresReview { get; set; }
+
     [ForeignKey("BookingId")]
     [InverseProperty("Payments")]
     public virtual Booking Booking { get; set; } = null!;

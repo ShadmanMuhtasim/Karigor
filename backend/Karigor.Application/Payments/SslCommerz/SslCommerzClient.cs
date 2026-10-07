@@ -13,6 +13,8 @@ namespace Karigor.Application.Payments.SslCommerz;
 
 public class SslCommerzClient
 {
+    public string MerchantId => _options.StoreId;
+    public string EnvironmentName => _options.IsSandbox ? "Sandbox" : "Live";
     private readonly HttpClient _httpClient;
     private readonly SslCommerzOptions _options;
     private readonly ILogger<SslCommerzClient> _logger;
@@ -90,16 +92,15 @@ public class SslCommerzClient
 
             if (initResponse == null || !string.Equals(initResponse.Status, "SUCCESS", StringComparison.OrdinalIgnoreCase))
             {
-                _logger.LogError("SSLCommerz initialization failed for {TransactionId}: {Reason}. Raw: {Raw}",
-                    transactionId, initResponse?.FailedReason ?? "Unknown error", responseString);
-                throw new InvalidOperationException($"SSLCommerz session initialization failed: {initResponse?.FailedReason ?? "Gateway error"}");
+                _logger.LogError("SSLCommerz initialization unresolved for {TransactionId}.", transactionId);
+                throw new InvalidOperationException("SSLCommerz session initialization unresolved.");
             }
 
             return initResponse;
         }
-        catch (JsonException ex)
+        catch (JsonException)
         {
-            _logger.LogError(ex, "Failed to parse SSLCommerz response for {TransactionId}. Raw: {Raw}", transactionId, responseString);
+            _logger.LogError("Failed to parse SSLCommerz initialization for {TransactionId}.", transactionId);
             throw new InvalidOperationException("Failed to communicate with payment gateway.");
         }
     }

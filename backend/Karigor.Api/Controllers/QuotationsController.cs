@@ -21,6 +21,7 @@ public class QuotationsController(IMarketplaceService marketplace) : ControllerB
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
         try { return StatusCode(201, await marketplace.CreateQuotationAsync(UserId(), dto)); }
+        catch (NegotiationConflictException e) { return Conflict(new { code = "negotiation_conflict", error = e.Message }); }
         catch (KeyNotFoundException e) { return NotFound(new { error = e.Message }); }
         catch (InvalidOperationException e) { return BadRequest(new { error = e.Message }); }
         catch (UnauthorizedAccessException) { return Forbid(); }
@@ -61,9 +62,10 @@ public class QuotationsController(IMarketplaceService marketplace) : ControllerB
     }
 
     [HttpPost("{id:int}/accept")]
-    public async Task<IActionResult> Accept(int id)
+    public async Task<IActionResult> Accept(int id, [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] AcceptQuotationDto? dto)
     {
-        try { return Ok(await marketplace.AcceptQuotationAsync(UserId(), id)); }
+        try { return Ok(await marketplace.AcceptQuotationAsync(UserId(), id, dto?.ExpectedVersion)); }
+        catch (NegotiationConflictException e) { return Conflict(new { code = "negotiation_conflict", error = e.Message }); }
         catch (KeyNotFoundException e) { return NotFound(new { error = e.Message }); }
         catch (InvalidOperationException e) { return BadRequest(new { error = e.Message }); }
         catch (UnauthorizedAccessException) { return Forbid(); }
@@ -74,6 +76,7 @@ public class QuotationsController(IMarketplaceService marketplace) : ControllerB
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
         try { return StatusCode(201, await marketplace.CounterQuotationAsync(UserId(), id, dto)); }
+        catch (NegotiationConflictException e) { return Conflict(new { code = "negotiation_conflict", error = e.Message }); }
         catch (KeyNotFoundException e) { return NotFound(new { error = e.Message }); }
         catch (InvalidOperationException e) { return BadRequest(new { error = e.Message }); }
         catch (UnauthorizedAccessException) { return Forbid(); }

@@ -1,5 +1,7 @@
 # Production Database Scripts
 
+**F5 cutover requirement (2026-10-07):** Before starting the F5 API, run the default read-only preflight in `005_f5_negotiation_integrity.sql`, resolve reported legacy issues, then explicitly apply that same script during a writer outage. It is the only F5 schema owner; ordinary startup only verifies it. Fresh databases also require 005 after the baseline. See [the schema and migration note](../../docs/database/F5_SCHEMA_AUTHORITY_AND_MIGRATION.md). Existing mutable binaries are incompatible with the new guards.
+
 This directory contains the production-safe database provisioning scripts for **KARIGOR** on MonsterASP.NET (or any hosted MSSQL environment).
 
 ---

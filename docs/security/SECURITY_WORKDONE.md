@@ -1624,3 +1624,110 @@ F6 stronger session revocation, F5 domain/schema work and payment concurrency re
 3. Browser Bearer transport, Blob URL memory/lifetime and identity-scoped UI state.
 4. Filesystem/SQL compensation, uncertain commits, crash-gap recovery and upload idempotency.
 5. Controlled legacy migration, ACLs, alternate static mappings and actual redeploy persistence tests.
+
+# F5 Immutable Negotiation and Agreement Integrity
+
+Date: 2026-10-07 (Asia/Dhaka). Implemented and verified locally; no commit, push, merge, deployment or production data changes. [Implementation guide](implementation/F5_NEGOTIATION_INTEGRITY.md), [database note](../database/F5_SCHEMA_AUTHORITY_AND_MIGRATION.md), [ADR 0003](../adr/0003-f5-sql-authority-and-immutable-negotiation.md).
+
+## 1. Original exploit and why role checks were insufficient
+
+A worker submitted 1000; the customer countered 800. Another worker initial POST with 5000 selected the existing Pending row and overwrote the customer's price/message. Acceptance inferred the proposer from odd chain depth, so the same worker could accept the overwritten 5000 offer as though the customer had proposed it.
+
+The worker really was a participant with the correct role. That did not authorize changing someone else's submitted terms. The missing boundary was consent to a specific immutable offer, its actual author and its current position in the negotiation.
+
+## 2. Before and after
+
+Before: one mutable Pending row, parity-implied author, checks before the acceptance transaction, no SQL booking-per-request uniqueness. Stale and concurrent actions could disagree about the current offer.
+
+After: initial POST creates one immutable root and returns 409 for an existing thread. The 800 counter retains its customer author, price and message. The worker must respond to that current offer using its displayed version; accepting it books exactly 800. A changed price requires an explicit new counter child, and only the opposite participant can respond. Self/other-customer/other-worker/stale actions fail.
+
+## 3. Immutable intent and explicit authorship
+
+New roots/counters store authenticated `ProposedByUserId` and server UTC `CreatedAt`. Client author fields are ignored. Submitted price/message, author/time, request/worker and parent link are immutable in the service flow and protected against SQL updates by a trigger. Price validation rejects fractional cents before SQL can round the submitted intent. Case-only/trailing-space message changes are also denied.
+
+Depth remains a cycle-bounded display/history calculation. Authorization and proposer labels use the stored identity; historical unknown authors remain Unknown. We did not reconstruct legacy authorship from parity or manufacture historical timestamps.
+
+## 4. Stale intent, optimistic concurrency and database uniqueness
+
+Quotation and ServiceRequest have real SQL rowversion. The response exposes a base64 offer version; accepting/countering must echo it as expectedVersion. Rowversion means the row changed since observation, not when the offer was created. An old offer cannot be accepted after it has a child, even if a caller retained its old price/version.
+
+Each F5 mutation makes a version-checked request write before offer writes. That orders operations for the same request, including offers from different workers. Two readers may both be authorized against the old state; only one can commit its request CAS. EF concurrency and SQL uniqueness conflicts become stable 409 responses.
+
+SQL unique indexes enforce one Pending head per request/worker, one child per linear parent and one booking per request. These are final guards when concurrent callers pass application checks. Role checks, optimistic concurrency, uniqueness and transactions address different parts of the invariant; none alone proves agreement integrity.
+
+## 5. Transaction boundaries and retries
+
+The execution strategy starts a fresh transaction and reloads participants/request/offer on every attempt after clearing tracked state. Countering verifies opposite author/current head/version, saves Pending → Countered, then inserts its immutable child before commit. Separate saves avoid inserting the child while its parent still owns the filtered Pending key; rollback restores both.
+
+Acceptance re-reads and verifies intent inside the transaction, closes the request, accepts exact current terms, rejects competing Pending offers and inserts one Scheduled booking. A real SQL failure at the booking insert rolls back request, accepted offer and competitor rejection. A retry test changes authoritative state after rollback and proves the next attempt refuses stale intent instead of reusing the tracked agreement.
+
+Notifications/realtime delivery still happen after commit. Delivery failure does not undo the agreement. An uncertain commit acknowledgement can yield conflict on retry; refreshing authoritative booking/negotiation state recovers that result. This is not an exactly-once notification or response guarantee.
+
+## 6. Schema authority and legacy safety
+
+Stage 0 inspected the production/development SQL, Quotation/ServiceRequest/Booking mappings/FKs/indexes, EF migration/snapshot and startup DDL. The repository uses controlled SQL provisioning plus additive startup payment/verification DDL; there is no automatic EF migration path. ADR 0001 is empty in this checkout. The approved plan's SQL-first preference is implemented in ADR 0003.
+
+F5's sole definition is `database/production/005_f5_negotiation_integrity.sql`. Its default mode reports legacy issues without persistent writes. Explicit apply mode repeats preflight with table locks and installs all additions in one transaction: proposer/time/quotation version, request version, proposer FK/index, three unique indexes, status check, immutable submission trigger and version stamp. Runtime EF mappings match; historical migrations/snapshot remain frozen. Startup verifies F5 and never creates its structures. Existing unrelated payment DDL remains documented outside this narrow scope.
+
+Preflight reports duplicate bookings/heads/roots, forks, cycles, missing/cross-request/cross-worker parents, invalid offer statuses, incoherent heads and active unknown provenance. It refuses dirty/ambiguous active data instead of inventing an author. Even a structurally clean chain cannot establish historical consent under the old mutable implementation. Inactive historical authors/time remain NULL and valid bookings are preserved.
+
+Read-only local `.\SQLEXPRESS/KarigorDev` inspection found no EF migration-history table and **two unresolved active offers, IDs 2 and 4**. Preflight reported no other structural issue. The application database was not changed. Its new startup will deliberately fail until an operator reviews the active offers and applies the compatible schema during a coordinated outage. Production data was not inspected; no claim is made about its historical correctness.
+
+## 7. Exact frontend and application changes
+
+- MarketplaceService, its interface, DTOs and QuotationsController implement server authors, immutable writes, current-version checks, transactions and HTTP 409. Existing create-booking retrieval behavior remains.
+- Quotation/ServiceRequest models, DbContext and F5SchemaGate map/verify the SQL additions, including EF trigger-compatible OUTPUT handling.
+- marketplaceApi sends versions. RequestDetailPage captures the version when a counter form opens and accepts the clicked offer's version. It shows conflict, discards stale drafts and refreshes current offers/request/bookings. Unknown authors have no response action and are visibly labelled unknown.
+- WorkerBookingsTab handles initial-submission conflicts visibly and refreshes summaries/jobs/bookings; its negotiation links continue to the same request detail actions.
+- DisposableSqlDatabase applies F5 only in its generated loopback database. New NegotiationIntegrityTests/F5SchemaTests and six browser cases cover the boundary. Existing Phase 0/F3 assertions remain unchanged; only required protocol fields/classification were updated.
+
+## 8. Executed tests and results
+
+| Check | Actual result |
+|---|---|
+| Release solution build | Passed, zero warnings/errors |
+| Full backend strict gate | **151 passed**, zero failed/expected-failed/skipped; raw dotnet and gate exit 0 |
+| F5 coverage within that suite | **35 passing cases**, including the original exploit |
+| Coordinated real-SQL races | Counters, counter/accept, same-offer accept and competing-worker accept: one coherent winner |
+| Actual SQL rollback | Error 547 at booking insert restores request/offer/competitor state; no booking |
+| Retry/state refresh | Synthetic transient plus real authoritative SQL change: retry re-reads and conflicts |
+| Legacy schema checks | Nine dirty fixtures detected/refused; clean inactive migration/reapply preserves unknown facts/booking; absent/disabled/mismatched guards denied |
+| Full browser security suite, installed Chrome | **36 passed**, including six F5 cases; zero failures/expected failures/skips |
+| Classifier self-tests | Six passed |
+| Frontend build / browser TypeScript / lint | Passed; existing lint and Vite warnings remain |
+| Local existing application preflight | Read-only: two active unknown-provenance offers; no migration |
+
+The first strict exploit run passed its real assertion and was correctly flagged as an unexpected pass until its known-defect exception was removed. The manifest is now empty. Initial browser dashboard selectors were corrected to match the actual button/input; two existing F3 HTTP tests were updated to send expected versions after their old protocol returned 409. No safe assertion was weakened or new failure allowlisted.
+
+Final full backend TRX: ignored `TestResults/security/75dd959798f1450e9c32af649b6f44c7/security.trx`. Browser report: ignored `karigor-client/test-results/security-browser/results.json`. Other logs are `TestResults/f5-*.log`. Commands are in the implementation guide. Generated SQL databases are cleaned up; no production connection/provider transaction was used. Hosted CI, live IIS and other browsers were not executed.
+
+## 9. Remaining limitations and payment readiness
+
+Schema deployment remains future operator work. Stop old mutable writers before installation and coordinate backend/frontend compatibility; old callers without versions get 409. Legacy active confirmation/closure is not automated. Unknown historical facts are preserved, not reconstructed. Notifications can fail after commit; broad request/booking workflows, scheduling across separate requests, refresh sessions and payment races remain separate.
+
+F5 schema authority is now specified/tested for the affected invariants. **Overall payment schema is not sufficiently canonical for payment concurrency implementation yet:** production baseline/EF snapshot/startup still disagree about payments and PaymentStatus. First establish the payment-specific SQL authority/additions and settlement/booking concurrency guarantees. F5 added no payment/booking rowversion, settlement pointer, outbox or distributed lock.
+
+## 10. Interview explanations and Q&A
+
+**30-second explanation:** A worker could overwrite a customer counter and then accept it because the server inferred its author from chain depth. I made offers immutable, stored authenticated authors, required displayed versions and opposite-party responses, and committed one exact-price agreement transactionally. SQL unique indexes protect heads, child links and booking identity. Real SQL races/rollback and browser conflict-recovery tests pass; ambiguous legacy offers are reported instead of reconstructed.
+
+**Longer explanation:** Role checks establish who a user is allowed to participate as; they do not establish who submitted a particular price or whether it is still current. I retained the existing chain and added explicit provenance and rowversion rather than introducing a workflow framework. Request CAS orders same-request writers, a parent transition releases the filtered Pending key before its child insert, and acceptance commits exact terms, request closure, competing-offer rejection and one booking together. One SQL script owns the schema and checks old data before adding guards. The UI refreshes after 409 so the user's next decision uses current intent.
+
+1. **Why not infer author from depth?** The old writer could overwrite another author's row without changing depth. Structure cannot prove provenance.
+2. **Why immutable offers instead of just checking roles?** An authorized participant may still alter someone else's intent; immutability binds acceptance to the submitted terms.
+3. **Why both rowversion and unique indexes?** Versions reject stale observations; uniqueness forbids duplicate heads/children/bookings even when callers compete.
+4. **Why save the parent before its child?** The filtered Pending key belongs to the parent until its status changes; both saves remain atomic in the outer transaction.
+5. **Why touch the request when countering?** Every F5 action then coordinates through the same versioned row, including competing workers and acceptance.
+6. **Why reload on retry?** A rollback does not make tracked entities authoritative; another action may have changed state before the retry.
+7. **Why not backfill clean legacy authors?** Parity suggests likely turns but cannot prove who submitted a value under the vulnerable writer. Unknown must remain unknown.
+8. **Does this fix payment or scheduling concurrency?** No. Those have different invariants, schema drift and serialization boundaries, and require separate work.
+
+## 11. Study-next concepts
+
+1. Immutable business intent, provenance, consent and resource authorization.
+2. SQL rowversion, EF original values, compare-and-swap and stable 409 contracts.
+3. Filtered unique indexes, linear graph invariants, SQL triggers and update/insert ordering.
+4. Multi-save transactions, rollback, execution strategies and uncertain commits.
+5. Barrier-coordinated race tests with separate DbContexts and authoritative UI refresh.
+6. SQL-first schema authority, preflight, legacy ambiguity and coordinated compatibility cutovers.
+7. Next scoped work: canonical payment schema, settlement allocation uniqueness and payment/booking concurrency.

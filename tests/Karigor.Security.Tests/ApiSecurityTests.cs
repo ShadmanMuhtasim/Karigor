@@ -64,7 +64,7 @@ public sealed class ApiSecurityTests(SecurityApplicationFixture fixture)
         Assert.Equal("fixture-only", await received.Task.WaitAsync(TimeSpan.FromSeconds(10)));
     }
 
-    [Fact, Trait("Finding", "F5"), Trait("Classification", "ExpectedFailRegression")]
+    [Fact, Trait("Finding", "F5"), Trait("Classification", "GreenBaseline")]
     public async Task WorkerCannotOverwriteAndAcceptCustomerCounterOffer()
     {
         var scenario = await fixture.SeedAsync();
@@ -75,7 +75,7 @@ public sealed class ApiSecurityTests(SecurityApplicationFixture fixture)
         first.EnsureSuccessStatusCode();
         var quote = (await first.Content.ReadFromJsonAsync<QuotationDto>())!;
         using var counterResponse = await customer.PostAsJsonAsync($"/api/quotations/{quote.Id}/counter",
-            new { proposedPrice = 800 });
+            new { proposedPrice = 800, expectedVersion = quote.Version });
         counterResponse.EnsureSuccessStatusCode();
         var counter = (await counterResponse.Content.ReadFromJsonAsync<QuotationDto>())!;
         Assert.Equal("Customer", counter.ProposedBy);
@@ -88,7 +88,7 @@ public sealed class ApiSecurityTests(SecurityApplicationFixture fixture)
         var db = scope.ServiceProvider.GetRequiredService<KarigorDbContext>();
         var stored = await db.Quotations.AsNoTracking().SingleAsync(q => q.Id == counter.Id);
         var originalTermsSurvived = stored.ProposedPrice == 800;
-        using var accepted = await worker.PostAsync($"/api/quotations/{counter.Id}/accept", content: null);
+        using var accepted = await worker.PostAsJsonAsync($"/api/quotations/{counter.Id}/accept", new { expectedVersion = counter.Version });
         if (accepted.IsSuccessStatusCode)
         {
             var booking = (await accepted.Content.ReadFromJsonAsync<BookingDto>())!;

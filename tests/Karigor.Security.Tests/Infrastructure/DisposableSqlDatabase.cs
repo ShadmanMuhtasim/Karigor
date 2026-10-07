@@ -41,7 +41,7 @@ public sealed class DisposableSqlDatabase : IAsyncDisposable
         return builder.ConnectionString;
     }
 
-    public async Task InitializeAsync()
+    public async Task InitializeAsync(bool applyF5 = true)
     {
         // Readiness retry is not a concurrency-test synchronization mechanism.
         using var admin = new SqlConnection(adminConnection);
@@ -71,6 +71,13 @@ public sealed class DisposableSqlDatabase : IAsyncDisposable
             using var command = database.CreateCommand();
             command.CommandText = batch;
             command.CommandTimeout = 30;
+            await command.ExecuteNonQueryAsync();
+        }
+        if (applyF5)
+        {
+            using var command = database.CreateCommand();
+            command.CommandText = "EXEC sys.sp_set_session_context @key=N'KarigorF5Apply', @value=1;\n" +
+                await File.ReadAllTextAsync(Path.Combine(RepositoryRoot, "database/production/005_f5_negotiation_integrity.sql"));
             await command.ExecuteNonQueryAsync();
         }
     }

@@ -360,6 +360,7 @@ try
     // Seed ordinary roles only. Administrator accounts require explicit operator bootstrap.
     using (var scope = app.Services.CreateScope())
     {
+        F5SchemaGate.Verify(scope.ServiceProvider.GetRequiredService<KarigorDbContext>());
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
         IdentityRoleSeeder.EnsureAsync(roleManager, "Customer", "Worker", "Admin").GetAwaiter().GetResult();
 

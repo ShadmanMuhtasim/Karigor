@@ -10,7 +10,7 @@ public interface IMarketplaceService
     Task<List<WorkerQuotationSummaryDto>> GetWorkerQuotationsAsync(string workerUserId);
     Task<ServiceRequestDto> GetServiceRequestDetailsAsync(string userId, int requestId);
     Task<List<QuotationDto>> GetRequestQuotationsAsync(string userId, int requestId);
-    Task<BookingDto> AcceptQuotationAsync(string userId, int quotationId);
+    Task<BookingDto> AcceptQuotationAsync(string userId, int quotationId, string? expectedVersion);
     Task<QuotationDto> CounterQuotationAsync(string userId, int quotationId, CounterQuotationDto dto);
     Task<BookingDto> CreateBookingAsync(string customerUserId, CreateBookingDto dto);
     Task<List<BookingDto>> GetCustomerBookingsAsync(string customerUserId);

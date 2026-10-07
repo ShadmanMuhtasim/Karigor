@@ -198,10 +198,10 @@ public sealed class SignalRSecurityTests(SecurityApplicationFixture fixture)
         using var created = await wh.PostAsJsonAsync("/api/quotations", new { serviceRequestId = s.RequestId, proposedPrice = 1000 });
         created.EnsureSuccessStatusCode();
         var quote = (await created.Content.ReadFromJsonAsync<QuotationDto>())!;
-        using var counterResponse = await ch.PostAsJsonAsync($"/api/quotations/{quote.Id}/counter", new { proposedPrice = 800 });
+        using var counterResponse = await ch.PostAsJsonAsync($"/api/quotations/{quote.Id}/counter", new { proposedPrice = 800, expectedVersion = quote.Version });
         counterResponse.EnsureSuccessStatusCode();
         var counter = (await counterResponse.Content.ReadFromJsonAsync<QuotationDto>())!;
-        using var accepted = await wh.PostAsync($"/api/quotations/{counter.Id}/accept", null);
+        using var accepted = await wh.PostAsJsonAsync($"/api/quotations/{counter.Id}/accept", new { expectedVersion = counter.Version });
         accepted.EnsureSuccessStatusCode();
         await FenceAsync(worker, customer, stranger);
         Assert.Equal(3, worker.Events.Count(e => e.Name == "QuotationUpdated"));
@@ -275,7 +275,7 @@ public sealed class SignalRSecurityTests(SecurityApplicationFixture fixture)
         using var created = await wh.PostAsJsonAsync("/api/quotations", new { serviceRequestId = s.RequestId, proposedPrice = 1000 });
         created.EnsureSuccessStatusCode();
         var quote = (await created.Content.ReadFromJsonAsync<QuotationDto>())!;
-        using var accepted = await ch.PostAsync($"/api/quotations/{quote.Id}/accept", null);
+        using var accepted = await ch.PostAsJsonAsync($"/api/quotations/{quote.Id}/accept", new { expectedVersion = quote.Version });
         accepted.EnsureSuccessStatusCode();
         await FenceAsync(competitor);
         var events = competitor.Events.Where(e => e.Name == "QuotationUpdated").Select(e => e.Data).ToArray();

@@ -1,4 +1,5 @@
 import { apiClient } from './client';
+import { isAxiosError } from 'axios';
 import type { ServiceRequestDto } from './customerApi';
 import { triggerSos } from './sosApi';
 
@@ -13,6 +14,9 @@ export interface QuotationDto {
   message?: string;
   status: string;
   parentQuotationId?: number;
+  proposedByUserId?: string;
+  createdAt?: string;
+  version: string;
   proposedBy?: 'Worker' | 'Customer' | string;
   negotiationDepth?: number;
   hasSimultaneousJobWarning?: boolean;
@@ -29,6 +33,8 @@ export interface WorkerQuotationSummaryDto {
   latestPrice: number;
   latestStatus: string; // "Pending", "Countered", "Accepted", "Rejected"
   latestProposedBy: string; // "Worker" or "Customer"
+  latestProposedByUserId?: string;
+  version: string;
   latestMessage?: string;
   negotiationStepsCount: number;
   preferredDate: string;
@@ -81,12 +87,15 @@ export interface AvailableRequestDto {
   preferredDate: string;
 }
 
+export const isNegotiationConflict = (error: unknown) => isAxiosError(error) && error.response?.status === 409;
+export const negotiationConflictMessage = 'This negotiation changed. The latest offers have been refreshed. Review them before trying again.';
+
 export const marketplaceApi = {
   getRequestDetails: async (requestId: number) => (await apiClient.get<ServiceRequestDto>(`/quotations/request/${requestId}/details`)).data,
   getQuotations: async (requestId: number) => (await apiClient.get<QuotationDto[]>(`/quotations/request/${requestId}`)).data,
   getWorkerQuotations: async () => (await apiClient.get<WorkerQuotationSummaryDto[]>('/quotations/worker')).data,
-  acceptQuotation: async (id: number) => (await apiClient.post<BookingDto>(`/quotations/${id}/accept`)).data,
-  counterQuotation: async (id: number, proposedPrice: number, message?: string) => (await apiClient.post<QuotationDto>(`/quotations/${id}/counter`, { proposedPrice, message })).data,
+  acceptQuotation: async (id: number, expectedVersion: string) => (await apiClient.post<BookingDto>(`/quotations/${id}/accept`, { expectedVersion })).data,
+  counterQuotation: async (id: number, expectedVersion: string, proposedPrice: number, message?: string) => (await apiClient.post<QuotationDto>(`/quotations/${id}/counter`, { expectedVersion, proposedPrice, message })).data,
   getCustomerBookings: async () => (await apiClient.get<BookingDto[]>('/bookings/customer')).data,
   getWorkerBookings: async () => (await apiClient.get<BookingDto[]>('/bookings/worker')).data,
   getBooking: async (id: number) => (await apiClient.get<BookingDto>(`/bookings/${id}`)).data,

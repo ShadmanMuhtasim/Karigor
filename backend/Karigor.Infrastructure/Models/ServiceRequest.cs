@@ -33,6 +33,9 @@ public partial class ServiceRequest
 
     public string? PhotoUrls { get; set; }
 
+    [Timestamp]
+    public byte[] RowVersion { get; set; } = [];
+
     [InverseProperty("ServiceRequest")]
     public virtual ICollection<Booking> Bookings { get; set; } = new List<Booking>();
 

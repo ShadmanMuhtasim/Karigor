@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { marketplaceApi } from '../../api/marketplaceApi';
+import { marketplaceApi, isNegotiationConflict, negotiationConflictMessage } from '../../api/marketplaceApi';
 import { locationApi } from '../../api/locationApi';
 import { workerApi } from '../../api/workerApi';
 import { KarigorMap } from '../../components/map/KarigorMap';
@@ -136,6 +136,13 @@ export function WorkerBookingsTab() {
     onError: (err: any) => {
       const msg = extractErrorMessage(err, 'Could not submit quotation. Please try again.');
       setQuoteError(msg);
+      if (isNegotiationConflict(err)) {
+        setQuoteError(negotiationConflictMessage);
+        queryClient.invalidateQueries({ queryKey: ['workerQuotations'] });
+        queryClient.invalidateQueries({ queryKey: ['workerBookings'] });
+        queryClient.invalidateQueries({ queryKey: ['availableRequests'] });
+        queryClient.invalidateQueries({ queryKey: ['nearbyRequests'] });
+      }
     },
   });
 

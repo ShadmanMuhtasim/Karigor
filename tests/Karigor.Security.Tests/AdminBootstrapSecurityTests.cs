@@ -46,6 +46,17 @@ public sealed class AdminBootstrapSecurityTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task IsolatedBootstrapAcceptsNumericEightCharacterLabPassword()
+    {
+        var email = Email();
+        var password = string.Concat(Enumerable.Range(0, 8).Select(_ => System.Security.Cryptography.RandomNumberGenerator.GetInt32(10).ToString()));
+        Assert.Equal(0, (await CommandAsync(email, password)).Exit);
+        await using var services = Services(); using var scope = services.CreateScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        Assert.True(await users.CheckPasswordAsync((await users.FindByEmailAsync(email))!, password));
+    }
+
+    [Fact]
     public async Task ExplicitBootstrapCreatesExactlyOneRequestedAdministrator()
     {
         var email = Email(); var password = Password();

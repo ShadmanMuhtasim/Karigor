@@ -50,10 +50,11 @@ public sealed class RefreshSessionService(KarigorDbContext db, ITokenService tok
             throw Denied();
     }
 
-    public Task<(AuthResultDto result, string rawRefreshToken)> CreateAsync(string userId) => Transaction(async () =>
+    public Task<(AuthResultDto result, string rawRefreshToken)> CreateAsync(string userId, string? expectedSecurityStamp = null) => Transaction(async () =>
     {
         var user = await LockUser(userId);
         RequireActive(user);
+        if (expectedSecurityStamp is not null && user.SecurityStamp != expectedSecurityStamp) throw Denied();
         var days = config.GetValue("Jwt:RefreshTokenExpiryDays", 7);
         if (days <= 0 || days > 365) throw new InvalidOperationException("Invalid refresh session lifetime.");
         var session = new RefreshSession { Id = Guid.NewGuid(), UserId = userId, CreatedAt = Now, ExpiresAt = Now.AddDays(days) };
@@ -126,6 +127,26 @@ public sealed class RefreshSessionService(KarigorDbContext db, ITokenService tok
             WHERE Id={id} AND RevokedAt IS NULL
             """);
     }
+
+    public Task<IdentityResult> ResetPasswordAsync(string userId, string token, string password) => Transaction(async () =>
+    {
+        await LockUser(userId);
+        // Reload after acquiring the same lock used by login, refresh and suspension.
+        var user = await users.FindByIdAsync(userId) ?? throw Denied();
+        await db.Entry(user).ReloadAsync();
+        var result = await users.ResetPasswordAsync(user, token, password);
+        if (!result.Succeeded) return result;
+        var now = Now;
+        // Password reset signs out every device. Use F6's existing Logout reason;
+        // the production constraint intentionally permits only Logout/Replay/Suspension.
+        await db.Database.ExecuteSqlInterpolatedAsync($"""
+            UPDATE dbo.RefreshSessions SET RevokedAt={now}, RevocationReason=N'Logout'
+            WHERE UserId={userId} AND RevokedAt IS NULL;
+            UPDATE dbo.RefreshTokens SET RevokedAt={now}
+            WHERE UserId={userId} AND RevokedAt IS NULL;
+            """);
+        return result;
+    });
 
     public Task<bool> SetSuspensionAsync(string userId, bool suspend) => Transaction(async () =>
     {

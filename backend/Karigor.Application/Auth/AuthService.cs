@@ -148,7 +148,7 @@ public class AuthService : IAuthService
         if (!await _userManager.CheckPasswordAsync(user, dto.Password))
             throw new UnauthorizedAccessException("Invalid email or password.");
 
-        return await BuildAuthResultAsync(user);
+        return await _sessions.CreateAsync(user.Id, user.SecurityStamp);
     }
 
     // -------------------------------------------------------------------------

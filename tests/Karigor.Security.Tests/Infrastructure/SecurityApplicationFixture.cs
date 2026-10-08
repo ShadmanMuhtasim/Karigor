@@ -22,6 +22,7 @@ public sealed class SecurityApplicationFixture : IAsyncLifetime
 {
     public DisposableSqlDatabase Database { get; } = new();
     public FakePaymentHandler Provider { get; } = new();
+    public FakePasswordResetEmailSender Email { get; } = new();
     public string UploadRoot { get; } = Path.Combine(Path.GetTempPath(), "Karigor_SecurityTests_" + Guid.NewGuid().ToString("N"));
     public SecurityApplicationFactory Factory { get; private set; } = null!;
 
@@ -136,6 +137,8 @@ public sealed class SecurityApplicationFactory(SecurityApplicationFixture fixtur
             ["Jwt:Key"] = "fixture-only-signing-key-64-characters-never-use-in-production-123456",
             ["Jwt:Issuer"] = "karigor-security-tests", ["Jwt:Audience"] = "karigor-security-tests",
             ["Storage:UploadPath"] = fixture.UploadRoot,
+            ["DataProtection:KeyPath"] = Path.Combine(fixture.UploadRoot, "keys"),
+            ["RateLimiting:Policies:PasswordResetLimiter:PermitLimit"] = "1000",
             ["RateLimiting:Policies:AuthLimiter:PermitLimit"] = "1000"
         }));
         return base.CreateHost(builder);
@@ -147,6 +150,8 @@ public sealed class SecurityApplicationFactory(SecurityApplicationFixture fixtur
         builder.UseContentRoot(Path.Combine(fixture.Database.RepositoryRoot, "backend/Karigor.Api"));
         builder.ConfigureServices(services =>
         {
+            services.RemoveAll<Karigor.Api.Email.IPasswordResetEmailSender>();
+            services.AddSingleton<Karigor.Api.Email.IPasswordResetEmailSender>(fixture.Email);
             services.PostConfigure<SslCommerzOptions>(options =>
             {
                 options.StoreId = "fixture"; options.StorePassword = "fixture"; options.IsSandbox = false;

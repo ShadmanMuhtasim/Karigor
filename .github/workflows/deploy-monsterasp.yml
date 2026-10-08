@@ -136,7 +136,9 @@ jobs:
           server-computer-name: ${{ secrets.SERVER_COMPUTER_NAME }}
           server-username: ${{ secrets.SERVER_USERNAME }}
           server-password: ${{ secrets.SERVER_PASSWORD }}
-          package: ${{ github.workspace }}/publish
+          source-path: '\publish\'
+          target-delete: 'false'
+          skip-directory-path: 'App_Data'
 
       # -----------------------------------------------------------------------
       # Post-Deployment Health Check
@@ -145,13 +147,8 @@ jobs:
         if: success()
         shell: pwsh
         run: |
-          $siteName = "${{ secrets.WEBSITE_NAME }}"
-          $customUrl = "${{ secrets.PRODUCTION_URL }}"
-          $baseUrl = if (-not [string]::IsNullOrWhiteSpace($customUrl)) {
-            $customUrl.TrimEnd('/')
-          } else {
-            "https://$siteName.monsterasp.net"
-          }
+          # This public origin is not a secret; avoid interpolating a malformed secret into shell code.
+          $baseUrl = "https://karigor.runasp.net"
 
           Write-Host "Verifying deployment endpoint at: $baseUrl"
 
@@ -199,6 +196,6 @@ jobs:
             }
 
             if (-not $success) {
-              Write-Host "⚠️ Warning: Endpoint $url was not healthy within warmup period. Verify database connection string and environment variables in MonsterASP."
+              throw "Endpoint $url was not healthy within the warmup period."
             }
           }

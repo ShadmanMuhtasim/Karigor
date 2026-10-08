@@ -61,6 +61,9 @@ public static class AdminBootstrapCommand
             builder.Services.AddIdentityCore<ApplicationUser>(options =>
             {
                 options.Password.RequiredLength = 8;
+                options.Password.RequireDigit = true;
+                options.Password.RequireUppercase = false;
+                options.Password.RequireLowercase = false;
                 options.Password.RequireNonAlphanumeric = false;
                 options.User.RequireUniqueEmail = true;
             }).AddRoles<IdentityRole>().AddEntityFrameworkStores<KarigorDbContext>();

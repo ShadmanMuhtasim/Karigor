@@ -170,6 +170,9 @@ export function LoginPage() {
             )}
 
             {/* Error banner */}
+            {searchParams.get('passwordReset') === 'true' && (
+              <p role="status" className="mb-5 p-3.5 bg-emerald-50 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 rounded-xl text-sm">Your password has been reset. Sign in with your new password.</p>
+            )}
             {error && (
               <div
                 id="login-error"
@@ -217,6 +220,7 @@ export function LoginPage() {
                   className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent text-sm transition"
                   placeholder="••••••••"
                 />
+                <Link to="/forgot-password" className="mt-2 inline-block text-sm font-semibold text-sky-600 dark:text-sky-400 hover:underline">Forgot password?</Link>
               </div>
 
               <button

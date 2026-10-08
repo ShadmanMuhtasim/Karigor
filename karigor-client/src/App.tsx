@@ -8,6 +8,7 @@ import { SplashScreen } from './components/SplashScreen';
 // Pages
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/auth/LoginPage';
+import { PasswordRecoveryPage } from './pages/auth/PasswordRecoveryPage';
 import { RegisterCustomerPage } from './pages/auth/RegisterCustomerPage';
 import { RegisterWorkerPage } from './pages/auth/RegisterWorkerPage';
 import { CustomerDashboard } from './pages/CustomerDashboard';
@@ -57,6 +58,9 @@ function AppContent() {
         {/* Public Routes */}
         <Route path="/home" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/forgot-password" element={<PasswordRecoveryPage key="forgot" />} />
+        <Route path="/reset-password" element={<PasswordRecoveryPage key="reset" reset />} />
+        <Route path="/admin" element={<ProtectedRoute requiredRole="Admin"><AdminDashboard /></ProtectedRoute>} />
         <Route path="/register/customer" element={<RegisterCustomerPage />} />
         <Route path="/register/worker" element={<RegisterWorkerPage />} />
         <Route path="/unauthorized" element={<UnauthorizedPage />} />

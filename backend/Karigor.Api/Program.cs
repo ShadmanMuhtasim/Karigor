@@ -13,6 +13,8 @@ using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using Karigor.Abstractions.Worker;
 using Karigor.Api.Administration;
+using Karigor.Api.Email;
+using Microsoft.AspNetCore.DataProtection;
 
 // Explicit operator mode runs before web configuration, logging, startup seeding or listener creation.
 if (AdminBootstrapCommand.IsRequested(args))
@@ -70,6 +72,16 @@ try
     })
     .AddEntityFrameworkStores<KarigorDbContext>()
     .AddDefaultTokenProviders();
+
+    builder.Services.Configure<DataProtectionTokenProviderOptions>(options => options.TokenLifespan = TimeSpan.FromMinutes(20));
+    var keyDirectory = new PrivateUploadPathProvider(builder.Environment.ContentRootPath,
+        builder.Configuration["DataProtection:KeyPath"] ?? "App_Data/DataProtectionKeys", builder.Environment.WebRootPath);
+    builder.Services.AddDataProtection().SetApplicationName("Karigor")
+        .PersistKeysToFileSystem(new DirectoryInfo(keyDirectory.GetUploadRoot()));
+    builder.Services.AddScoped<PasswordResetService>();
+    builder.Services.AddSingleton<PasswordResetEmailQueue>();
+    builder.Services.AddScoped<IPasswordResetEmailSender, SmtpPasswordResetEmailSender>();
+    builder.Services.AddHostedService<PasswordResetEmailWorker>();
 
     // -------------------------------------------------------------------------
     // JWT Authentication
@@ -158,6 +170,14 @@ try
     builder.Services.AddRateLimiter(options =>
     {
         options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+        options.AddPolicy<string>("PasswordResetLimiter", context => RateLimitPartition.GetSlidingWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new SlidingWindowRateLimiterOptions
+            {
+                Window = TimeSpan.FromMinutes(5), SegmentsPerWindow = 5,
+                PermitLimit = builder.Configuration.GetValue("RateLimiting:Policies:PasswordResetLimiter:PermitLimit", 5),
+                QueueLimit = 0, AutoReplenishment = true
+            }));
 
         // Global safety net: a generous default so any endpoint that does NOT
         // opt into a named limiter is still protected (no magic 429s during demo).
@@ -181,6 +201,8 @@ try
             // Retry-After value (seconds until the window rolls over).
             var retryAfterSeconds = builder.Configuration
                 .GetValue("RateLimiting:WindowSeconds", 60);
+            if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+                retryAfterSeconds = (int)Math.Ceiling(retryAfter.TotalSeconds);
 
             // Standard HTTP header
             context.HttpContext.Response.Headers
@@ -424,6 +446,15 @@ try
     app.UseMiddleware<ExceptionHandlingMiddleware>();  // must be first — catches everything
 
     app.UseSerilogRequestLogging();
+    app.Use(async (context, next) =>
+    {
+        if (context.Request.Path.StartsWithSegments("/reset-password"))
+        {
+            context.Response.Headers["Referrer-Policy"] = "no-referrer";
+            context.Response.Headers.CacheControl = "no-store";
+        }
+        await next();
+    });
 
     // Swagger enabled for all environments (academic project requirement)
     app.UseSwagger();

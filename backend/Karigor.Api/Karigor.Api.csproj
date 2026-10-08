@@ -24,6 +24,16 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Remove="App_Data/DataProtectionKeys/**" />
+    <None Remove="App_Data/DataProtectionKeys/**" />
+    <MsDeploySkipRules Include="SkipDataProtectionKeys">
+      <ObjectName>dirPath</ObjectName>
+      <AbsolutePath>.*\\App_Data\\DataProtectionKeys.*</AbsolutePath>
+    </MsDeploySkipRules>
+    <MsDeploySkipRules Include="SkipDataProtectionKeyFiles">
+      <ObjectName>filePath</ObjectName>
+      <AbsolutePath>.*\\App_Data\\DataProtectionKeys\\.*</AbsolutePath>
+    </MsDeploySkipRules>
     <!-- WebDeploy preservation: ensure deployments do not delete or overwrite persistent user uploads.
          The private upload root lives OUTSIDE the web root (App_Data/Uploads) so static-file
          middleware can never serve it; only the authenticated streaming endpoint can. -->

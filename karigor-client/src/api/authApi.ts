@@ -67,6 +67,17 @@ export function registerCustomer(payload: RegisterCustomerPayload) { return auth
 export function registerWorker(payload: RegisterWorkerPayload) { return authenticate('/api/auth/register/worker', payload); }
 export function login(payload: LoginPayload) { return authenticate('/api/auth/login', payload); }
 
+export async function forgotPassword(email: string): Promise<string> {
+  const { data } = await axios.post<{ message: string }>('/api/auth/forgot-password', { email }, authRequestOptions);
+  return data.message;
+}
+
+export async function resetPassword(payload: { email: string; token: string; newPassword: string; confirmPassword: string }): Promise<void> {
+  await axios.post('/api/auth/reset-password', payload, authRequestOptions);
+  invalidateAuth();
+  setAccessToken(null);
+}
+
 /** Attempt to restore session using the httpOnly refresh token cookie */
 export async function refreshSession(): Promise<AuthUser> {
   return refreshAuthToken();

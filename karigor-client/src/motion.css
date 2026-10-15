@@ -1,0 +1,216 @@
+/*
+ * Interaction-only polish inspired by the supplied reference video.
+ * No layout, copy, color-system, routing, or feature behavior is changed here.
+ */
+
+:root {
+  --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes karigorHeroIn {
+  from {
+    opacity: 0;
+    transform: translateY(22px) scale(0.985);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes karigorAmbientDrift {
+  from {
+    transform: scale(1.018);
+  }
+  to {
+    transform: scale(1.045);
+  }
+}
+
+@keyframes karigorRevealUp {
+  from {
+    opacity: 0;
+    transform: translateY(34px) scale(0.985);
+    filter: blur(7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+/* Home hero: stagger the existing heading, tagline and CTA row. */
+section:first-of-type > .relative.z-10 > * {
+  opacity: 0;
+  animation: karigorHeroIn 720ms var(--motion-ease-out) both;
+}
+
+section:first-of-type > .relative.z-10 > :nth-child(1) {
+  animation-delay: 90ms;
+}
+
+section:first-of-type > .relative.z-10 > :nth-child(2) {
+  animation-delay: 190ms;
+}
+
+section:first-of-type > .relative.z-10 > :nth-child(3) {
+  animation-delay: 300ms;
+}
+
+/* Very slow background motion so the hero feels alive without changing its design. */
+section:first-of-type > .absolute.inset-0.z-0 {
+  transform-origin: center;
+  animation: karigorAmbientDrift 9s ease-in-out alternate infinite;
+  will-change: transform;
+}
+
+/* Smooth micro-interactions for controls already using the project's utility classes. */
+.btn-press,
+.btn-press-full,
+.card-lift,
+nav a,
+nav button {
+  transition-property: transform, box-shadow, border-color, background-color, color, filter, opacity;
+  transition-duration: 240ms;
+  transition-timing-function: var(--motion-ease-out);
+}
+
+.btn-press,
+.btn-press-full {
+  position: relative;
+  isolation: isolate;
+}
+
+.btn-press::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(
+    105deg,
+    transparent 28%,
+    rgba(255, 255, 255, 0.22) 47%,
+    rgba(255, 255, 255, 0.1) 54%,
+    transparent 72%
+  );
+  transform: translateX(-125%);
+  transition: transform 620ms var(--motion-ease-soft);
+  z-index: -1;
+}
+
+.card-lift {
+  will-change: transform, box-shadow;
+}
+
+.card-lift img {
+  transition: transform 600ms var(--motion-ease-out), filter 300ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn-press:hover {
+    transform: translateY(-3px) scale(1.025);
+    filter: brightness(1.035);
+    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.16);
+  }
+
+  .dark .btn-press:hover {
+    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.38);
+  }
+
+  .btn-press:hover::after {
+    transform: translateX(125%);
+  }
+
+  .btn-press:active,
+  .btn-press-full:active {
+    transform: translateY(0) scale(0.965);
+    transition-duration: 90ms;
+  }
+
+  .card-lift:hover {
+    transform: translateY(-7px) scale(1.01);
+    box-shadow:
+      0 24px 48px rgba(15, 23, 42, 0.13),
+      0 4px 12px rgba(15, 23, 42, 0.06);
+  }
+
+  .dark .card-lift:hover {
+    box-shadow:
+      0 26px 56px rgba(0, 0, 0, 0.42),
+      0 5px 16px rgba(0, 0, 0, 0.22);
+  }
+
+  .card-lift:hover img {
+    transform: scale(1.055);
+    filter: saturate(1.04) contrast(1.02);
+  }
+
+  nav a:hover,
+  nav button:hover {
+    transform: translateY(-1px);
+  }
+}
+
+/*
+ * Scroll reveal uses CSS view timelines where supported.
+ * Unsupported browsers simply show the existing static layout unchanged.
+ */
+@supports (animation-timeline: view()) {
+  section:not(:first-of-type),
+  footer,
+  .card-lift {
+    animation-name: karigorRevealUp;
+    animation-fill-mode: both;
+    animation-timing-function: linear;
+    animation-timeline: view();
+  }
+
+  section:not(:first-of-type),
+  footer {
+    animation-range: entry 6% cover 24%;
+  }
+
+  .card-lift {
+    animation-range: entry 10% cover 28%;
+  }
+}
+
+/* Clear keyboard focus is a modern UX improvement and does not alter layout. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role='button']:focus-visible {
+  outline: 2px solid rgb(16 185 129 / 0.95);
+  outline-offset: 3px;
+  transition: outline-offset 150ms ease;
+}
+
+/* Respect the user's operating-system motion preference. */
+@media (prefers-reduced-motion: reduce) {
+  section:first-of-type > .relative.z-10 > *,
+  section:first-of-type > .absolute.inset-0.z-0,
+  section:not(:first-of-type),
+  footer,
+  .card-lift,
+  .btn-press,
+  .btn-press-full,
+  nav a,
+  nav button,
+  .card-lift img {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+    transform: none !important;
+    filter: none !important;
+  }
+
+  .btn-press::after {
+    display: none;
+  }
+}
